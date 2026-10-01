@@ -18,6 +18,7 @@ REQUIRED_IDS = [
     "chat-log",
     "status",
     "alert",
+    "working",
 ]
 
 
@@ -82,3 +83,16 @@ def test_status_is_polite_live_region():
 def test_alert_has_role_alert():
     assert _html().ids["alert"].get("role") == "alert"
 
+
+
+def test_working_indicator_contract():
+    a = _html().ids["working"]
+    assert a.get("role") == "group"
+    assert a.get("aria-label") == "Triage in progress"
+    assert "hidden" in a
+
+
+def test_css_has_reduced_motion_rules():
+    css = (STATIC / "app.css").read_text(encoding="utf-8")
+    assert "prefers-reduced-motion: reduce" in css
+    assert "@keyframes ray" in css and "@keyframes breathe" in css

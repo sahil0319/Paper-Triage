@@ -269,7 +269,7 @@ rendering rule; keep the UI test hooks from plan.md. Every task ends with
   already send `paper_ids` = ids of the rows shown (forward-compatible; the current server
   ignores the extra field), so the chat never breaks when T031 lands. Acceptance: T034 green;
   manual mock run shows ranked rows, critique disclosure, refusal and error states.
-- [ ] T037 [FE] [US1] Searching indicator (FR-012, SC-006), brief D14-D18. Files `index.html`
+- [x] T037 [FE] [US1] Searching indicator (FR-012, SC-006), brief D14-D18. Files `index.html`
   (`#working`, `role="group"`, `aria-label="Triage in progress"`, hidden by default),
   `app.css` (cream card, 8-ray glyph, `ray`/`breathe` keyframes, verb transition, D17
   reduced-motion rules), `app.js` (show 300 ms after submit; verb loop every 2.4 s per D15;

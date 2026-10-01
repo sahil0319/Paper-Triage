@@ -21,6 +21,7 @@
   var askBtn = document.getElementById("ask");
   var logEl = document.getElementById("chat-log");
   var chatEl = document.getElementById("chat");
+  var workingEl = document.getElementById("working");
 
   var SVG_NS = "http://www.w3.org/2000/svg";
   var NETWORK_MSG = "Could not reach the server. Check that the app is running.";
@@ -28,7 +29,8 @@
   var state = {
     rows: [],          // result items currently shown, in display order
     lastQuery: "",
-    running: false
+    running: false,
+    mock: false
   };
 
   // ---- small DOM helpers ----
@@ -47,6 +49,22 @@
     Object.keys(attrs || {}).forEach(function (k) { el.setAttribute(k, attrs[k]); });
     append(el, Array.prototype.slice.call(arguments, 2));
     return el;
+  }
+
+  // Eight-ray activity glyph (D14). Decorative; the animation is CSS only.
+  function rayGlyph(size, cls) {
+    var g = svg("svg", { class: cls, width: String(size), height: String(size), viewBox: "0 0 24 24",
+      "aria-hidden": "true", focusable: "false" });
+    for (var i = 0; i < 8; i++) {
+      var a = i * Math.PI / 4;
+      g.appendChild(svg("line", {
+        class: "ray", style: "--i:" + i,
+        x1: (12 + 3.5 * Math.cos(a)).toFixed(2), y1: (12 + 3.5 * Math.sin(a)).toFixed(2),
+        x2: (12 + 9 * Math.cos(a)).toFixed(2), y2: (12 + 9 * Math.sin(a)).toFixed(2),
+        stroke: "currentColor", "stroke-width": "2.25", "stroke-linecap": "round"
+      }));
+    }
+    return g;
   }
 
   function append(el, children) {
@@ -279,6 +297,107 @@
     refreshSuggestions();
   }
 
+  // ---- searching indicator (D14-D18): activity and elapsed time, never progress ----
+
+  var VERBS = [
+    "Fetching papers…", "Reading full text…", "Summarizing abstracts…", "Looking for weak claims…",
+    "Checking for missing baselines…", "Weighing overclaims…", "Ranking by relevance…"
+  ];
+  var SHOW_DELAY_MS = 300;
+  var VERB_MS = 2400;
+  var VERB_MS_REDUCED = 5000;
+
+  var work = { t0: 0, showT: null, tickT: null, verbT: null, verbI: 0, verbEl: null, timeEl: null,
+    noteEl: null, minutes: 0 };
+
+  function reducedMotion() {
+    return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }
+
+  function clock(sec) {
+    var m = Math.floor(sec / 60);
+    var r = sec % 60;
+    return m + ":" + (r < 10 ? "0" : "") + r;
+  }
+
+  function noteFor(sec) {
+    if (sec >= 180) return "Taking longer than usual. The request has not failed; you can keep waiting.";
+    if (sec >= 90) return "Still working. Papers are processed in parallel; results appear when all are ranked.";
+    return state.mock ? "Mock mode: canned responses, usually a few seconds."
+      : "Live runs take 1 to 3 minutes for up to 10 papers.";
+  }
+
+  function elapsedSec() {
+    return Math.floor((performance.now() - work.t0) / 1000);
+  }
+
+  function updateClock() {
+    var sec = elapsedSec();
+    if (work.timeEl) work.timeEl.textContent = clock(sec);
+    if (work.noteEl) work.noteEl.textContent = noteFor(sec);
+    var min = Math.floor(sec / 60);
+    if (min > work.minutes) {
+      work.minutes = min;
+      statusEl.textContent = "Still working, " + plural(min, "minute") + " elapsed.";
+    }
+  }
+
+  function nextVerb() {
+    if (!work.verbEl) return;
+    work.verbI = (work.verbI + 1) % VERBS.length;
+    if (reducedMotion()) { work.verbEl.textContent = VERBS[work.verbI]; return; }
+    var el = work.verbEl;
+    el.classList.add("is-out");
+    window.setTimeout(function () {
+      if (work.verbEl !== el) return;
+      el.textContent = VERBS[work.verbI];
+      el.classList.remove("is-out");
+      el.classList.remove("is-in");
+      void el.offsetWidth;
+      el.classList.add("is-in");
+    }, 150);
+  }
+
+  function showWorking() {
+    clear(workingEl);
+    work.verbI = 0;
+    work.verbEl = h("span", { class: "working__verb", "aria-hidden": "true" }, VERBS[0]);
+    work.timeEl = h("span", { class: "working__time", "aria-hidden": "true" }, clock(elapsedSec()));
+    work.noteEl = h("p", { class: "working__note" }, noteFor(elapsedSec()));
+    workingEl.appendChild(h("div", { class: "working__row" },
+      h("span", { class: "working__glyph" }, rayGlyph(20)), work.verbEl, work.timeEl));
+    workingEl.appendChild(work.noteEl);
+    workingEl.hidden = false;
+    work.verbT = window.setInterval(nextVerb, reducedMotion() ? VERB_MS_REDUCED : VERB_MS);
+  }
+
+  function startWorking() {
+    stopWorking();
+    work.t0 = performance.now();
+    work.minutes = 0;
+    work.showT = window.setTimeout(showWorking, SHOW_DELAY_MS);
+    work.tickT = window.setInterval(updateClock, 1000);
+    // Previous list stays visible but inert while a new run is in flight (D18).
+    [listEl, notesEl].forEach(function (el) {
+      el.setAttribute("inert", "");
+      el.classList.add("is-stale");
+    });
+  }
+
+  function stopWorking() {
+    window.clearTimeout(work.showT);
+    window.clearInterval(work.tickT);
+    window.clearInterval(work.verbT);
+    work.showT = work.tickT = work.verbT = null;
+    work.verbEl = work.timeEl = work.noteEl = null;
+    clear(workingEl);
+    workingEl.hidden = true;
+    [listEl, notesEl].forEach(function (el) {
+      el.removeAttribute("inert");
+      el.classList.remove("is-stale");
+    });
+  }
+
   // ---- submit ----
 
   function setBusy(busy) {
@@ -287,6 +406,7 @@
     button.textContent = busy ? "Triaging…" : "Triage papers";
     if (busy) input.setAttribute("readonly", ""); else input.removeAttribute("readonly");
     results.setAttribute("aria-busy", busy ? "true" : "false");
+    if (busy) startWorking(); else stopWorking();
   }
 
   function runTriage(query) {
@@ -294,7 +414,7 @@
     state.lastQuery = query;
     setBusy(true);
     showAlert("");
-    statusEl.textContent = "Triage started. This can take 1 to 3 minutes.";
+    statusEl.textContent = state.mock ? "Triage started." : "Triage started. This can take 1 to 3 minutes.";
     postJSON("/api/triage", { query: query })
       .then(function (data) { render(data, false); })
       .catch(function (err) {
@@ -411,7 +531,7 @@
   }
 
   function pendingEl() {
-    return h("p", { class: "turn__pending" }, "Reading your papers…");
+    return h("p", { class: "turn__pending" }, rayGlyph(16, "turn__glyph"), "Reading your papers…");
   }
 
   function answerEl(data) {
@@ -486,6 +606,7 @@
 
   function loadStatus() {
     return getJSON("/api/status").then(function (s) {
+      state.mock = !!s.mock;
       mockEl.hidden = !s.mock;
       modelEl.textContent = s.model ? "Model: " + s.model : "";
       modelEl.hidden = !s.model;
