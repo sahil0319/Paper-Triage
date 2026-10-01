@@ -1,7 +1,8 @@
 import pytest
 
+from paper_triage.critic import critique
 from paper_triage.llm import MockClient
-from paper_triage.models import Summary
+from paper_triage.models import Critique, Summary
 from paper_triage.summarizer import summarize
 
 PAPER = {
@@ -71,3 +72,32 @@ def test_summarizer_propagates_llm_error():
 
     with pytest.raises(LLMError):
         summarize(PAPER, Boom())
+
+
+# ---- critic ----
+
+
+def test_critic_returns_critique_with_mock():
+    out = critique(PAPER, MockClient())
+    assert isinstance(out, Critique)
+    assert out.basis == "fulltext"
+
+
+def test_critic_prompt_skeptical_and_supported_only():
+    spy = Spy(Critique(basis="fulltext"))
+    critique(PAPER, spy)
+    system, user, schema = spy.calls[0]
+    assert schema is Critique
+    assert '<paper id="2401.00001" basis="fulltext">' in user and "BODY" in user
+    low = system.lower()
+    assert "skeptical" in low and "not stated" in low
+    assert "weak_claims" in low and "overclaims" in low and "missing_baselines" in low
+
+
+def test_critic_basis_comes_from_paper_not_llm():
+    spy = Spy(Critique(basis="fulltext", missing_baselines=["X"]))
+    out = critique(ABSTRACT_ONLY, spy)
+    assert out.basis == "abstract"
+    assert out.missing_baselines == ["X"]
+    assert 'basis="abstract"' in spy.calls[0][1] and "BODY" not in spy.calls[0][1]
+    assert critique(PAPER, Spy(Critique(basis="abstract"))).basis == "fulltext"

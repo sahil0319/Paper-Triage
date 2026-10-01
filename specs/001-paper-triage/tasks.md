@@ -82,7 +82,7 @@ Package = `src/paper_triage/` (abbrev `pt/` below means `src/paper_triage/`).
 - [x] T011 [P] [US1] Test first `tests/test_agents.py::test_summarizer*`, then
   `pt/prompts/summarizer.md` + `pt/summarizer.py`: `summarize(paper, client) -> Summary`; prompt
   wraps `<paper id basis>`, <=120 words, "not stated" rule.
-- [ ] T012 [P] [US1] Test first `tests/test_agents.py::test_critic*`, then
+- [x] T012 [P] [US1] Test first `tests/test_agents.py::test_critic*`, then
   `pt/prompts/critic.md` + `pt/critic.py`: `critique(paper, client) -> Critique`; skeptical
   reviewer; only supported claims; basis set from paper, not LLM.
 - [ ] T013 [P] [US1] Test first `tests/test_agents.py::test_ranker*`, then
