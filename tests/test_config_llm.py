@@ -160,3 +160,137 @@ def test_llm_anthropic_sdk_error_wrapped():
 
 def test_llm_refusal_is_llm_error():
     assert issubclass(LLMRefusal, LLMError)
+
+
+# ---- T025: OpenAI provider ------------------------------------------------------------------
+
+
+def _oa_client(parse_result=None, create_result=None, exc=None):
+    from paper_triage.llm import OpenAIClient
+
+    calls = []
+
+    def parse(**kw):
+        calls.append(("parse", kw))
+        if exc:
+            raise exc
+        return parse_result
+
+    def create(**kw):
+        calls.append(("create", kw))
+        if exc:
+            raise exc
+        return create_result
+
+    sdk = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(parse=parse, create=create)))
+    return OpenAIClient(model="oa-test", client=sdk), calls
+
+
+def _completion(content=None, parsed=None, refusal=None):
+    msg = SimpleNamespace(content=content, parsed=parsed, refusal=refusal)
+    return SimpleNamespace(choices=[SimpleNamespace(message=msg, finish_reason="stop")])
+
+
+def test_openai_parse_args_and_result():
+    want = Rank(rank=7, rank_reason="r")
+    c, calls = _oa_client(parse_result=_completion(parsed=want))
+    assert c.parse("SYS", "USER", Rank) is want
+    kind, kw = calls[0]
+    assert kind == "parse" and kw["model"] == "oa-test" and kw["response_format"] is Rank
+    assert kw["messages"] == [
+        {"role": "system", "content": "SYS"},
+        {"role": "user", "content": "USER"},
+    ]
+    assert "temperature" not in kw and "max_tokens" not in kw
+
+
+def test_openai_parse_refusal():
+    c, _ = _oa_client(parse_result=_completion(refusal="no"))
+    with pytest.raises(LLMRefusal):
+        c.parse("s", "u", Rank)
+
+
+def test_openai_parse_missing_parsed_is_error():
+    c, _ = _oa_client(parse_result=_completion())
+    with pytest.raises(LLMError):
+        c.parse("s", "u", Rank)
+
+
+def test_openai_text_and_refusal():
+    c, calls = _oa_client(create_result=_completion(content="hi [x]"))
+    assert c.text("SYS", "U") == "hi [x]"
+    assert calls[0][0] == "create" and "temperature" not in calls[0][1]
+    c, _ = _oa_client(create_result=_completion(refusal="no"))
+    with pytest.raises(LLMRefusal):
+        c.text("s", "u")
+
+
+def test_openai_api_error_wrapped():
+    import openai
+
+    exc = openai.APIConnectionError(request=httpx.Request("POST", "http://x"))
+    c, _ = _oa_client(exc=exc)
+    with pytest.raises(LLMError):
+        c.parse("s", "u", Rank)
+    with pytest.raises(LLMError):
+        c.text("s", "u")
+
+
+def test_openai_validation_error_propagates():
+    from pydantic import ValidationError
+
+    try:
+        Rank(rank="abc", rank_reason="r")  # type: ignore[arg-type]
+    except ValidationError as e:
+        exc = e
+    c, _ = _oa_client(exc=exc)
+    with pytest.raises(ValidationError):
+        c.parse("s", "u", Rank)
+
+
+def test_provider_config(monkeypatch):
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    monkeypatch.delenv("OPENAI_MODEL", raising=False)
+    s = get_settings()
+    assert s.provider == "anthropic" and s.model == "claude-opus-5-5"
+    monkeypatch.setenv("LLM_PROVIDER", "OpenAI")
+    s = get_settings()
+    assert s.provider == "openai" and s.model == "gpt-5-mini"
+    monkeypatch.setenv("OPENAI_MODEL", "m-o")
+    assert get_settings().model == "m-o"
+    monkeypatch.setenv("LLM_PROVIDER", "")
+    assert get_settings().provider == "anthropic"
+
+
+def test_provider_switch(monkeypatch):
+    from paper_triage.llm import OpenAIClient
+
+    monkeypatch.setenv("MOCK_LLM", "0")
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-fake")
+    c = get_client()
+    assert isinstance(c, OpenAIClient)
+    monkeypatch.setenv("LLM_PROVIDER", "anthropic")
+    assert isinstance(get_client(), AnthropicClient)
+
+
+def test_provider_missing_key_clear_error(monkeypatch):
+    monkeypatch.setenv("MOCK_LLM", "0")
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    with pytest.raises(LLMError, match="OPENAI_API_KEY"):
+        get_client()
+
+
+def test_provider_unknown_is_error(monkeypatch):
+    monkeypatch.setenv("MOCK_LLM", "0")
+    monkeypatch.setenv("LLM_PROVIDER", "bogus")
+    with pytest.raises(LLMError, match="LLM_PROVIDER"):
+        get_client()
+
+
+def test_mock_wins_over_openai(monkeypatch):
+    monkeypatch.setenv("MOCK_LLM", "1")
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    assert isinstance(get_client(), MockClient)

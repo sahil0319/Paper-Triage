@@ -66,7 +66,7 @@ def create_app() -> FastAPI:
         s = get_settings()
         with request.app.state.lock:
             count = len(db.paper_ids(request.app.state.conn))
-        return {"mock": s.mock, "model": s.model, "paper_count": count}
+        return {"mock": s.mock, "model": s.model, "provider": s.provider, "paper_count": count}
 
     @app.post("/api/triage")
     def post_triage(body: TriageIn, request: Request):

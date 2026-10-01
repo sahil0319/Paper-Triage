@@ -21,7 +21,8 @@ Answered by planner with defaults (no user round-trip, per orchestrator).
 - Q: May full extracted text be stored locally? → A: Yes, in the local store only; never served
   to anyone but the local UI/chat; PDFs themselves are not kept.
 - Q: Which model is used, and is there a per-run cap? → A: Model from `ANTHROPIC_MODEL` env with
-  one documented default; per run max 20 papers (default 10).
+  one documented default; per run max 20 papers (default 10). (T025: optional `LLM_PROVIDER=openai`
+  uses `OPENAI_API_KEY`/`OPENAI_MODEL` instead; Anthropic stays the default.)
 - Q: Are non-arXiv PDF URLs supported in v1? → A: Yes, as direct URLs only; id is
   `pdf:` + first 12 hex chars of SHA-256 of the URL; title from PDF metadata else URL.
 - Q: How does chat find relevant papers when many are stored? → A: Put all stored papers'

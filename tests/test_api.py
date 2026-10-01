@@ -18,6 +18,7 @@ def test_status_mock(client):
     assert r.status_code == 200
     body = r.json()
     assert body["mock"] is True and body["model"] and body["paper_count"] == 0
+    assert body["provider"] == "anthropic"
 
 
 def test_index_served(client):

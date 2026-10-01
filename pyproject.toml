@@ -10,6 +10,7 @@ dependencies = [
   "pydantic>=2",
   "anthropic",
   "pypdf",
+  "openai>=3.22.1",
 ]
 
 [dependency-groups]

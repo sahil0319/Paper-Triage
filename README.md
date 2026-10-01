@@ -34,8 +34,20 @@ export ANTHROPIC_MODEL=...          # model id to use
 uv run uvicorn paper_triage.app:app
 ```
 
+Live with OpenAI instead of Claude (`LLM_PROVIDER` is `anthropic` by default; `MOCK_LLM=1` wins over both):
+
+```sh
+# in .env (blank values in .env.example): LLM_PROVIDER=openai, OPENAI_API_KEY=..., OPENAI_MODEL=...
+set -a; source .env; set +a
+uv run uvicorn paper_triage.app:app
+```
+
+`OPENAI_MODEL` defaults to `gpt-5-mini`; confirm that id is available to your key, or set your own.
+Startup fails with a clear error if `LLM_PROVIDER=openai` and `OPENAI_API_KEY` is unset.
+
 Open http://127.0.0.1:8000. Optional: `PAPER_TRIAGE_DB` sets the SQLite path
-(default `./paper_triage.db`). `GET /api/status` reports mock mode, model and stored paper count.
+(default `./paper_triage.db`). `GET /api/status` reports mock mode, provider, model and stored
+paper count.
 
 ## Test
 
@@ -65,7 +77,7 @@ src/paper_triage/
   critic.py       runtime agent, prompt in prompts/critic.md
   ranker.py       runtime agent, prompt in prompts/ranker.md
   chat.py         grounded chat agent, prompt in prompts/chat.md
-  llm.py          the single Anthropic client wrapper (honors MOCK_LLM=1)
+  llm.py          the single LLM client wrapper (Anthropic or OpenAI; honors MOCK_LLM=1)
   db.py models.py config.py
   fixtures/       sample arXiv feed + PDF used in mock mode
   static/         the UI

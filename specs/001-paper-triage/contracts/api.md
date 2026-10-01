@@ -8,7 +8,8 @@ Single-page UI (`static/index.html`).
 
 ## GET /api/status
 
-`200 {"mock": bool, "model": str, "paper_count": int}`
+`200 {"mock": bool, "model": str, "provider": "anthropic"|"openai", "paper_count": int}`
+(`provider` additive, T025; `model` is the active provider's model.)
 
 ## POST /api/triage
 

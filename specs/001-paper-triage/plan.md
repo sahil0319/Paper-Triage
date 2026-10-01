@@ -31,7 +31,8 @@ ruff. (No others; constitution I.)
 **Performance Goals**: mock 5-paper triage < 5 s (SC-001); live bound by arXiv 3 s/request
 
 **Constraints**: offline tests; arXiv 1 req/3 s; <=20 papers/run; 40k chars text per LLM call;
-model from `ANTHROPIC_MODEL` (default `claude-opus-5-5` in `config.py` only)
+model from `ANTHROPIC_MODEL` (default `claude-opus-5-5` in `config.py` only);
+T025: `LLM_PROVIDER=openai` swaps in `OpenAIClient` (`OPENAI_API_KEY`, `OPENAI_MODEL`), same wrapper
 
 **Scale/Scope**: 1 user, tens to low hundreds of stored papers
 
