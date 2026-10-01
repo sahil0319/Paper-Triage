@@ -143,7 +143,7 @@ scope -> `refused: true`; empty store -> refused, LLM not called.
   rings, contrast AA, `prefers-reduced-motion`, no motion-dependent info, narrow-width layout,
   anti-references checked (no gradient hero, no card grid, no chat gloss). Files
   `pt/static/*` only.
-- [ ] T024 [BE] `README.md`: what it does, setup (`uv sync`, `.env`), run (mock and live), test
+- [x] T024 [BE] `README.md`: what it does, setup (`uv sync`, `.env`), run (mock and live), test
   commands, arXiv rate-limit note, pypdf/PyMuPDF swap note, layout of runtime agents + prompts.
 
 ## Lanes (parallel build)
