@@ -157,6 +157,15 @@ def get_result(conn: sqlite3.Connection, paper_id: str, topic: str) -> dict | No
     return _result_dict(row) if row else None
 
 
+def touch_results(conn: sqlite3.Connection, topic: str, paper_ids: list[str]) -> None:
+    """Mark existing results as just used so `latest_topic` reflects the most recent run."""
+    conn.executemany(
+        "UPDATE results SET created_at=? WHERE topic=? AND paper_id=?",
+        [(_now(), topic, pid) for pid in paper_ids],
+    )
+    conn.commit()
+
+
 def list_results(conn: sqlite3.Connection, topic: str) -> list[dict]:
     """Results for a topic joined with paper fields: rank desc, failed last."""
     rows = conn.execute(

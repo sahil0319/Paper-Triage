@@ -341,3 +341,16 @@ def test_triage_items_no_paging_and_offset_rejected(env):
         triage("2401.00001", 10, conn, http, MockClient(), 5)
     with pytest.raises(ValueError, match="offset only applies to topic searches"):
         triage("diffusion 2401.00001", 10, conn, http, MockClient(), 5)
+
+
+def test_rerun_of_stored_topic_becomes_latest_topic(env):
+    """F-002: a run whose results are all reused still counts as the most recent run."""
+    conn, http = env
+    triage("diffusion", 5, conn, http, MockClient())
+    triage("other topic", 5, conn, http, MockClient())
+    assert db.latest_topic(conn) == "other topic"
+    llm = Flaky()  # any parse call would be a recompute
+    triage("diffusion", 5, conn, http, llm)
+    assert llm.calls == []
+    assert db.latest_topic(conn) == "diffusion"
+    assert len(db.list_results(conn, "diffusion")) == 5

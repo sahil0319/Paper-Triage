@@ -141,6 +141,7 @@ def triage(
         if existing is None or existing["status"] != "ok":
             todo.append(paper)
     _process_all(conn, todo, topic, llm)
+    db.touch_results(conn, topic, [p["id"] for p in papers if p not in todo])
     results = []
     for paper in papers:
         row = db.get_result(conn, paper["id"], topic)

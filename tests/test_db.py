@@ -148,3 +148,14 @@ def test_papers_by_ids_input_order_unknown_skipped_latest_result(conn):
     assert got[1]["summary"]["summary"] == "s" and got[1]["critique"]["basis"] == "abstract"
     assert got[1]["authors"] == paper("b")["authors"]
     assert db.papers_by_ids(conn, []) == []
+
+
+def test_touch_results_refreshes_latest_topic_only_for_given_papers(conn):
+    for pid in ("a", "b"):
+        db.upsert_paper(conn, paper(pid))
+    save_ok(conn, "a", "first", 1)
+    save_ok(conn, "b", "second", 1)
+    assert db.latest_topic(conn) == "second"
+    db.touch_results(conn, "first", ["a", "missing"])
+    assert db.latest_topic(conn) == "first"
+    assert db.get_result(conn, "b", "second")["rank"] == 1
