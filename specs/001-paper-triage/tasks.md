@@ -32,7 +32,7 @@ Package = `src/paper_triage/` (abbrev `pt/` below means `src/paper_triage/`).
 
 ## Phase 2: Foundational (blocks all stories)
 
-- [ ] T003 [P] Test first `tests/test_models.py`, then `pt/models.py`: Pydantic `Summary`,
+- [x] T003 [P] Test first `tests/test_models.py`, then `pt/models.py`: Pydantic `Summary`,
   `WeakClaim`, `Overclaim`, `Critique` (basis Literal), `Rank` (validator clamps 0-10),
   `ChatAnswer`, `PaperOut` per data-model.md.
 - [ ] T004 MOCK LLM wrapper. Test first in `tests/test_config_llm.py`, then `pt/llm.py`:
