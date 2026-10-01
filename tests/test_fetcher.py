@@ -257,3 +257,11 @@ def test_fetch_caps_items_at_n(env):
     f, _, _, _ = env
     papers, _ = f.fetch("", [("arxiv", f"2401.0000{i}") for i in (1, 2, 3, 4)], 2)
     assert len(papers) == 2
+
+
+def test_fetch_hostless_url_is_error_others_continue(env):
+    f, _, _, _ = env
+    papers, errors = f.fetch("", [("pdf", "http://"), ("arxiv", "2401.00001")], 10)
+    assert [p["id"] for p in papers] == ["2401.00001"]
+    assert errors[0]["input"] == "http://"
+    assert errors[0]["reason"]

@@ -123,7 +123,7 @@ class Fetcher:
         try:
             r = self.client.get(url)
             r.raise_for_status()
-        except httpx.HTTPError as e:
+        except (httpx.HTTPError, httpx.InvalidURL, ValueError) as e:  # ValueError: host-less URL
             raise FetchError(f"download failed: {e}") from e
         return r.content
 
@@ -137,7 +137,7 @@ class Fetcher:
 
     def _pdf_paper(self, url: str) -> dict:
         """Direct (non-arXiv) PDF URL -> paper dict; raises FetchError/ExtractError."""
-        data = self._download(url, throttled=urlparse(url).hostname.endswith("arxiv.org"))
+        data = self._download(url, throttled=(urlparse(url).hostname or "").endswith("arxiv.org"))
         text = extract_text(data)
         basename = urlparse(url).path.rsplit("/", 1)[-1]
         return {
