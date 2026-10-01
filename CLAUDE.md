@@ -45,6 +45,9 @@ Each agent appends to `.claude/state/agents/<name>.md` after every task: goal, s
 - PreCompact -> `scripts/save_checkpoint.sh`. SessionStart injects checkpoint.md.
 - `scripts/run_loop.sh` restarts on usage limit/crash (max 20 iters, stops on DONE). No `--dangerously-skip-permissions`.
 
+## Agent definitions are cached per session
+Edits to `.claude/agents/*.md` (tools, skills, rules) take effect only after restarting Claude Code. Verified 2026-10-01: probes after an edit still ran the old tools/prompt. After any agent edit, restart, then probe (ask an agent: Skill tool? caveman loaded?) before real work.
+
 ## Spec-kit (do it properly)
 Planner runs speckit-constitution/specify/clarify/plan/tasks/analyze through the Skill tool and the `.specify/scripts/bash/` helpers, and persists the analyze report to specs/<feature>/analysis.md. Builders start from Skill speckit-implement. Tester owns speckit-checklist (output in specs/<feature>/checklists/). New tasks added mid-build (e.g. T025/T026) must be re-checked with speckit-analyze.
 
