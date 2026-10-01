@@ -79,7 +79,7 @@ Package = `src/paper_triage/` (abbrev `pt/` below means `src/paper_triage/`).
   `basis="abstract"`; non-arXiv URL -> id `pdf:<sha256(url)[:12]>`, title from PDF `/Title` or
   URL basename, abstract = first 1,500 chars; unreachable URL -> error entry, others continue.
   Already-stored paper -> no download (test asserts zero requests). Upserts into `papers`.
-- [ ] T011 [P] [US1] Test first `tests/test_agents.py::test_summarizer*`, then
+- [x] T011 [P] [US1] Test first `tests/test_agents.py::test_summarizer*`, then
   `pt/prompts/summarizer.md` + `pt/summarizer.py`: `summarize(paper, client) -> Summary`; prompt
   wraps `<paper id basis>`, <=120 words, "not stated" rule.
 - [ ] T012 [P] [US1] Test first `tests/test_agents.py::test_critic*`, then
