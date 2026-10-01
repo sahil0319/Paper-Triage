@@ -262,7 +262,7 @@ rendering rule; keep the UI test hooks from plan.md. Every task ends with
   apply (system fonts, `#8e939c` input edge, 12px button radius, 32/48 spacing). Acceptance:
   T034 test green with `#chat-scope`, `#results-count` added to its hook list; manual check on
   port 8765 at 320/768/1024/1440 px, no horizontal scroll, keyboard reaches every control.
-- [ ] T036 [FE] [US1] [US2] Redesigned rendering in `pt/static/app.js` (+ `app.css`): D8 paper
+- [x] T036 [FE] [US1] [US2] Redesigned rendering in `pt/static/app.js` (+ `app.css`): D8 paper
   row, D9 rank block, D11 flags/failed rows, D12 disclosure (h4 sections), D13 notes, D24 turns,
   D25 citation chips (`a.cite`, `cite--off`), D26 refusal (`.turn__a--refused`), D27 chat error
   with "Ask again", D28 suggestions, D29/D30/D31 states, D35 keyboard (`/`, Escape). Chat requests
