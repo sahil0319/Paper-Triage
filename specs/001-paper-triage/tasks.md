@@ -320,7 +320,7 @@ rendering rule; keep the UI test hooks from plan.md. Every task ends with
   with a shown title's marker word ->
   `a.cite` whose id is in the shown list (SC-002). Every case: zero external requests.
   Acceptance: `MOCK_LLM=1 uv run pytest -q -m e2e` green offline.
-- [ ] T042 [BE] `README.md` v2: result links, "Load 5 more", chat scoped to the current
+- [x] T042 [BE] `README.md` v2: result links, "Load 5 more", chat scoped to the current
   results, searching indicator, browser e2e setup (`uv run playwright install chromium`, see
   `SETUP_LOG.md`) and run command, `E2E_PORT`. Needs T033.
 
