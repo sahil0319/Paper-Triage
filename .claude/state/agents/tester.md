@@ -12,3 +12,10 @@
 ## 2026-10-01 BE wave A (T014 T015 T018 T019 T021api T022)
 - pytest 156 pass, ruff clean, e2e 6/6, live smoke :8766 ok (status/triage/papers/chat), grounded-chat rules ok. ticks match git, no db/env tracked.
 - no failures. 2 minor notes in docs/qa/BE-wave-A.md. Handoff DONE.
+
+## Final pass T001-T024 (2026-10-01)
+- goal: whole-project verify both lanes. status: GREEN.
+- pytest 156 pass, ruff clean, e2e ok, live smoke :8766 ok (killed), impeccable detect [] , css tokens match DESIGN, a11y static ok.
+- repo hygiene ok (.db/.env ignored, 24/24 ticks match commits). fresh clone+uv sync not run (sandbox denied).
+- advisory: mock chat only refuses on "out of scope" sentinel; generic OOS q gets canned cite. Not SC-003 violation. Optional [BE].
+- details: docs/qa/final.md. next: none -> DONE.
