@@ -139,7 +139,7 @@ scope -> `refused: true`; empty store -> refused, LLM not called.
   `socket.socket.connect` monkeypatched to raise: status mock=true; triage topic -> 5 results,
   >=1 `basis="abstract"`; mixed ids+URL input; chat in-scope cites only stored ids; out-of-scope
   refused; 5-paper triage < 5 s (SC-001).
-- [ ] T023 [FE] UI polish + a11y (re-read DESIGN.md + PRODUCT.md; impeccable audit/polish): focus
+- [x] T023 [FE] UI polish + a11y (re-read DESIGN.md + PRODUCT.md; impeccable audit/polish): focus
   rings, contrast AA, `prefers-reduced-motion`, no motion-dependent info, narrow-width layout,
   anti-references checked (no gradient hero, no card grid, no chat gloss). Files
   `pt/static/*` only.
