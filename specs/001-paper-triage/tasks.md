@@ -88,19 +88,19 @@ Package = `src/paper_triage/` (abbrev `pt/` below means `src/paper_triage/`).
 - [x] T013 [P] [US1] Test first `tests/test_agents.py::test_ranker*`, then
   `pt/prompts/ranker.md` + `pt/ranker.py`: `rank(paper, summary, topic, client) -> Rank`;
   rubric anchors; empty topic -> "overall reading priority" wording; clamp.
-- [x] T014 [US1] Test first `tests/test_pipeline.py`, then `pt/pipeline.py`:
+- [x] T014 [BE] [US1] Test first `tests/test_pipeline.py`, then `pt/pipeline.py`:
   `triage(query, n, conn, http, llm) -> {topic, results, errors}`: parse -> fetch -> per paper
   summarize/critique/rank (one retry on validation error; `LLMError`/`LLMRefusal` -> result
   `failed` with reason, others continue); reuse existing (paper_id, topic) result; cap n<=20;
   return sorted per contracts/api.md.
-- [x] T015 [US1] Test first `tests/test_api.py` (status, triage, papers, 422s), then
+- [x] T015 [BE] [US1] Test first `tests/test_api.py` (status, triage, papers, 422s), then
   `pt/app.py`: FastAPI app; startup opens db + `init_schema`; deps from `config`/`get_client`/
   `make_http`; `GET /api/status`, `POST /api/triage`, `GET /api/papers`; static mount at `/`.
-- [x] T016 [US1] UI structure. Re-read DESIGN.md + PRODUCT.md first; apply frontend-design /
+- [x] T016 [FE] [US1] UI structure. Re-read DESIGN.md + PRODUCT.md first; apply frontend-design /
   impeccable guidance. `pt/static/index.html` + `pt/static/app.css`: one page, header with mock
   label slot, query input + submit on top, ranked list region, chat region (beside wide / below
   narrow, empty for now); system font stack, one accent, generous whitespace; semantic landmarks.
-- [ ] T017 [US1] `pt/static/app.js` triage flow (re-read DESIGN.md + PRODUCT.md): submit ->
+- [ ] T017 [FE] [US1] `pt/static/app.js` triage flow (re-read DESIGN.md + PRODUCT.md): submit ->
   `POST /api/triage`; loading, empty ("No papers found"), and per-item error states; each row
   shows rank, title, id, reason at a glance, "abstract only" flag; critique in `<details>`
   (weak claims / overclaims / missing baselines / "not stated"); rows have `id="paper-<id>"`;
@@ -112,14 +112,14 @@ Package = `src/paper_triage/` (abbrev `pt/` below means `src/paper_triage/`).
 **Independent test**: stored fixture papers, mock mode: in-scope -> valid citations; out of
 scope -> `refused: true`; empty store -> refused, LLM not called.
 
-- [ ] T018 [US2] Test first `tests/test_chat.py`, then `pt/prompts/chat.md` + `pt/chat.py`:
+- [ ] T018 [BE] [US2] Test first `tests/test_chat.py`, then `pt/prompts/chat.md` + `pt/chat.py`:
   `answer(question, conn, client) -> ChatAnswer`; empty store -> refusal without calling client
   (assert via spy); context = top-k papers as `<paper id title>` with abstract, summary,
   critique; regex `\[([^\[\]\s]+)\]` validation, strip unknown ids into `dropped_citations`;
   sentinel or zero valid citations -> `refused: true`.
-- [ ] T019 [US2] Extend `tests/test_api.py`, then `pt/app.py`: `POST /api/chat` (422 on empty
+- [ ] T019 [BE] [US2] Extend `tests/test_api.py`, then `pt/app.py`: `POST /api/chat` (422 on empty
   question), persists `chat_turns`.
-- [ ] T020 [US2] Chat UI (re-read DESIGN.md + PRODUCT.md; frontend-design / impeccable):
+- [ ] T020 [FE] [US2] Chat UI (re-read DESIGN.md + PRODUCT.md; frontend-design / impeccable):
   `pt/static/index.html`, `app.css`, `app.js`: question input + send; answers in an
   `aria-live` log; citations rendered as links to `#paper-<id>`; refusal is a distinct,
   calm, intentional state (not an error look); keyboard send.
@@ -129,22 +129,26 @@ scope -> `refused: true`; empty store -> refused, LLM not called.
 **Goal**: reload shows stored results without refetching.
 **Independent test**: triage, new app instance on same db, `GET /api/papers` returns same list.
 
-- [ ] T021 [US3] Extend `tests/test_api.py` (new TestClient on same db file returns same
+- [ ] T021 [BE+FE] [US3] Extend `tests/test_api.py` (new TestClient on same db file returns same
   results, no fetch), then (re-read DESIGN.md + PRODUCT.md) `pt/static/app.js`: on load call `/api/status` (toggle mock label,
   show model) and `/api/papers` to render stored list.
 
 ## Phase 6: Polish
 
-- [ ] T022 E2E mock smoke `tests/test_e2e_mock.py`: with `MOCK_LLM=1`, no key, and
+- [ ] T022 [BE] E2E mock smoke `tests/test_e2e_mock.py`: with `MOCK_LLM=1`, no key, and
   `socket.socket.connect` monkeypatched to raise: status mock=true; triage topic -> 5 results,
   >=1 `basis="abstract"`; mixed ids+URL input; chat in-scope cites only stored ids; out-of-scope
   refused; 5-paper triage < 5 s (SC-001).
-- [ ] T023 UI polish + a11y (re-read DESIGN.md + PRODUCT.md; impeccable audit/polish): focus
+- [ ] T023 [FE] UI polish + a11y (re-read DESIGN.md + PRODUCT.md; impeccable audit/polish): focus
   rings, contrast AA, `prefers-reduced-motion`, no motion-dependent info, narrow-width layout,
   anti-references checked (no gradient hero, no card grid, no chat gloss). Files
   `pt/static/*` only.
-- [ ] T024 `README.md`: what it does, setup (`uv sync`, `.env`), run (mock and live), test
+- [ ] T024 [BE] `README.md`: what it does, setup (`uv sync`, `.env`), run (mock and live), test
   commands, arXiv rate-limit note, pypdf/PyMuPDF swap note, layout of runtime agents + prompts.
+
+## Lanes (parallel build)
+[BE] = backend-builder; [FE] = frontend-builder. Disjoint files: FE owns `src/paper_triage/static/**` + `tests/frontend/**`; BE owns the rest. T021 is split: BE commits the API test half first as "T021 (api): ...", FE then does the UI half and ticks the box as "T021 (ui): ...".
+Waves: A (parallel) BE T018 -> T019 -> T021(api) -> T022 || FE T017 -> T021(ui). B: FE T020 (needs T019 landed) -> T023. C: BE T024 (README) last. Tester runs after each wave on both lanes.
 
 ## Dependencies
 

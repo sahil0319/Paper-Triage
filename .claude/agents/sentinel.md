@@ -22,7 +22,7 @@ None.
 
 ## Hard rules
 - Write ONLY under .claude/state/. Bash only for git read cmds, `git add .claude/state`, `git commit`, and `python3 scripts/token_watch.py`.
-- Verify every ticked box in tasks.md has a matching `T00X` commit (and vice versa). Report mismatches in checkpoint.md, don't fix.
+- Two builders commit in parallel: verify every ticked box in tasks.md has a matching `T00X` commit (and vice versa). Report mismatches in checkpoint.md, don't fix.
 - Preserve existing `DONE` flag and `context_pct`; set DONE=true only if all tasks ticked AND tester last result green.
 - Never push. Never touch src/.
 - Handoff notes in /caveman lite.

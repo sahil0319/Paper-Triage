@@ -1,42 +1,8 @@
-# Checkpoint: Phase Build
-
-## State
-- phase: build
-- active task: T014 (next)
-- done: T001-T013 all ticked + 13 commits verified in git log; tester green (docs/qa/T001-T005, T006-T010, T011-T013)
-- next: builder T014-T017 (pipeline, API, UI structure, UI triage flow)
-- decisions:
-  - Groups of tasks per builder/tester cycle
-  - Native dev agents now registered
-  - DESIGN.md is the real Apple-style spec (committed 4cc32b0) -> UI tasks T016,T017,T020,T021,T023 must re-read it
-  - No-mistakes init deferred (needs origin, user decision pending)
-  - Agents propagate LLMError/LLMRefusal/ValidationError so T014 pipeline owns single retry
-  - Use `unset VIRTUAL_ENV` for uv
-  - Ruff format not part of gate
-- open failures: none (F-001 resolved in e52a67a)
-- files touched: T001-T013 commits verified in git log; .claude/state/agents/{builder,tester}.md created (untracked); DESIGN.md modified (4cc32b0); docs/qa/ created with tester results; progress.json modified
-- exact next command: /build T014
-
-## Tick Verification
-- T001-T013: 13 commits match git log
-  - T001: d5449e1 project scaffold
-  - T002: d0a7a4d env-driven Settings
-  - T003: f3c519b pydantic models
-  - T004: e87fc36 LLM wrapper with mock twin
-  - T005: 427767d sqlite db layer
-  - T006: 37956f3 net throttle, mock http transport, fixtures
-  - T007: be9a0b5 pypdf text extraction and LLM text prep
-  - T008: 540fa7f parse query into topic and items
-  - T009: bd4bb10 fetcher arXiv search and by_ids with cache and throttle
-  - T010: 10c9a7b fetcher PDF download, full text, direct URLs, reuse
-  - T011: b307041 summarizer agent, prompt, shared prompting helpers
-  - T012: 78d714f critic agent and prompt
-  - T013: 55df157 ranker agent and prompt
-- F-001: e52a67a fix host-less URL gives fetch error entry, not crash
-- T014-T024: pending, no commits yet
-
-## Key Notes
-- AnthropicClient wraps only APIError; T014 pipeline must handle ValidationError retry
-- Use `unset VIRTUAL_ENV` for uv
-- MockClient reads basis from `<paper id basis>` tag; MockTransport fixtures used for net.py testing
-- UI tasks must re-read DESIGN.md and PRODUCT.md for Apple-style design patterns
+# Checkpoint
+- phase: build (parallel lanes)
+- done: T001-T016 (T014,T015 BE; T016 FE committed 406cfe7)
+- in flight: T017 FE: partial uncommitted src/paper_triage/static/app.js from the stopped builder; frontend-builder continues it
+- next wave A: BE T018 -> T019 -> T021(api) -> T022 || FE T017 -> T021(ui). Wave B: FE T020 (needs T019), T023. Wave C: BE T024
+- decisions: builder split into backend-builder/frontend-builder; tester single, tags failures [BE]/[FE]; no-mistakes init still deferred (user decision on local origin pending); FE port 8765, tester 8766
+- open failures: none
+- exact next command: /build  (wave A)

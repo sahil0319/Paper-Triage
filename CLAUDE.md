@@ -15,22 +15,25 @@ Design: DESIGN.md (user-supplied Apple style; real spec in place since 2026-10-0
 
 ## DEV vs RUNTIME (do not confuse)
 - RUNTIME agents = the product's code: fetcher, summarizer, critic, ranker, chat. Live in `src/`.
-- DEV agents = build crew in `.claude/agents/`: researcher, planner, builder, tester, sentinel. (impeccable-* agents are tool-provided; ignore unless doing UI polish.)
+- DEV agents = build crew in `.claude/agents/`: researcher, planner, backend-builder, frontend-builder, tester, sentinel. (impeccable-* agents are tool-provided; ignore unless doing UI polish.)
 
 ## Roster
 | agent | model | writes | owns |
 |---|---|---|---|
 | researcher | sonnet | docs/research/ | research notes |
 | planner | opus | specs/, .specify/ | speckit-constitution/specify/clarify/plan/tasks/analyze |
-| builder | sonnet | src/, tests/, tasks.md | speckit-implement |
+| backend-builder [BE] | sonnet | src/paper_triage/** except static/, tests/ except tests/frontend/, pyproject, README | speckit-implement (BE tasks) |
+| frontend-builder [FE] | sonnet | src/paper_triage/static/**, tests/frontend/** | speckit-implement (FE tasks); re-reads DESIGN.md + PRODUCT.md every task |
 | tester | sonnet | docs/qa/ | speckit-checklist, pytest, ruff, e2e, no-mistakes gate |
 | sentinel | haiku | .claude/state/ | checkpoints |
 Subagents can't spawn subagents: the main session is the only router.
 
 ## Pipeline
-research -> plan -> (build <-> test loop per task) -> checkpoint after every task -> README + final test pass.
-Slash: /research /plan /build /test /checkpoint /resume /status.
-Per task: builder -> tester -> (fail: back to builder, max 3 loops, then BLOCKED) -> sentinel.
+research -> plan -> build (BE and FE lanes IN PARALLEL) <-> test loop -> checkpoint -> README + final test pass.
+Slash: /research /plan /build (both lanes) /build-be /build-fe /test /checkpoint /resume /status.
+Tasks in tasks.md carry a lane tag [BE]/[FE] (T021 is [BE+FE], API half first). Waves: see "Lanes" in tasks.md.
+Per wave: spawn backend-builder AND frontend-builder in the same message (background) -> when both report, tester (failures tagged [BE]/[FE], back to the owning lane, max 3 loops per task, then BLOCKED) -> sentinel.
+Parallel safety: disjoint file ownership; each lane commits only its own paths (`git commit -m ... -- <paths> tasks.md`), never `git add -A`/stash/reset; FE uses port 8765, tester 8766. API handoff FE<-BE via specs/001-paper-triage/contracts/api.md + "API facts" in .claude/state/agents/backend-builder.md. FE gaps are reported as `NEEDS-BE:` and routed by the orchestrator.
 
 ## Handoff format
 Every agent ends with exactly one line: `DONE` | `BLOCKED: <why>` | `NEXT:<agent>`.
@@ -43,6 +46,6 @@ Each agent appends to `.claude/state/agents/<name>.md` after every task: goal, s
 - `scripts/run_loop.sh` restarts on usage limit/crash (max 20 iters, stops on DONE). No `--dangerously-skip-permissions`.
 
 ## Hard rules
-- One task = one small commit. Never push; no real remotes. no-mistakes gate is local only (bare repo in `.local/`).
+- One task = one small commit (per lane). Never push; no real remotes. no-mistakes gate is local only (bare repo in `.local/`).
 - `.env` ignored; no secrets in commits. Stay inside project dir.
 - Don't install ECC or extra tooling beyond SETUP_LOG.md.

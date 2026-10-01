@@ -1,6 +1,6 @@
 ---
-description: Run builder on next (or given) task
-argument-hint: [task-id]
+description: Run backend-builder and frontend-builder IN PARALLEL on the next wave
+argument-hint: [wave A|B|C | task-ids]
 ---
-Spawn `builder` agent for task: ${ARGUMENTS:-next unticked task in specs/*/tasks.md}. It uses speckit-implement, one task, one commit. UI task -> it must re-read DESIGN.md + PRODUCT.md first.
-After DONE: run /test flow (tester), then `sentinel`. Report handoff line only.
+Read "Lanes" in specs/001-paper-triage/tasks.md. Pick the next unticked tasks per lane (or those in $ARGUMENTS). In ONE message spawn `backend-builder` and `frontend-builder` (Agent tool, run_in_background) with their lane's task ids; skip a lane with nothing unblocked. Tell each the other lane is running in parallel. FE tasks that need an unlanded BE endpoint (e.g. T020 needs T019) wait for the next wave.
+When both report: `tester` on both lanes, route tagged failures back to the owning lane, then `sentinel`. Report handoff lines only.

@@ -7,7 +7,7 @@ model: sonnet
 # tester (DEV agent)
 
 ## Role
-Verify builder output. Report, don't fix.
+Verify backend-builder and frontend-builder output. Report, don't fix. Tag each failure [BE] or [FE] in failures.md so the right lane picks it up. For [FE] also check: static assets served (curl against `MOCK_LLM=1` uvicorn on port 8766), `npx impeccable detect src/paper_triage/static`, DESIGN.md token adherence by reading app.css.
 
 ## Inputs
 Latest commit, tasks.md, specs/*/spec.md acceptance criteria.
@@ -21,10 +21,10 @@ speckit-checklist.
 ## Hard rules
 - Write ONLY under docs/qa/ (plus own state note). Never edit src/ or tests/.
 - Run: pytest (MOCK_LLM=1), ruff, MOCK_LLM end-to-end smoke, then no-mistakes gate (LOCAL ONLY, never push, no real remote).
-- On failure: append to docs/qa/failures.md with exact repro, hand back `NEXT:builder`.
+- On failure: append to docs/qa/failures.md with exact repro, hand back to the owning builder lane.
 - Max 3 fix loops per task. Third failure -> mark task BLOCKED in progress.json notes and hand back `BLOCKED`.
 - Append to `.claude/state/agents/tester.md` after every task.
 - Handoff notes in /caveman lite.
 
 ## Handoff
-Last line exactly one of: `DONE` (green) / `BLOCKED: <why>` / `NEXT:builder` (failures logged)
+Last line exactly one of: `DONE` (green) / `BLOCKED: <why>` / `NEXT:backend-builder` / `NEXT:frontend-builder` / both (failures logged, tagged)

@@ -12,3 +12,4 @@
 - dev agents (.claude/agents/*.md) not registered in the running session (loaded at startup) -> orchestrator spawns general-purpose agents told to follow the agent file. Restart session to use native subagent_types
 - no-mistakes init: BLOCKED by own deny rule (git remote add origin). Needs user decision: allow a local bare repo as origin, or skip the gate. Tester substitutes pytest+ruff+e2e until then
 - DESIGN.md: user replaced placeholder with real Apple-style spec (563 lines); builder notified
+- 2026-10-01: builder split into backend-builder + frontend-builder (parallel lanes, disjoint files, pathspec commits). Old builder.md removed. tasks.md tagged [BE]/[FE]; CLAUDE.md + commands updated (/build runs both lanes; /build-be, /build-fe added)
