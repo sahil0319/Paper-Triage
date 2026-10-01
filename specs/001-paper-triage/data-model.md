@@ -23,7 +23,7 @@ Schema created idempotently on startup (`CREATE TABLE IF NOT EXISTS`). JSON colu
 
 | column | type | rule |
 |---|---|---|
-| key | TEXT PK | normalized query string (`q:<terms>:<n>` or `ids:<sorted ids>`) |
+| key | TEXT PK | normalized query string (v2: `q:<terms>:<n>:<offset>` or `ids:<sorted ids>`; old `q:<terms>:<n>` rows are simply never hit again) |
 | body | TEXT | raw Atom XML |
 | fetched_at | TEXT | ISO; no expiry in v1 |
 
@@ -61,6 +61,18 @@ Schema created idempotently on startup (`CREATE TABLE IF NOT EXISTS`). JSON colu
 - **Rank**: `rank: int` (clamped 0-10 in validator), `rank_reason: str` (1-2 sentences).
 - **ChatAnswer** (API, not LLM): `answer: str`, `citations: list[str]`, `refused: bool`,
   `dropped_citations: list[str]`.
+
+- **PaperOut** (API, v2): adds `abs_url: str | None`, `pdf_url: str | None`, derived per
+  contracts/api.md (arXiv: from the id; `pdf` source: `papers.pdf_url`). No schema migration:
+  `papers.pdf_url` already exists; `abs_url` is never stored.
+
+## Result set (v2, client-held, not persisted)
+
+Page state in `app.js`: `query` (string sent to `/api/triage`), `topic`, `ids` (ordered, unique,
+max 50), `nextOffset` (int | null), `hasMore` (bool). A new search replaces it; load-more
+appends to `ids` and updates `nextOffset`/`hasMore`; a reload rebuilds it from
+`GET /api/papers` (`nextOffset` = number of shown results, `hasMore` = topic non-empty).
+Sent as `paper_ids` on every `POST /api/chat`.
 
 ## State
 

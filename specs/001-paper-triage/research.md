@@ -57,6 +57,8 @@ Source notes: docs/research/paper-triage.md (arXiv, PDF, prompts, chat) + claude
 
 ## R6 Grounded chat
 
+- **v2 note**: the context source is superseded by R10 (current result set via `paper_ids`);
+  the citation format, sentinel and validation below still apply.
 - **Decision**: context stuffing: top 20 stored papers by latest rank, each as `<paper id=..>`
   with title, abstract, summary, critique. Instruction: cite as `[<id>]` using the exact id;
   if unanswerable reply exactly `NOT_IN_STORED_PAPERS` + one sentence. Server: regex
@@ -80,3 +82,41 @@ Source notes: docs/research/paper-triage.md (arXiv, PDF, prompts, chat) + claude
 - **Decision**: FastAPI, synchronous triage request (<=20 papers; sequential), static files
   served from `src/paper_triage/static/`. Run: `uv run uvicorn paper_triage.app:app`.
 - **Rationale**: no job queue (constitution IV).
+
+## R9 v2: load-more paging
+
+- **Decision**: `offset` on `POST /api/triage` maps to arXiv API `start`; `has_more` from the
+  feed's `opensearch:totalResults` (fallback: full page). Cache key gains `:<offset>`. Mock feed
+  grows to 15 entries and honours `start`, so 10 + 5 exhausts it deterministically.
+- **Rationale**: arXiv API supports `start`/`max_results` natively; no server-side session.
+- **Alternatives**: server-side search sessions with stored cursors (state, more code);
+  "exclude ids" parameter (arXiv cannot filter by id list).
+
+## R10 v2: chat scope
+
+- **Decision**: client sends `paper_ids` (current result set, max 50) with each question; the
+  server builds context only from those stored papers and validates citations against them.
+  MockClient answers only on id or content-word overlap with the context papers.
+- **Rationale**: the result set already lives in the page; no session table needed. The cap of
+  50 bounds the prompt (about 50 papers x short summary/critique/abstract).
+- **Alternatives**: `search_id` persisted per run (new table, more API); topic-based scope
+  (fails for ID/URL searches and repeated topics).
+
+## R11 v2: searching indicator
+
+- **Decision**: client-only working card (brief D14-D18): rotating verbs + elapsed time, no
+  progress claims, shown 300 ms after submit, gone on response/error.
+- **Rationale**: triage is one synchronous request; a progress endpoint would need background
+  jobs (constitution IV). Honest activity beats fake progress.
+
+## R12 v2: browser e2e
+
+- **Decision**: pytest-playwright (dev only) + chromium. A test harness in `tests/` runs uvicorn
+  in a thread on `127.0.0.1:${E2E_PORT:-8766}` with `MOCK_LLM=1` and a temp DB, wraps the app
+  in a test-only ASGI middleware that can delay `POST /api/triage` (so the indicator is
+  observable), and aborts and records any non-local browser request. Tests marked `e2e`; skipped
+  with a clear reason only if chromium is not installed.
+- **Rationale**: real browser proves indicator, links, load-more and chat scope; mock transport
+  already makes the fetcher deterministic offline (`net.make_http(mock=True)`).
+- **Alternatives**: Selenium (heavier), JS test runner (adds Node toolchain), product-side
+  latency env var (test concern leaking into product code).

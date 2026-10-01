@@ -33,3 +33,7 @@
 
 - Env var names (`ANTHROPIC_MODEL`) and id format in Clarifications are recorded decisions from
   CLAUDE.md defaults, kept deliberately; not treated as leakage.
+- v2 re-validation (2026-10-01): all items still pass. FR count is 15 (FR-001..FR-014 incl.
+  FR-001a), at the constitution IV cap; stories stay at 3 (load-more and links fold into US1,
+  chat scope into US2). arXiv URL patterns in FR-014 are the user-visible link targets, kept
+  deliberately. Zero [NEEDS CLARIFICATION] markers; defaults recorded under Clarifications.

@@ -152,9 +152,196 @@ scope -> `refused: true`; empty store -> refused, LLM not called.
   default 4, 1 = sequential; DB stays on calling thread; summarizer || critic) + `ranker.md` score
   calibration (5-8 typical, 9-10 rare). Tests, README, `.env.example`.
 
+## Phase 7: v2 amendment (redesign, searching indicator, links, load-more, chat scope, browser e2e)
+
+**Sources**: spec.md FR-008..FR-014, SC-002..SC-008, Clarifications "2026-10-01 (v2)";
+plan.md "v2 Amendment" (incl. UI test hooks); contracts/api.md (authoritative shapes);
+data-model.md; research R9-R12; brief `docs/design/brief-v2-redesign.md` (D1-D35, B1-B3).
+Every FE task: re-read DESIGN.md + PRODUCT.md + the brief first; keep the textContent-only
+rendering rule; keep the UI test hooks from plan.md. Every task ends with
+`MOCK_LLM=1 uv run pytest -q` and `uv run ruff check .` green.
+
+### Wave D — BE lane (no FE dependency)
+
+- [ ] T027 [BE] [US1] B1 source links (FR-014). Test first: `tests/test_pipeline.py` and
+  `tests/test_api.py` assert every result item of `POST /api/triage` and `GET /api/papers` has
+  `abs_url`/`pdf_url`: arXiv `2401.00001` -> `"https://arxiv.org/abs/2401.00001"` and
+  `"https://arxiv.org/pdf/2401.00001"` (no version, https); a direct PDF URL item ->
+  `abs_url is None`, `pdf_url == <input URL>`. Then: `pt/models.py` `PaperOut` adds
+  `abs_url: str | None = None`, `pdf_url: str | None = None`; `pt/pipeline.py` adds
+  `source_urls(paper_id, source, pdf_url) -> (abs_url, pdf_url)`, extends `_OUT_KEYS`/`to_out`
+  and passes the paper's `pdf_url` in `triage()`; `pt/db.py` `list_results` also selects
+  `papers.pdf_url`. Files: `pt/models.py`, `pt/pipeline.py`, `pt/db.py`,
+  `tests/test_models.py`, `tests/test_pipeline.py`, `tests/test_api.py`.
+- [ ] T028 [BE] [US1] Mock feed for paging. `pt/fixtures/arxiv_search.xml`: grow to 15 entries
+  `2401.00001`..`2401.00015` (ids, abstracts and PDF links of entries 1-5 unchanged; invalid-PDF
+  id `2401.00005` kept; entries 6-15 have valid PDF links); every title contains one unique
+  marker word (>= 6 letters, e.g. "Basalt", "Cobalt") that appears nowhere else in the feed;
+  no entry contains the words "capital" or "france" (used by refusal tests);
+  declare `xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/"`. `pt/net.py`
+  `_feed(ids, n, start)` returns `entries[start:start+n]` for searches (honours the `start`
+  query param, default 0) and writes `<opensearch:totalResults>` = 15 for searches, = matched
+  count for `id_list`. Test first `tests/test_net.py`: `start=10&max_results=5` -> ids
+  `2401.00011`..`2401.00015`, totalResults 15; `start=15` -> 0 entries. Audit and fix tests
+  that assumed "default 10 returns 5" (pin `max_results=5` or expect 10): `tests/test_api.py`,
+  `tests/test_pipeline.py`, `tests/test_fetcher.py`, `tests/test_e2e_mock.py`.
+- [ ] T029 [BE] [US1] B2 offset paging (FR-013, contracts/api.md POST /api/triage). Test first
+  `tests/test_fetcher.py`: `search(topic, n, offset)` sends `start=offset`; cache key
+  `q:<terms>:<n>:<offset>`; total read from `opensearch:totalResults`; missing total -> fallback.
+  `tests/test_pipeline.py`: topic offset 0 n 10 -> `offset 0, next_offset 10, has_more true`;
+  offset 10 n 5 -> 5 results `2401.00011`..`2401.00015`, `next_offset 15, has_more false`;
+  id query -> `next_offset None, has_more False`; id query with offset > 0 -> `ValueError`.
+  `tests/test_api.py`: `offset` -1 or 1001 -> 422; id query + `offset: 5` ->
+  `422 {"detail": "offset only applies to topic searches"}`; `FetchError` -> `has_more false`.
+  Then `pt/fetcher.py` (`search(topic, n, offset=0) -> (papers, total)`; `fetch(topic, items,
+  n, offset=0) -> (papers, errors, page)` with `page = {"next_offset", "has_more"}`),
+  `pt/pipeline.py` (`triage(..., offset=0)` returns `offset`, `next_offset`, `has_more`),
+  `pt/app.py` (`TriageIn.offset: int = 0`, range 0..1000).
+- [ ] T030 [BE] [US2] MockClient scope fix (FR-010, contracts/api.md mock rule). Test first
+  `tests/test_config_llm.py`: with a chat prompt of two `<paper id title>` blocks and
+  `<question>` "What is the capital of France?" -> text starts with `NOT_IN_STORED_PAPERS`;
+  question containing paper B's title marker word -> `"... [B]"`; question naming id A ->
+  cites A; no paper tags -> sentinel. Only the text inside `<question>...</question>` is matched
+  against titles/abstracts inside `<paper>` blocks; stop words in `_MOCK_STOP_WORDS`; content
+  word = lowercase, >= 4 letters. Then `pt/llm.py` `MockClient.text`. Update existing tests that
+  relied on the old "out of scope" substring or on generic questions being answered
+  (`tests/test_chat.py`, `tests/test_api.py`, `tests/test_e2e_mock.py`) to use a fixture title
+  word for in-scope questions.
+- [ ] T031 [BE] [US2] B3 chat scope (FR-008-FR-010, contracts/api.md POST /api/chat). Test first
+  `tests/test_chat.py`: `paper_ids=[]` -> refused, client spy not called; ids none stored ->
+  refused, no call; a stored paper not in `paper_ids` never appears in the prompt (spy) and a
+  citation of it lands in `dropped_citations`; a load-more id in the set can be cited.
+  `tests/test_api.py`: missing `paper_ids` -> 422; 51 ids -> `422 {"detail": "paper_ids: at
+  most 50 ids"}`; earlier-search scenario: triage topic (10), triage `2401.00001`, chat with
+  `paper_ids=["2401.00001"]` asking `2401.00002`'s marker word (question = the marker word
+  plus "?", nothing else, so no other word can overlap) -> `refused: true`,
+  `citations: []`; `chat_turns` still stored. Then `pt/db.py` `papers_by_ids(conn, ids)`
+  (paper + latest result per id, input order, unknown skipped), `pt/chat.py`
+  `answer(question, paper_ids, conn, client)` (context = set only, citations validated against
+  set, `NO_SET_TEXT` per contract), `pt/config.py` `chat_max_ids = 50`, `pt/app.py`
+  `ChatIn.paper_ids: list[str]` (required, dedupe, max 50), `pt/prompts/chat.md` (context is
+  the user's current result set; anything else -> sentinel).
+- [ ] T032 [BE] Playwright harness (constitution 1.1.0 I/II, research R12). `pyproject.toml`:
+  dev dep `pytest-playwright`, pytest marker `e2e: real-browser tests (need chromium)`;
+  `uv lock`; run `uv run playwright install chromium` once; `SETUP_LOG.md`: date, both commands,
+  purpose, "browser download only at install time; tests run offline". `tests/e2e_harness.py`:
+  `LiveServer` runs `uvicorn.Server` in a daemon thread on `127.0.0.1:${E2E_PORT:-8766}` with
+  `MOCK_LLM=1` and a temp `PAPER_TRIAGE_DB`, app = `create_app()` wrapped in a test-only ASGI
+  middleware that awaits `asyncio.sleep(self.triage_delay)` before `POST /api/triage`;
+  `.url`, `.set_triage_delay(seconds)`; start waits for `GET /api/status` 200 (10 s timeout).
+  `tests/conftest.py`: session fixture `live_server`, session override `base_url` ->
+  `live_server.url`, fixture `offline_page(page)` that aborts and records every request whose
+  host is not `127.0.0.1`/`localhost` and fails the test if any was recorded; browser tests skip
+  with "chromium not installed: run `uv run playwright install chromium`" when the browser is
+  missing. `tests/test_e2e_harness.py`: status via httpx (`mock: true`); triage with delay 1 s
+  takes >= 1 s; `@pytest.mark.e2e` page `/` has title "Paper Triage" and zero external requests.
+  `README.md`: test commands incl. `MOCK_LLM=1 uv run pytest -q -m e2e`. Files: `pyproject.toml`,
+  `uv.lock`, `SETUP_LOG.md`, `README.md`, `tests/e2e_harness.py`, `tests/conftest.py`,
+  `tests/test_e2e_harness.py`.
+- [ ] T033 [BE] API-level v2 smoke, offline (`tests/test_e2e_mock.py`, socket guard on):
+  topic triage `max_results` 10 -> 10 results, all with `abs_url`/`pdf_url`, `has_more` true,
+  `next_offset` 10; `offset` 10 + `max_results` 5 -> 5 new ids, `has_more` false (SC-008 API
+  half); chat with the 15 ids and a title marker word cites only set ids (SC-002); "What is the
+  capital of France?" refused; id-only set + question about another stored paper refused
+  (SC-003); SC-001 timing kept.
+
+### Wave D — FE lane (no new API needed)
+
+- [ ] T034 [FE] Static asset guard test first `tests/frontend/test_static_assets.py` (stdlib
+  only, no browser): `pt/static/index.html`, `app.css`, `app.js` reference no external URL
+  (no `http(s)://` in `src`/`href`, no `@import`, no `@font-face`, no `url(http`); the UI test
+  hooks from plan.md that exist today are present in `index.html` (`#query`, `#submit`,
+  `#paper-list`, `#question`, `#ask`, `#chat-log`, `#status`, `#alert`). Later FE tasks extend
+  the hook list.
+- [ ] T035 [FE] [US1] Redesign shell (FR-012). Re-read DESIGN.md + PRODUCT.md + brief. Files
+  `pt/static/index.html`, `pt/static/app.css`: brief D1 tokens (whole `:root`), D2 font stacks
+  (no `@font-face`), D3 base/focus/forced colors, D4 shell + grid + skip links, D5 nav, D6 query
+  band, D7 results header (`#results-count`, `#status` sr-only), D13 notes box, D22 chat panel,
+  D23 `#chat-scope` element (fallback copy), D29/D30 empty-state markup, D31 alert surface,
+  D32 mock badge, D33 breakpoints, D34 contrast, D35 target sizes. Brief section 0 deviations
+  apply (system fonts, `#8e939c` input edge, 12px button radius, 32/48 spacing). Acceptance:
+  T034 test green with `#chat-scope`, `#results-count` added to its hook list; manual check on
+  port 8765 at 320/768/1024/1440 px, no horizontal scroll, keyboard reaches every control.
+- [ ] T036 [FE] [US1] [US2] Redesigned rendering in `pt/static/app.js` (+ `app.css`): D8 paper
+  row, D9 rank block, D11 flags/failed rows, D12 disclosure (h4 sections), D13 notes, D24 turns,
+  D25 citation chips (`a.cite`, `cite--off`), D26 refusal (`.turn__a--refused`), D27 chat error
+  with "Ask again", D28 suggestions, D29/D30/D31 states, D35 keyboard (`/`, Escape). Chat requests
+  already send `paper_ids` = ids of the rows shown (forward-compatible; the current server
+  ignores the extra field), so the chat never breaks when T031 lands. Acceptance: T034 green;
+  manual mock run shows ranked rows, critique disclosure, refusal and error states.
+- [ ] T037 [FE] [US1] Searching indicator (FR-012, SC-006), brief D14-D18. Files `index.html`
+  (`#working`, `role="group"`, `aria-label="Triage in progress"`, hidden by default),
+  `app.css` (cream card, 8-ray glyph, `ray`/`breathe` keyframes, verb transition, D17
+  reduced-motion rules), `app.js` (show 300 ms after submit; verb loop every 2.4 s per D15;
+  `m:ss` timer from `performance.now()`; note copy by elapsed time incl. mock copy; D16
+  announcements in `#status`; results `aria-busy`; D18 busy state: `#submit` disabled
+  "Triaging…", `#query` readonly, previous list `inert` + opacity .4; hidden and restored on
+  success, zero results, or error). Acceptance: T034 extended to require `#working` with its
+  role/label; manual mock run shows the card while running and removes it after.
+
+### Wave E — FE lane (needs landed BE API) || BE README
+
+- [ ] T038 [FE] [US1] Paper links (FR-014, SC-007), brief D10. Needs T027. `app.js` + `app.css`:
+  arXiv rows render `a[data-link="abs"]` "arXiv page" and `a[data-link="pdf"]` "PDF" from
+  `r.abs_url`/`r.pdf_url` (fallback derive per D10), `pdf` rows only `a[data-link="pdf"]`;
+  `target="_blank" rel="noopener noreferrer"`, aria-labels per D10; `href` set only for
+  `http:`/`https:` URLs; failed rows keep links. Acceptance: T034 green; manual mock check that
+  hrefs equal `https://arxiv.org/abs/<id>` and `https://arxiv.org/pdf/<id>`.
+- [ ] T039 [FE] [US1] [US3] Load 5 more (FR-013, SC-008), brief D19-D20 (D21 superseded by
+  contracts/api.md). Needs T029, T037. `index.html`, `app.js`, `app.css`: result-set state per
+  data-model.md; `#load-more` button + caption after the list; request `{query, max_results: 5,
+  offset: nextOffset}`; exhaustion from `has_more` (not result count); append without
+  re-sorting, dedupe by `paper_id`, `li.batch-sep` "Papers 11–15", `.paper--new` flash
+  (reduced-motion variant), focus rule, `#status` announcements, `#results-count` update;
+  loading state (`aria-disabled`, "Loading 5 more…", `.working--compact`), error state
+  (`p.load-more__error` role=alert, "Try again"); only-duplicates page -> "No new papers in this
+  batch." and button stays while `has_more`; hidden for item runs (topic `""`), during a full
+  triage, when `has_more` false, or when 50 ids are shown. After reload (`/api/papers`):
+  `nextOffset` = shown count, shown when topic non-empty. Acceptance: T034 green; manual mock
+  run 10 -> 15 rows, then button gone.
+- [ ] T040 [FE] [US2] Chat scope wiring (FR-008-FR-010), brief D23. Needs T031, T039. `app.js`,
+  `index.html`, `app.css`: `paper_ids` = result-set ids (first page + load-more, max 50, display
+  order); new search replaces the set; `#chat-scope` copy "Chatting about N papers from this
+  search." / "… from your last run." (N = shown rows with status ok); empty set: "Run a search
+  first…" and `#question`/`#ask` disabled; server refusals render per D26. Acceptance: manual
+  mock run: "What is the capital of France?" -> refusal; title word of a shown paper -> cited.
+- [ ] T041 [FE] Browser e2e specs `tests/frontend/test_e2e_browser.py` (`@pytest.mark.e2e`,
+  fixtures `live_server`, `offline_page`, `base_url` from T032; selectors only from plan.md UI
+  test hooks). Needs T032, T037-T040. Cases: (1) indicator: `set_triage_delay(1.5)`, submit
+  "diffusion distillation" -> `#working` visible, then hidden within 10 s, 10 `li.paper`
+  (SC-006); reset delay 0. (2) links: every arXiv row's `a[data-link="abs"]` href ==
+  `https://arxiv.org/abs/<id>`, `a[data-link="pdf"]` href == `https://arxiv.org/pdf/<id>`,
+  `target="_blank"`, rel contains `noopener` (SC-007). (3) load-more: click `#load-more` ->
+  15 rows, unique ids, new ids `2401.00011`..`2401.00015`, then `#load-more` not visible
+  (SC-008). (4) id search "2401.00001 2401.00002" -> `#load-more` not visible. (5) chat "What is
+  the capital of France?" -> last `li.turn` has `.turn__a--refused` and no `a.cite` (SC-003).
+  (6) id search "2401.00001", then ask with the marker word of `2401.00002`'s title (read from
+  the earlier topic run; question = marker word plus "?" only) -> refused. (7) topic run, ask
+  with a shown title's marker word ->
+  `a.cite` whose id is in the shown list (SC-002). Every case: zero external requests.
+  Acceptance: `MOCK_LLM=1 uv run pytest -q -m e2e` green offline.
+- [ ] T042 [BE] `README.md` v2: result links, "Load 5 more", chat scoped to the current
+  results, searching indicator, browser e2e setup (`uv run playwright install chromium`, see
+  `SETUP_LOG.md`) and run command, `E2E_PORT`. Needs T033.
+
 ## Lanes (parallel build)
 [BE] = backend-builder; [FE] = frontend-builder. Disjoint files: FE owns `src/paper_triage/static/**` + `tests/frontend/**`; BE owns the rest. T021 is split: BE commits the API test half first as "T021 (api): ...", FE then does the UI half and ticks the box as "T021 (ui): ...".
 Waves: A (parallel) BE T018 -> T019 -> T021(api) -> T022 || FE T017 -> T021(ui). B: FE T020 (needs T019 landed) -> T023. C: BE T024 (README) last. Tester runs after each wave on both lanes.
+
+v2 waves (spawn both lanes in one message; tester after each wave; failures go back tagged):
+
+- **Wave D** (parallel, no cross-lane dependency):
+  BE T027 -> T028 -> T029 -> T030 -> T031 -> T032 -> T033 ||
+  FE T034 -> T035 -> T036 -> T037 (needs `docs/design/brief-v2-redesign.md`, landed e169b0f).
+  FE T036 already sends `paper_ids` with chat requests, so the UI keeps working when BE T031
+  makes `paper_ids` required mid-wave.
+- **Wave E** (starts after Wave D passes the tester):
+  FE T038 (needs T027) -> T039 (needs T029, T037, T038) -> T040 (needs T031, T039) -> T041 (needs
+  T032, T037-T040) || BE T042 (needs T033).
+- API handoff: BE records landed field names in "API facts" of
+  `.claude/state/agents/backend-builder.md`; contracts/api.md is the source of truth. FE gaps
+  are reported as `NEEDS-BE:`.
+- Tester port 8766 (`E2E_PORT` default); FE manual and e2e runs use `E2E_PORT=8765`.
 
 ## Dependencies
 
@@ -163,6 +350,10 @@ US1: T009 -> T010 (needs T005-T007); T011-T013 need T003+T004 (parallel); T014 n
 T008-T013; T015 needs T014; T016 -> T017 need T015.
 US2: T018 needs T004+T005; T019 needs T015+T018; T020 needs T017+T019.
 US3: T021 needs T017. Polish: T022 needs T019; T023 after T020+T021; T024 last.
+v2: T027 -> T028 -> T029 (T029 needs T028 fixture); T030 -> T031 (T031 tests need T028 marker
+words and T030 mock rule); T032 independent of T027-T031 but ordered after them in the BE lane;
+T033 needs T027-T031. FE: T034 -> T035 -> T036 -> T037; T038 needs T027+T036; T039 needs
+T029+T037+T038; T040 needs T031+T039; T041 needs T032+T037-T040; T042 needs T033.
 
 ## Parallel Examples
 
@@ -173,3 +364,7 @@ US3: T021 needs T017. Polish: T022 needs T019; T023 after T020+T021; T024 last.
 
 MVP = Phases 1-3 (stop and validate quickstart steps 1-3). Then US2, US3, polish, README.
 Story -> tasks: US1 T009-T017 (9), US2 T018-T020 (3), US3 T021 (1).
+v2 (16 tasks, T027-T042): US1 T027-T029, T035-T039; US2 T030, T031, T036, T040; US3 T039;
+cross-cutting tests/tooling T032-T034, T041; docs T042. Increment order: Wave D gives links,
+paging and scoped chat at the API plus the redesigned UI with the indicator; Wave E wires the
+UI to the new API and proves it in a real browser.
