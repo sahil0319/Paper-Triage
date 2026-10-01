@@ -148,6 +148,9 @@ scope -> `refused: true`; empty store -> refused, LLM not called.
 - [x] T025 [BE] OpenAI provider for LLM wrapper: `LLM_PROVIDER=anthropic|openai` (default anthropic,
   MOCK_LLM=1 wins), `OpenAIClient` (`OPENAI_API_KEY`, `OPENAI_MODEL`), `/api/status.provider`,
   `.env.example` + README, fake-SDK tests. Files `llm.py`, `config.py`, `app.py`, tests, docs.
+- [x] T026 [BE] Live-run fixes: concurrent per-paper LLM work in `pipeline.triage()` (`TRIAGE_CONCURRENCY`,
+  default 4, 1 = sequential; DB stays on calling thread; summarizer || critic) + `ranker.md` score
+  calibration (5-8 typical, 9-10 rare). Tests, README, `.env.example`.
 
 ## Lanes (parallel build)
 [BE] = backend-builder; [FE] = frontend-builder. Disjoint files: FE owns `src/paper_triage/static/**` + `tests/frontend/**`; BE owns the rest. T021 is split: BE commits the API test half first as "T021 (api): ...", FE then does the UI half and ticks the box as "T021 (ui): ...".

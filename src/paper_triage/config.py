@@ -17,6 +17,14 @@ class Settings:
     default_papers: int = 10
     text_cap: int = 40000
     chat_top_k: int = 20
+    concurrency: int = 4  # papers processed in parallel (TRIAGE_CONCURRENCY, min 1)
+
+
+def _concurrency() -> int:
+    try:
+        return max(1, int(os.environ.get("TRIAGE_CONCURRENCY", "").strip() or 4))
+    except ValueError:
+        return 4
 
 
 def get_settings() -> Settings:
@@ -30,4 +38,5 @@ def get_settings() -> Settings:
         provider=provider,
         mock=os.environ.get("MOCK_LLM") == "1",
         db_path=os.environ.get("PAPER_TRIAGE_DB") or "./paper_triage.db",
+        concurrency=_concurrency(),
     )

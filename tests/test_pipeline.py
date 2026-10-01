@@ -1,3 +1,6 @@
+import threading
+import time
+
 import pytest
 from pydantic import ValidationError
 
@@ -177,3 +180,122 @@ def test_same_paper_new_topic_gets_own_result(env):
     llm = Flaky()
     triage("2401.00001 distillation", 10, conn, http, llm)
     assert llm.calls.count(Rank) == 1
+
+
+class Slow:
+    """MockClient wrapper: sleeps per call; tracks peak concurrent calls; optional per-id failure."""
+
+    def __init__(self, delay=0.05, fail_id=None, fail_schema=Summary):
+        self.inner = MockClient()
+        self.delay, self.fail_id, self.fail_schema = delay, fail_id, fail_schema
+        self.lock = threading.Lock()
+        self.active = self.peak = 0
+        self.threads = set()
+
+    def parse(self, system, user, schema):
+        with self.lock:
+            self.active += 1
+            self.peak = max(self.peak, self.active)
+            self.threads.add(threading.get_ident())
+        try:
+            time.sleep(self.delay)
+            if self.fail_id and self.fail_id in user and schema is self.fail_schema:
+                raise LLMRefusal("no")
+            return self.inner.parse(system, user, schema)
+        finally:
+            with self.lock:
+                self.active -= 1
+
+    def text(self, system, user):  # pragma: no cover
+        raise AssertionError("text() not expected")
+
+
+IDS = "2401.00001 2401.00002 2401.00003 2401.00004 2401.00005"
+
+
+def _timed(env, monkeypatch, conc, llm, topic=IDS):
+    conn, http = env
+    monkeypatch.setenv("TRIAGE_CONCURRENCY", str(conc))
+    t = time.perf_counter()
+    out = triage(topic, 10, conn, http, llm)
+    return out, time.perf_counter() - t
+
+
+def test_concurrent_faster_than_sequential_same_results(env, monkeypatch, tmp_path):
+    seq_llm, par_llm = Slow(), Slow()
+    seq, t_seq = _timed(env, monkeypatch, 1, seq_llm)
+    assert seq_llm.peak == 1
+    conn2 = db.connect(str(tmp_path / "b.db"))
+    db.init_schema(conn2)
+    par, t_par = _timed((conn2, env[1]), monkeypatch, 4, par_llm)
+    assert par_llm.peak > 1
+    assert t_par < t_seq * 0.7
+    assert par == seq  # same order + content as sequential
+
+
+def test_concurrent_failure_isolated(env, monkeypatch):
+    llm = Slow(delay=0.01, fail_id="2401.00002")
+    out, _ = _timed(env, monkeypatch, 4, llm)
+    by_id = {r["paper_id"]: r for r in out["results"]}
+    assert by_id["2401.00002"]["status"] == "failed"
+    assert "summar" in by_id["2401.00002"]["error"].lower()
+    assert all(r["status"] == "ok" for i, r in by_id.items() if i != "2401.00002")
+    assert out["results"][-1]["paper_id"] == "2401.00002"
+    assert db.get_result(env[0], "2401.00002", "")["status"] == "failed"
+
+
+def test_concurrent_retry_once_semantics(env, monkeypatch):
+    llm = Slow(delay=0.01, fail_id="2401.00003")
+    _timed(env, monkeypatch, 4, llm)
+    # second attempt happens: failing paper hit twice (initial + one retry), not more
+    calls = []
+    orig = llm.parse
+
+    def spy(system, user, schema):
+        if schema is Summary and "2401.00003" in user:
+            calls.append(1)
+        return orig(system, user, schema)
+
+    llm.parse = spy
+    triage(IDS, 10, env[0], env[1], llm)  # failed row is recomputed
+    assert len(calls) == 2
+
+
+def test_summarizer_and_critic_run_concurrently_within_paper(env, monkeypatch):
+    llm = Slow(delay=0.1)
+    out, t = _timed(env, monkeypatch, 2, llm, "2401.00001")
+    assert out["results"][0]["status"] == "ok"
+    assert llm.peak == 2 and len(llm.threads) >= 2
+    assert t < 0.27  # summ||crit then rank = 2 delays (0.2s), vs 0.3s sequential
+
+
+def test_db_only_touched_on_calling_thread(env, monkeypatch):
+    seen = set()
+    for name in ("save_result", "get_result"):
+        orig = getattr(db, name)
+
+        def wrap(*a, _orig=orig, **k):
+            seen.add(threading.get_ident())
+            return _orig(*a, **k)
+
+        monkeypatch.setattr(db, name, wrap)
+    llm = Slow(delay=0.01)
+    out, _ = _timed(env, monkeypatch, 4, llm)
+    assert len(out["results"]) == 5
+    assert seen == {threading.get_ident()}
+    assert threading.get_ident() in llm.threads or len(llm.threads) > 1
+
+
+def test_concurrency_setting_default_min_and_invalid(monkeypatch):
+    from paper_triage.config import get_settings
+
+    monkeypatch.delenv("TRIAGE_CONCURRENCY", raising=False)
+    assert get_settings().concurrency == 4
+    monkeypatch.setenv("TRIAGE_CONCURRENCY", "0")
+    assert get_settings().concurrency == 1
+    monkeypatch.setenv("TRIAGE_CONCURRENCY", "-3")
+    assert get_settings().concurrency == 1
+    monkeypatch.setenv("TRIAGE_CONCURRENCY", "8")
+    assert get_settings().concurrency == 8
+    monkeypatch.setenv("TRIAGE_CONCURRENCY", "abc")
+    assert get_settings().concurrency == 4

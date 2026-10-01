@@ -45,6 +45,10 @@ uv run uvicorn paper_triage.app:app
 `OPENAI_MODEL` defaults to `gpt-5-mini`; confirm that id is available to your key, or set your own.
 Startup fails with a clear error if `LLM_PROVIDER=openai` and `OPENAI_API_KEY` is unset.
 
+`TRIAGE_CONCURRENCY` (default 4, min 1) sets how many papers are summarized/critiqued/ranked in
+parallel (summarizer and critic also overlap within a paper). `1` = fully sequential. Fetching and
+arXiv throttling stay sequential; lower it if your key hits rate limits.
+
 Open http://127.0.0.1:8000. Optional: `PAPER_TRIAGE_DB` sets the SQLite path
 (default `./paper_triage.db`). `GET /api/status` reports mock mode, provider, model and stored
 paper count.

@@ -126,6 +126,18 @@ def test_ranker_prompt_has_topic_summary_no_full_text_and_anchors():
         assert anchor in system
 
 
+def test_ranker_prompt_calibration_guidance():
+    spy = Spy(Rank(rank=7, rank_reason="r"))
+    rank(PAPER, SUMMARY, "diffusion distillation", spy)
+    system = spy.calls[0][0].lower()
+    assert "5-8" in system  # most relevant papers land here
+    assert "1 in 5" in system  # 9-10 is rare
+    assert "full range" in system
+    assert "ties" in system
+    assert "separates" in system and "7" in system  # reason must say what beats a 7
+    assert "central and strong" not in system  # old saturating anchor wording
+
+
 def test_ranker_empty_topic_uses_overall_priority_wording():
     spy = Spy(Rank(rank=5, rank_reason="r"))
     rank(PAPER, SUMMARY, "  ", spy)

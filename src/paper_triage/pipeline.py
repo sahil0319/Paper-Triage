@@ -4,6 +4,7 @@ Owns the single retry for LLMError/LLMRefusal/pydantic ValidationError (agents l
 """
 
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
 
 from pydantic import ValidationError
 
@@ -45,26 +46,64 @@ def _reason(step: str, e: Exception) -> str:
     return f"{step}: {type(e).__name__}: {' '.join(str(e).split())[:200]}"
 
 
-def _process(conn: sqlite3.Connection, paper: dict, topic: str, llm: LLMClient) -> None:
-    """Run the three agents for one paper and store the result (ok, or failed with partials)."""
-    pid = paper["id"]
-    step, summary, crit = "summarizer", None, None
+def _compute(paper: dict, topic: str, llm: LLMClient, crit_pool: ThreadPoolExecutor | None) -> dict:
+    """LLM work for one paper; never touches the DB (safe in a worker thread).
+
+    Returns {"summary", "critique", "rank", "rank_reason", "error"}. With crit_pool the critic runs
+    alongside the summarizer; without it the order is the original sequential one.
+    """
+    out = {"summary": None, "critique": None, "rank": None, "rank_reason": None, "error": None}
+    step = "summarizer"
     try:
-        summary = _retry(lambda: summarize(paper, llm))
-        step = "critic"
-        crit = _retry(lambda: critique(paper, llm))
+        if crit_pool is None:
+            out["summary"] = _retry(lambda: summarize(paper, llm))
+            step = "critic"
+            out["critique"] = _retry(lambda: critique(paper, llm))
+        else:
+            fut = crit_pool.submit(_retry, lambda: critique(paper, llm))
+            errs = {}
+            try:
+                out["summary"] = _retry(lambda: summarize(paper, llm))
+            except _RETRY_ON as e:
+                errs["summarizer"] = e
+            try:
+                out["critique"] = fut.result()
+            except _RETRY_ON as e:
+                errs["critic"] = e
+            for step, e in errs.items():  # summarizer first, like the sequential order
+                raise e
         step = "ranker"
-        rk = _retry(lambda: rank(paper, summary, topic, llm))
+        rk = _retry(lambda: rank(paper, out["summary"], topic, llm))
+        out["rank"], out["rank_reason"] = rk.rank, rk.rank_reason
     except _RETRY_ON as e:
+        out["error"] = _reason(step, e)
+    return out
+
+
+def _save(conn: sqlite3.Connection, pid: str, topic: str, r: dict) -> None:
+    if r["error"]:
         db.save_result(
-            conn, pid, topic, status="failed", summary=summary, critique=crit,
-            error=_reason(step, e),
+            conn, pid, topic, status="failed", summary=r["summary"], critique=r["critique"],
+            error=r["error"],
         )
+    else:
+        db.save_result(
+            conn, pid, topic, status="ok", summary=r["summary"], critique=r["critique"],
+            rank=r["rank"], rank_reason=r["rank_reason"],
+        )
+
+
+def _process_all(conn: sqlite3.Connection, todo: list[dict], topic: str, llm: LLMClient) -> None:
+    """Compute (concurrently when TRIAGE_CONCURRENCY > 1), then store in paper order on this thread."""
+    workers = get_settings().concurrency
+    if workers <= 1 or not todo:
+        for paper in todo:
+            _save(conn, paper["id"], topic, _compute(paper, topic, llm, None))
         return
-    db.save_result(
-        conn, pid, topic, status="ok", summary=summary, critique=crit, rank=rk.rank,
-        rank_reason=rk.rank_reason,
-    )
+    with ThreadPoolExecutor(workers) as pool, ThreadPoolExecutor(workers) as crit_pool:
+        futs = [pool.submit(_compute, p, topic, llm, crit_pool) for p in todo]
+        for paper, fut in zip(todo, futs, strict=True):
+            _save(conn, paper["id"], topic, fut.result())
 
 
 def triage(query: str, n: int, conn: sqlite3.Connection, http, llm: LLMClient) -> dict:
@@ -79,11 +118,14 @@ def triage(query: str, n: int, conn: sqlite3.Connection, http, llm: LLMClient) -
         papers, errors = Fetcher(conn, client, throttle).fetch(topic, items, n)
     except FetchError as e:
         return {"topic": topic, "results": [], "errors": [{"input": topic, "reason": str(e)}]}
-    results = []
+    todo = []
     for paper in papers:
         existing = db.get_result(conn, paper["id"], topic)
         if existing is None or existing["status"] != "ok":
-            _process(conn, paper, topic, llm)
+            todo.append(paper)
+    _process_all(conn, todo, topic, llm)
+    results = []
+    for paper in papers:
         row = db.get_result(conn, paper["id"], topic)
         results.append(
             to_out({**row, "title": paper["title"], "authors": paper["authors"],
