@@ -1,5 +1,5 @@
 {
-  "phase": "done",
+  "phase": "done+live-hardening",
   "tasks": {
     "T001": "done",
     "T002": "done",
@@ -24,12 +24,14 @@
     "T021": "done",
     "T022": "done",
     "T023": "done",
-    "T024": "done"
+    "T024": "done",
+    "T025": "done",
+    "T026": "done"
   },
   "last_checkpoint_ts": 1727740800,
-  "context_pct": 74.0,
-  "last_warn_level": 1,
-  "last_warn_ts": 1790848616.519422,
+  "context_pct": 88.5,
+  "last_warn_level": 2,
+  "last_warn_ts": 1790850814.690676,
   "DONE": true,
   "last_precompact_ts": 1790846263.5785239
 }
