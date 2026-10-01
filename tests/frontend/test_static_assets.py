@@ -19,6 +19,7 @@ REQUIRED_IDS = [
     "status",
     "alert",
     "working",
+    "load-more",
 ]
 
 

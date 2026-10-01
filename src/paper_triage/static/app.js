@@ -22,6 +22,11 @@
   var logEl = document.getElementById("chat-log");
   var chatEl = document.getElementById("chat");
   var workingEl = document.getElementById("working");
+  var moreWrap = document.getElementById("load-more-wrap");
+  var moreBtn = document.getElementById("load-more");
+  var moreCaption = document.getElementById("load-more-caption");
+  var moreError = document.getElementById("load-more-error");
+  var workingMoreEl = document.getElementById("working-more");
 
   var SVG_NS = "http://www.w3.org/2000/svg";
   var NETWORK_MSG = "Could not reach the server. Check that the app is running.";
@@ -30,8 +35,16 @@
     rows: [],          // result items currently shown, in display order
     lastQuery: "",
     running: false,
-    mock: false
+    mock: false,
+    query: "",          // query sent to /api/triage for the current result set
+    topic: "",
+    nextOffset: null,   // offset for the next load-more call
+    hasMore: false,
+    loadingMore: false,
+    generation: 0       // bumped by every full triage; stale load-more replies are dropped
   };
+  var MAX_IDS = 50;
+  var PAGE = 5;
 
   // ---- small DOM helpers ----
 
@@ -319,6 +332,11 @@
   function render(data, stored) {
     var rs = data.results || [];
     state.rows = rs.slice();
+    state.topic = data.topic || "";
+    state.query = stored ? state.topic : state.lastQuery;
+    // After a reload the server sends no paging fields: next offset = rows shown (data-model).
+    state.nextOffset = stored ? rs.length : (data.next_offset === undefined ? null : data.next_offset);
+    state.hasMore = stored ? !!state.topic : !!data.has_more;
     clear(listEl);
     rs.forEach(function (r) { listEl.appendChild(row(r)); });
     showNotes(data.errors);
@@ -340,6 +358,7 @@
       statusEl.textContent = "No papers found.";
     }
     refreshSuggestions();
+    refreshLoadMore();
   }
 
   // ---- searching indicator (D14-D18): activity and elapsed time, never progress ----
@@ -352,8 +371,8 @@
   var VERB_MS = 2400;
   var VERB_MS_REDUCED = 5000;
 
-  var work = { t0: 0, showT: null, tickT: null, verbT: null, verbI: 0, verbEl: null, timeEl: null,
-    noteEl: null, minutes: 0 };
+  var work = { el: null, compact: false, t0: 0, showT: null, tickT: null, verbT: null, verbI: 0,
+    verbEl: null, timeEl: null, noteEl: null, minutes: 0 };
 
   function reducedMotion() {
     return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
@@ -404,24 +423,28 @@
   }
 
   function showWorking() {
-    clear(workingEl);
+    var el = work.el;
+    clear(el);
     work.verbI = 0;
     work.verbEl = h("span", { class: "working__verb", "aria-hidden": "true" }, VERBS[0]);
     work.timeEl = h("span", { class: "working__time", "aria-hidden": "true" }, clock(elapsedSec()));
-    work.noteEl = h("p", { class: "working__note" }, noteFor(elapsedSec()));
-    workingEl.appendChild(h("div", { class: "working__row" },
-      h("span", { class: "working__glyph" }, rayGlyph(20)), work.verbEl, work.timeEl));
-    workingEl.appendChild(work.noteEl);
-    workingEl.hidden = false;
+    work.noteEl = work.compact ? null : h("p", { class: "working__note" }, noteFor(elapsedSec()));
+    el.appendChild(h("div", { class: "working__row" },
+      h("span", { class: "working__glyph" }, rayGlyph(work.compact ? 16 : 20)), work.verbEl, work.timeEl));
+    if (work.noteEl) el.appendChild(work.noteEl);
+    el.hidden = false;
     work.verbT = window.setInterval(nextVerb, reducedMotion() ? VERB_MS_REDUCED : VERB_MS);
   }
 
-  function startWorking() {
+  function startWorking(el, compact) {
     stopWorking();
+    work.el = el || workingEl;
+    work.compact = !!compact;
     work.t0 = performance.now();
     work.minutes = 0;
     work.showT = window.setTimeout(showWorking, SHOW_DELAY_MS);
     work.tickT = window.setInterval(updateClock, 1000);
+    if (compact) return;
     // The first-run empty state would contradict the running indicator.
     emptyEl.hidden = true;
     // Previous list stays visible but inert while a new run is in flight (D18).
@@ -437,8 +460,8 @@
     window.clearInterval(work.verbT);
     work.showT = work.tickT = work.verbT = null;
     work.verbEl = work.timeEl = work.noteEl = null;
-    clear(workingEl);
-    workingEl.hidden = true;
+    [workingEl, workingMoreEl].forEach(function (el) { clear(el); el.hidden = true; });
+    work.el = null;
     [listEl, notesEl].forEach(function (el) {
       el.removeAttribute("inert");
       el.classList.remove("is-stale");
@@ -454,11 +477,15 @@
     if (busy) input.setAttribute("readonly", ""); else input.removeAttribute("readonly");
     results.setAttribute("aria-busy", busy ? "true" : "false");
     if (busy) startWorking(); else stopWorking();
+    refreshLoadMore();
   }
 
   function runTriage(query) {
     if (state.running) return;
     state.lastQuery = query;
+    state.generation++; // any load-more reply still in flight belongs to the old result set
+    state.loadingMore = false;
+    moreError.hidden = true;
     setBusy(true);
     showAlert("");
     statusEl.textContent = state.mock ? "Triage started." : "Triage started. This can take 1 to 3 minutes.";
@@ -471,6 +498,129 @@
       })
       .then(function () { setBusy(false); });
   }
+
+
+  // ---- load 5 more (D19, D20) ----
+
+  var loadMoreLabel = "Load 5 more papers";
+
+  function setMoreLabel(loading) {
+    clear(moreBtn);
+    if (loading) {
+      moreBtn.appendChild(rayGlyph(16, "btn__glyph"));
+      moreBtn.appendChild(document.createTextNode("Loading 5 more…"));
+    } else {
+      moreBtn.appendChild(document.createTextNode(loadMoreLabel));
+    }
+  }
+
+  // Shown only for topic searches with a loaded result set. Hidden during a full triage, when the
+  // server says there is nothing more, and at the 50-paper limit.
+  function refreshLoadMore() {
+    var offered = !!state.topic && state.rows.length > 0 && state.nextOffset !== null &&
+      !state.running;
+    if (!offered) { moreWrap.hidden = true; return; }
+    var full = state.rows.length >= MAX_IDS;
+    var canLoad = state.hasMore && !full;
+    moreWrap.hidden = false;
+    moreBtn.hidden = !canLoad;
+    if (state.loadingMore) {
+      moreBtn.setAttribute("aria-disabled", "true");
+    } else {
+      moreBtn.removeAttribute("aria-disabled");
+    }
+    if (!state.loadingMore) {
+      setMoreLabel(false);
+      if (!moreError.hidden) moreBtn.firstChild.nodeValue = "Try again";
+    }
+    var t = "“" + state.topic + "”";
+    moreCaption.textContent = !canLoad
+      ? (full && state.hasMore
+        ? "Showing " + MAX_IDS + " papers, the most one search holds."
+        : "No more papers for " + t + ".")
+      : "Showing " + plural(state.rows.length, "paper") + " for " + t + ".";
+  }
+
+  function showMoreError(detail) {
+    moreError.textContent = "Could not load more papers. " + detail;
+    moreError.hidden = false;
+  }
+
+  function appendPage(data) {
+    var seen = {};
+    state.rows.forEach(function (r) { seen[r.paper_id] = true; });
+    var fresh = [];
+    (data.results || []).forEach(function (r) {
+      if (seen[r.paper_id] || state.rows.length + fresh.length >= MAX_IDS) return;
+      seen[r.paper_id] = true;
+      fresh.push(r);
+    });
+    var first = state.rows.length + 1;
+    if (fresh.length) {
+      listEl.appendChild(h("li", { class: "batch-sep", "aria-hidden": "true" },
+        fresh.length === 1 ? "Paper " + first : "Papers " + first + "–" + (first + fresh.length - 1)));
+    }
+    var added = [];
+    fresh.forEach(function (r) {
+      var li = row(r);
+      li.classList.add("paper--new");
+      listEl.appendChild(li);
+      added.push(li);
+      state.rows.push(r);
+    });
+    window.setTimeout(function () {
+      added.forEach(function (li) { li.classList.remove("paper--new"); });
+    }, reducedMotion() ? 5000 : 1600);
+    return added;
+  }
+
+  function loadMore() {
+    if (state.loadingMore || state.running || !state.hasMore) return;
+    var gen = state.generation;
+    var focusOnButton = true;
+    state.loadingMore = true;
+    moreError.hidden = true;
+    setMoreLabel(true);
+    refreshLoadMore();
+    statusEl.textContent = "Loading 5 more papers.";
+    startWorking(workingMoreEl, true);
+    postJSON("/api/triage", { query: state.query, max_results: PAGE, offset: state.nextOffset })
+      .then(function (data) {
+        if (gen !== state.generation) return;
+        focusOnButton = document.activeElement === moreBtn;
+        var added = appendPage(data);
+        state.nextOffset = data.next_offset === undefined ? null : data.next_offset;
+        state.hasMore = !!data.has_more && state.nextOffset !== null;
+        var failed = failedCount(state.rows);
+        countEl.textContent = plural(state.rows.length, "paper") +
+          " · sorted by relevance within each batch" +
+          (failed ? " · " + failed + " could not be processed" : "");
+        statusEl.textContent = !added.length
+          ? "No new papers in this batch." + (state.hasMore ? "" : " No more for this topic.")
+          : "Added " + plural(added.length, "paper") + ". " +
+            (state.hasMore ? state.rows.length + " shown." : "No more for this topic.");
+        state.loadingMore = false;
+        stopWorking();
+        refreshLoadMore();
+        if (!added.length) {
+          moreCaption.textContent = "No new papers in this batch. " + moreCaption.textContent;
+        } else if (focusOnButton) {
+          added[0].focus();
+          added[0].scrollIntoView({ block: "start" });
+        }
+        refreshChat();
+      })
+      .catch(function (err) {
+        if (gen !== state.generation) return;
+        state.loadingMore = false;
+        stopWorking();
+        showMoreError(failMessage(err));
+        statusEl.textContent = "";
+        refreshLoadMore();
+      });
+  }
+
+  moreBtn.addEventListener("click", loadMore);
 
   form.addEventListener("submit", function (ev) {
     ev.preventDefault();
@@ -501,6 +651,10 @@
       return h("li", {}, b);
     })));
   chatEl.insertBefore(suggestEl, logEl);
+
+  function refreshChat() {
+    refreshSuggestions();
+  }
 
   function refreshSuggestions() {
     var hasOk = state.rows.some(function (r) { return r.status !== "failed"; });

@@ -48,6 +48,14 @@
       <div id="alert" class="alert" role="alert" hidden></div>
       <div id="notes" class="notes" hidden></div>
       <ol id="paper-list" class="papers"></ol>
+      <div id="load-more-wrap" class="load-more" hidden>
+        <p id="load-more-error" class="load-more__error" role="alert" hidden></p>
+        <div class="load-more__row">
+          <button id="load-more" type="button" class="btn btn--secondary">Load 5 more papers</button>
+          <p id="load-more-caption" class="load-more__caption"></p>
+        </div>
+        <div id="working-more" class="working working--compact" role="group" aria-label="Loading more papers" hidden></div>
+      </div>
       <div id="empty" class="empty">
         <p class="empty__title">Nothing triaged yet.</p>
         <p class="empty__body">Enter a topic, or paste arXiv IDs or PDF links. Each run fetches up to

@@ -493,6 +493,29 @@ a.cite:active { background: var(--color-hairline); color: var(--color-ink); }
 /* previous results while a new run is in flight (D18) */
 .is-stale { opacity: 0.4; }
 
+/* ---- load 5 more (D19, D20) ---- */
+
+.batch-sep {
+  font: var(--type-caption); letter-spacing: var(--tracking-caption); font-weight: 400;
+  color: var(--color-muted); border-top: 1px solid var(--color-hairline);
+  padding-top: var(--space-lg);
+}
+.batch-sep + .paper { border-top: 0; padding-top: var(--space-md); }
+
+@keyframes new-flash { from { background-color: var(--color-cream); } to { background-color: transparent; } }
+.paper--new { animation: new-flash var(--dur-flash) var(--ease-out); }
+
+.load-more { margin-top: var(--space-lg); }
+.load-more__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-md); }
+.load-more__caption { font: var(--type-caption); letter-spacing: var(--tracking-caption); font-weight: 400;
+  color: var(--color-muted); }
+.load-more__error { font: var(--type-body-md); line-height: var(--leading-prose); color: var(--color-coral);
+  margin-bottom: var(--space-xs); }
+#load-more { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-xs); }
+.btn__glyph { flex: none; }
+.working--compact { margin-top: var(--space-sm); padding: var(--space-sm) var(--space-md); }
+.working--compact .working__verb { font: 500 14px/1.25 var(--font-text); }
+
 /* ---- breakpoints ---- */
 
 @media (min-width: 768px) {
@@ -530,7 +553,7 @@ a.cite:active { background: var(--color-hairline); color: var(--color-ink); }
 @media (forced-colors: active) {
   .badge, .alert, .notes, .chat, .btn--secondary, .critique, .turn__a--refused { border: 1px solid CanvasText; }
   .rank__meter, .working { border: 1px solid CanvasText; }
-  .working__glyph, .turn__glyph { color: CanvasText; }
+  .working__glyph, .turn__glyph, .btn__glyph { color: CanvasText; }
   .rank__meter span { background: CanvasText; }
   .btn--primary { border: 1px solid ButtonText; }
   :focus-visible { outline: 2px solid Highlight; }
@@ -543,4 +566,5 @@ a.cite:active { background: var(--color-hairline); color: var(--color-ink); }
   .ray { opacity: 1; }
   .working__verb.is-out { transition: none; }
   .paper--cited { animation: none; outline: 2px solid var(--color-info-border); }
+  .paper--new { animation: none; box-shadow: inset 3px 0 0 var(--color-cream); }
 }

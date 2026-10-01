@@ -287,7 +287,7 @@ rendering rule; keep the UI test hooks from plan.md. Every task ends with
   `target="_blank" rel="noopener noreferrer"`, aria-labels per D10; `href` set only for
   `http:`/`https:` URLs; failed rows keep links. Acceptance: T034 green; manual mock check that
   hrefs equal `https://arxiv.org/abs/<id>` and `https://arxiv.org/pdf/<id>`.
-- [ ] T039 [FE] [US1] [US3] Load 5 more (FR-013, SC-008), brief D19-D20 (D21 superseded by
+- [x] T039 [FE] [US1] [US3] Load 5 more (FR-013, SC-008), brief D19-D20 (D21 superseded by
   contracts/api.md). Needs T029, T037. `index.html`, `app.js`, `app.css`: result-set state per
   data-model.md; `#load-more` button + caption after the list; request `{query, max_results: 5,
   offset: nextOffset}`; exhaustion from `has_more` (not result count); append without
