@@ -117,7 +117,7 @@ scope -> `refused: true`; empty store -> refused, LLM not called.
   (assert via spy); context = top-k papers as `<paper id title>` with abstract, summary,
   critique; regex `\[([^\[\]\s]+)\]` validation, strip unknown ids into `dropped_citations`;
   sentinel or zero valid citations -> `refused: true`.
-- [ ] T019 [BE] [US2] Extend `tests/test_api.py`, then `pt/app.py`: `POST /api/chat` (422 on empty
+- [x] T019 [BE] [US2] Extend `tests/test_api.py`, then `pt/app.py`: `POST /api/chat` (422 on empty
   question), persists `chat_turns`.
 - [ ] T020 [FE] [US2] Chat UI (re-read DESIGN.md + PRODUCT.md; frontend-design / impeccable):
   `pt/static/index.html`, `app.css`, `app.js`: question input + send; answers in an

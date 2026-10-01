@@ -40,3 +40,5 @@ Request `{"question": str}` (non-empty, else 422).
 `200 {"answer": str, "citations": [str], "refused": bool, "dropped_citations": [str]}`.
 Rules: empty store -> `refused: true`, no LLM call. Sentinel `NOT_IN_STORED_PAPERS` or zero
 valid citations -> `refused: true`. Every id in `citations` exists in `papers`.
+Refusal `answer` is a plain sentence (never contains the sentinel). Each call (answered or refused,
+not 422/502) is stored in `chat_turns`. Model failure -> `502 {"detail": "model call failed: .."}`.

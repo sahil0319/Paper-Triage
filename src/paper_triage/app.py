@@ -8,11 +8,12 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from . import db
+from .chat import answer as chat_answer
 from .config import get_settings
-from .llm import get_client
+from .llm import LLMError, get_client
 from .net import make_http
 from .pipeline import sort_results, to_out, triage
 
@@ -22,6 +23,18 @@ STATIC = Path(__file__).parent / "static"
 class TriageIn(BaseModel):
     query: str
     max_results: int = 10
+
+
+class ChatIn(BaseModel):
+    question: str
+
+    @field_validator("question")
+    @classmethod
+    def _non_empty(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("question must not be empty")
+        return v
 
 
 def create_app() -> FastAPI:
@@ -74,6 +87,17 @@ def create_app() -> FastAPI:
                 topic = db.latest_topic(conn) or ""
             rows = db.list_results(conn, topic)
         return {"topic": topic, "results": sort_results([to_out(r) for r in rows])}
+
+    @app.post("/api/chat")
+    def post_chat(body: ChatIn, request: Request):
+        st = request.app.state
+        with st.lock:
+            try:
+                out = chat_answer(body.question, st.conn, st.llm)
+            except LLMError as e:
+                raise HTTPException(502, f"model call failed: {e}") from e
+            db.save_chat_turn(st.conn, body.question, out.answer, out.citations, out.refused)
+        return out.model_dump()
 
     app.mount("/", StaticFiles(directory=STATIC, html=True), name="static")
     return app
