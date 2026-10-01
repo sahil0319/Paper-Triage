@@ -19,3 +19,4 @@
 - repo hygiene ok (.db/.env ignored, 24/24 ticks match commits). fresh clone+uv sync not run (sandbox denied).
 - advisory: mock chat only refuses on "out of scope" sentinel; generic OOS q gets canned cite. Not SC-003 violation. Optional [BE].
 - details: docs/qa/final.md. next: none -> DONE.
+T025 verify: PASS, 167 tests, ruff clean, no failures. DONE

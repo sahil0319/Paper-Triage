@@ -67,3 +67,12 @@ Gaps: none blocking. No automated JS/browser test exists (FE verified by static 
 
 ## Advisory note (not logged as failure): mock chat and out-of-scope questions
 In mock mode the chat refuses only when the question contains the sentinel "out of scope" (MockClient). A natural question like "What is the capital of France?" or "recipe for banana bread" returns a canned answer citing a stored id (refused=false). Real mode is not affected: the model decides, and the chat layer additionally refuses any answer with no valid citation. SC-003 says "out-of-scope test questions", and all tests use the sentinel convention, so no criterion is violated. Impact is a demo wart in mock mode only. Optional improvement [BE]: document the sentinel in README, or have MockClient refuse when the question shares no token with any stored title/summary. Not required for DONE.
+
+## T025 (c549b1a, OpenAI provider) - PASS
+- `uv run pytest -q`: 167 passed (offline, fake SDK objects); `ruff check .`: clean.
+- MOCK_LLM=1 + LLM_PROVIDER=openai, no key -> MockClient; /api/status `{mock:true, model:gpt-5-mini, provider:openai}`.
+- openai, no MOCK, no OPENAI_API_KEY -> `LLMError: LLM_PROVIDER=openai but OPENAI_API_KEY is not set` (raised in create_app, so startup fails as README says). No key read/printed; no .env created.
+- Default provider anthropic unchanged (AnthropicClient; status provider=anthropic, model claude-opus-5-5).
+- OpenAIClient: APIError->LLMError, refusal/content_filter->LLMRefusal, no-parsed->LLMError, ValidationError propagates, text() returns content or "". Covered by tests.
+- tasks.md T025 ticked, matches commit. README, contracts/api.md, .env.example consistent. No secrets/.env tracked.
+- Failures: none.

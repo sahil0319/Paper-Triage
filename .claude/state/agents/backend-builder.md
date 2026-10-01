@@ -15,3 +15,8 @@
 - goal: README. status: done, commit T024. verified mock server /api/status on 8767, pytest 156 pass, ruff clean.
 - finding: app does not load .env (no dotenv); README says source it. .env.example unreadable by my tools, not verified content.
 - next: tester
+
+## T025 openai provider
+- status: done, commit "T025: openai provider"
+- API facts: GET /api/status now {mock, model, provider, paper_count}; provider additive ("anthropic"|"openai"). No other shape change.
+- next: tester
