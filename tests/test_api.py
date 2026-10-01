@@ -149,3 +149,29 @@ def test_chat_llm_failure_is_502_plain_detail(client):
     r = client.post("/api/chat", json={"question": "hi"})
     assert r.status_code == 502 and "down" in r.json()["detail"]
     assert _turns(client) == []
+
+
+# --- T021 (api): revisit earlier results on a fresh app over the same db ---
+
+
+def test_new_app_instance_same_db_returns_same_results_without_fetch(tmp_db, monkeypatch):
+    import httpx
+
+    from paper_triage.net import Throttle
+
+    monkeypatch.setenv("PAPER_TRIAGE_DB", tmp_db)
+    with TestClient(create_app()) as c1:
+        first = c1.post("/api/triage", json={"query": "diffusion distillation"}).json()
+    assert len(first["results"]) == 5
+
+    def no_network(request):
+        raise AssertionError(f"unexpected fetch: {request.url}")
+
+    with TestClient(create_app()) as c2:
+        c2.app.state.http = (httpx.Client(transport=httpx.MockTransport(no_network)), Throttle(0))
+        status = c2.get("/api/status").json()
+        assert status["mock"] is True and status["paper_count"] == 5
+        stored = c2.get("/api/papers").json()
+        assert stored == {"topic": "diffusion distillation", "results": first["results"]}
+        again = c2.post("/api/triage", json={"query": "diffusion distillation"}).json()
+        assert again["results"] == first["results"]
