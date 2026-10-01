@@ -35,7 +35,7 @@ Package = `src/paper_triage/` (abbrev `pt/` below means `src/paper_triage/`).
 - [x] T003 [P] Test first `tests/test_models.py`, then `pt/models.py`: Pydantic `Summary`,
   `WeakClaim`, `Overclaim`, `Critique` (basis Literal), `Rank` (validator clamps 0-10),
   `ChatAnswer`, `PaperOut` per data-model.md.
-- [ ] T004 MOCK LLM wrapper. Test first in `tests/test_config_llm.py`, then `pt/llm.py`:
+- [x] T004 MOCK LLM wrapper. Test first in `tests/test_config_llm.py`, then `pt/llm.py`:
   `LLMClient` Protocol (`parse(system, user, schema)`, `text(system, user)`); `MockClient`
   (deterministic schema instances keyed by sha256 of `<paper id="...">` in prompt; chat text
   cites first `<paper id>` in context as `[id]`, returns `NOT_IN_STORED_PAPERS ...` when the
