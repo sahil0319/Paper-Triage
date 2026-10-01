@@ -299,3 +299,24 @@ def test_concurrency_setting_default_min_and_invalid(monkeypatch):
     assert get_settings().concurrency == 8
     monkeypatch.setenv("TRIAGE_CONCURRENCY", "abc")
     assert get_settings().concurrency == 4
+
+
+def test_source_urls():
+    from paper_triage.pipeline import source_urls
+
+    assert source_urls("2401.00001", "arxiv", "https://arxiv.org/pdf/2401.00001v2") == (
+        "https://arxiv.org/abs/2401.00001", "https://arxiv.org/pdf/2401.00001")
+    assert source_urls("math.GT/0107001", "arxiv", None) == (
+        "https://arxiv.org/abs/math.GT/0107001", "https://arxiv.org/pdf/math.GT/0107001")
+    assert source_urls("pdf:abc", "pdf", "https://example.org/a.pdf") == (
+        None, "https://example.org/a.pdf")
+
+
+def test_triage_results_carry_source_links(env):
+    conn, http = env
+    out = triage("2401.00001 https://example.org/a.pdf", 10, conn, http, MockClient())
+    by_src = {r["source"]: r for r in out["results"]}
+    assert by_src["arxiv"]["abs_url"] == "https://arxiv.org/abs/2401.00001"
+    assert by_src["arxiv"]["pdf_url"] == "https://arxiv.org/pdf/2401.00001"
+    assert by_src["pdf"]["abs_url"] is None
+    assert by_src["pdf"]["pdf_url"] == "https://example.org/a.pdf"

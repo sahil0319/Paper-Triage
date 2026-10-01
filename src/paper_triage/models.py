@@ -64,3 +64,5 @@ class PaperOut(BaseModel):
     critique: Critique | None = None
     status: Literal["ok", "failed"]
     error: str | None = None
+    abs_url: str | None = None
+    pdf_url: str | None = None

@@ -163,7 +163,7 @@ rendering rule; keep the UI test hooks from plan.md. Every task ends with
 
 ### Wave D — BE lane (no FE dependency)
 
-- [ ] T027 [BE] [US1] B1 source links (FR-014). Test first: `tests/test_pipeline.py` and
+- [x] T027 [BE] [US1] B1 source links (FR-014). Test first: `tests/test_pipeline.py` and
   `tests/test_api.py` assert every result item of `POST /api/triage` and `GET /api/papers` has
   `abs_url`/`pdf_url`: arXiv `2401.00001` -> `"https://arxiv.org/abs/2401.00001"` and
   `"https://arxiv.org/pdf/2401.00001"` (no version, https); a direct PDF URL item ->

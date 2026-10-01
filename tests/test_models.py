@@ -63,3 +63,12 @@ def test_paper_out_shape():
     failed = PaperOut(paper_id="p", title="T", source="pdf", basis="abstract", status="failed",
                       error="boom")
     assert failed.rank is None and failed.summary is None and failed.authors == []
+
+
+def test_paper_out_source_url_defaults():
+    p = PaperOut(paper_id="p", title="T", source="pdf", basis="abstract", status="ok")
+    assert p.abs_url is None and p.pdf_url is None
+    q = PaperOut(paper_id="2401.00001", title="T", source="arxiv", basis="abstract", status="ok",
+                 abs_url="https://arxiv.org/abs/2401.00001",
+                 pdf_url="https://arxiv.org/pdf/2401.00001")
+    assert q.model_dump()["abs_url"].endswith("/abs/2401.00001")

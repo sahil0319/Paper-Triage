@@ -176,3 +176,14 @@ def test_new_app_instance_same_db_returns_same_results_without_fetch(tmp_db, mon
         assert stored == {"topic": "diffusion distillation", "results": first["results"]}
         again = c2.post("/api/triage", json={"query": "diffusion distillation"}).json()
         assert again["results"] == first["results"]
+
+
+def test_source_links_on_triage_and_papers(client):
+    body = client.post("/api/triage", json={"query": "2401.00001 https://example.org/a.pdf"}).json()
+    again = client.get("/api/papers", params={"topic": ""}).json()["results"]
+    for results in (body["results"], again):
+        by_src = {r["source"]: r for r in results}
+        assert by_src["arxiv"]["abs_url"] == "https://arxiv.org/abs/2401.00001"
+        assert by_src["arxiv"]["pdf_url"] == "https://arxiv.org/pdf/2401.00001"
+        assert by_src["pdf"]["abs_url"] is None
+        assert by_src["pdf"]["pdf_url"] == "https://example.org/a.pdf"

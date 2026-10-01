@@ -160,7 +160,7 @@ def get_result(conn: sqlite3.Connection, paper_id: str, topic: str) -> dict | No
 def list_results(conn: sqlite3.Connection, topic: str) -> list[dict]:
     """Results for a topic joined with paper fields: rank desc, failed last."""
     rows = conn.execute(
-        """SELECT r.*, p.title, p.authors, p.source, p.basis
+        """SELECT r.*, p.title, p.authors, p.source, p.basis, p.pdf_url
            FROM results r JOIN papers p ON p.id = r.paper_id
            WHERE r.topic = ?
            ORDER BY r.status = 'failed', r.rank DESC, r.rowid""",

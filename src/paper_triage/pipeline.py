@@ -20,7 +20,7 @@ from .summarizer import summarize
 _RETRY_ON = (LLMError, ValidationError)  # LLMRefusal is an LLMError
 _OUT_KEYS = (
     "paper_id", "title", "authors", "source", "basis", "rank", "rank_reason", "summary",
-    "critique", "status", "error",
+    "critique", "status", "error", "abs_url", "pdf_url",
 )
 
 
@@ -32,8 +32,17 @@ def _retry(fn):
         return fn()
 
 
+def source_urls(paper_id: str, source: str, pdf_url: str | None) -> tuple[str | None, str | None]:
+    """(abs_url, pdf_url) for a result item: arXiv links derive from the id, a PDF keeps its URL."""
+    if source == "arxiv":
+        return f"https://arxiv.org/abs/{paper_id}", f"https://arxiv.org/pdf/{paper_id}"
+    return None, pdf_url
+
+
 def to_out(row: dict) -> dict:
     """db.list_results row -> API result item (contracts/api.md)."""
+    row = dict(row)
+    row["abs_url"], row["pdf_url"] = source_urls(row["paper_id"], row["source"], row.get("pdf_url"))
     return {k: row.get(k) for k in _OUT_KEYS}
 
 
@@ -129,6 +138,7 @@ def triage(query: str, n: int, conn: sqlite3.Connection, http, llm: LLMClient) -
         row = db.get_result(conn, paper["id"], topic)
         results.append(
             to_out({**row, "title": paper["title"], "authors": paper["authors"],
-                    "source": paper["source"], "basis": paper["basis"]})
+                    "source": paper["source"], "basis": paper["basis"],
+                    "pdf_url": paper.get("pdf_url")})
         )
     return {"topic": topic, "results": sort_results(results), "errors": errors}
