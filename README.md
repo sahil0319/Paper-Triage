@@ -13,7 +13,7 @@ Pipeline: Fetcher -> Summarizer -> Critic -> Ranker -> grounded Chat.
   rank (0-10) with the reason, summary and critique.
 - **Searching indicator.** A triage can take a while in live mode (roughly 1 to 3 minutes for up
   to 10 papers). While it runs the page shows a working card with activity and elapsed time, never
-  a progress percentage, and the controls are disabled until the search ends.
+  a progress percentage.
 - **Paper links.** Each result links to its source: arXiv papers get an abstract page and a PDF
   link (`https://arxiv.org/abs/<id>`, `https://arxiv.org/pdf/<id>`); a direct PDF URL gets the PDF
   link only (`abs_url` is `null`).
