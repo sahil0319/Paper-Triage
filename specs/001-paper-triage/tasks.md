@@ -135,7 +135,7 @@ scope -> `refused: true`; empty store -> refused, LLM not called.
 
 ## Phase 6: Polish
 
-- [ ] T022 [BE] E2E mock smoke `tests/test_e2e_mock.py`: with `MOCK_LLM=1`, no key, and
+- [x] T022 [BE] E2E mock smoke `tests/test_e2e_mock.py`: with `MOCK_LLM=1`, no key, and
   `socket.socket.connect` monkeypatched to raise: status mock=true; triage topic -> 5 results,
   >=1 `basis="abstract"`; mixed ids+URL input; chat in-scope cites only stored ids; out-of-scope
   refused; 5-paper triage < 5 s (SC-001).
