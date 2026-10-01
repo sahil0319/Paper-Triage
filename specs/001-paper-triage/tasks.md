@@ -85,7 +85,7 @@ Package = `src/paper_triage/` (abbrev `pt/` below means `src/paper_triage/`).
 - [x] T012 [P] [US1] Test first `tests/test_agents.py::test_critic*`, then
   `pt/prompts/critic.md` + `pt/critic.py`: `critique(paper, client) -> Critique`; skeptical
   reviewer; only supported claims; basis set from paper, not LLM.
-- [ ] T013 [P] [US1] Test first `tests/test_agents.py::test_ranker*`, then
+- [x] T013 [P] [US1] Test first `tests/test_agents.py::test_ranker*`, then
   `pt/prompts/ranker.md` + `pt/ranker.py`: `rank(paper, summary, topic, client) -> Rank`;
   rubric anchors; empty topic -> "overall reading priority" wording; clamp.
 - [ ] T014 [US1] Test first `tests/test_pipeline.py`, then `pt/pipeline.py`:

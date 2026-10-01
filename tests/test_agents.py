@@ -2,7 +2,8 @@ import pytest
 
 from paper_triage.critic import critique
 from paper_triage.llm import MockClient
-from paper_triage.models import Critique, Summary
+from paper_triage.models import Critique, Rank, Summary
+from paper_triage.ranker import rank
 from paper_triage.summarizer import summarize
 
 PAPER = {
@@ -101,3 +102,38 @@ def test_critic_basis_comes_from_paper_not_llm():
     assert out.missing_baselines == ["X"]
     assert 'basis="abstract"' in spy.calls[0][1] and "BODY" not in spy.calls[0][1]
     assert critique(PAPER, Spy(Critique(basis="abstract"))).basis == "fulltext"
+
+
+# ---- ranker ----
+
+SUMMARY = Summary(summary="Distills samplers fast.", contributions=["2-step sampler"])
+
+
+def test_ranker_returns_rank_with_mock_in_range():
+    out = rank(PAPER, SUMMARY, "diffusion", MockClient())
+    assert isinstance(out, Rank) and 0 <= out.rank <= 10 and out.rank_reason
+
+
+def test_ranker_prompt_has_topic_summary_no_full_text_and_anchors():
+    spy = Spy(Rank(rank=7, rank_reason="r"))
+    rank(PAPER, SUMMARY, "diffusion distillation", spy)
+    system, user, schema = spy.calls[0]
+    assert schema is Rank
+    assert '<paper id="2401.00001" basis="fulltext">' in user
+    assert "diffusion distillation" in user and "Distills samplers fast." in user
+    assert "BODY" not in user
+    for anchor in ("0-2", "3-5", "6-8", "9-10"):
+        assert anchor in system
+
+
+def test_ranker_empty_topic_uses_overall_priority_wording():
+    spy = Spy(Rank(rank=5, rank_reason="r"))
+    rank(PAPER, SUMMARY, "  ", spy)
+    user = spy.calls[0][1]
+    assert "overall reading priority" in user.lower()
+    assert "Topic:" not in user
+
+
+def test_ranker_clamps_out_of_range():
+    assert rank(PAPER, SUMMARY, "t", Spy(Rank(rank=99, rank_reason="r"))).rank == 10
+    assert rank(PAPER, SUMMARY, "t", Spy(Rank(rank=-4, rank_reason="r"))).rank == 0
