@@ -1,0 +1,146 @@
+import httpx
+import pytest
+
+from paper_triage import db
+from paper_triage.fetcher import Fetcher, FetchError, parse_feed
+from paper_triage.net import make_http
+
+
+class CountingThrottle:
+    def __init__(self):
+        self.waits = 0
+
+    def wait(self):
+        self.waits += 1
+
+
+@pytest.fixture
+def env(tmp_db):
+    conn = db.connect(tmp_db)
+    db.init_schema(conn)
+    client, _ = make_http(True)
+    requests = []
+    client.event_hooks["request"].append(lambda r: requests.append(r))
+    th = CountingThrottle()
+    return Fetcher(conn, client, th), requests, th, conn
+
+
+# ---- search ----
+
+
+def test_search_returns_normalized_papers(env):
+    f, _, _, _ = env
+    papers = f.search("diffusion distillation", 10)
+    assert len(papers) == 5
+    p = papers[0]
+    assert p["id"] == "2401.00001"
+    assert p["version"] == "v1"
+    assert p["source"] == "arxiv"
+    assert p["title"] == "Progressive Distillation for Fast Sampling of Diffusion Models"
+    assert p["authors"] == ["Ada Lovelace", "Alan Turing"]
+    assert p["published"] == "2024-01-02"
+    assert p["pdf_url"] == "http://arxiv.org/pdf/2401.00001v1"
+    assert p["abstract"].startswith("We distill")
+    assert p["basis"] == "abstract"
+    assert p["full_text"] is None
+    assert papers[1]["version"] == "v2"
+
+
+def test_search_respects_n_and_query_params(env):
+    f, requests, _, _ = env
+    assert len(f.search("diffusion distillation", 3)) == 3
+    q = requests[0].url.params
+    assert q["search_query"] == "all:diffusion AND all:distillation"
+    assert q["max_results"] == "3"
+    assert q["sortBy"] == "relevance"
+
+
+def test_search_throttled_and_cached(env):
+    f, requests, th, conn = env
+    a = f.search("Diffusion  Distillation", 5)
+    b = f.search("diffusion distillation", 5)  # same normalized key
+    assert a == b
+    assert len(requests) == 1
+    assert th.waits == 1
+    assert db.cache_get(conn, "q:diffusion distillation:5") is not None
+    f.search("diffusion distillation", 4)  # different n -> new request
+    assert len(requests) == 2
+
+
+def test_search_http_failure_raises(tmp_db):
+    conn = db.connect(tmp_db)
+    db.init_schema(conn)
+    client = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(503)))
+    with pytest.raises(FetchError):
+        Fetcher(conn, client, CountingThrottle()).search("x", 5)
+
+
+# ---- by_ids ----
+
+
+def test_by_ids_found_and_not_found(env):
+    f, _, _, _ = env
+    papers, errors = f.by_ids(["2401.00002", "9999.99999"])
+    assert [p["id"] for p in papers] == ["2401.00002"]
+    assert errors == [{"input": "9999.99999", "reason": "not found"}]
+
+
+def test_by_ids_preserves_input_order(env):
+    f, _, _, _ = env
+    papers, errors = f.by_ids(["2401.00003", "2401.00001"])
+    assert [p["id"] for p in papers] == ["2401.00003", "2401.00001"]
+    assert errors == []
+
+
+def test_by_ids_cached(env):
+    f, requests, th, conn = env
+    f.by_ids(["2401.00002", "2401.00001"])
+    f.by_ids(["2401.00001", "2401.00002"])
+    assert len(requests) == 1
+    assert th.waits == 1
+    assert db.cache_get(conn, "ids:2401.00001,2401.00002") is not None
+
+
+def test_by_ids_empty_makes_no_request(env):
+    f, requests, _, _ = env
+    assert f.by_ids([]) == ([], [])
+    assert requests == []
+
+
+def test_by_ids_http_failure_reports_each_id(tmp_db):
+    conn = db.connect(tmp_db)
+    db.init_schema(conn)
+    client = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(500)))
+    papers, errors = Fetcher(conn, client, CountingThrottle()).by_ids(["2401.00001"])
+    assert papers == []
+    assert errors[0]["input"] == "2401.00001"
+    assert errors[0]["reason"]
+
+
+# ---- parse_feed ----
+
+
+def test_parse_feed_skips_arxiv_error_entry():
+    xml = """<?xml version="1.0"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry><id>http://arxiv.org/api/errors#incorrect_id_format_for_1234</id>
+  <title>Error</title><summary>incorrect id format</summary></entry>
+</feed>"""
+    assert parse_feed(xml) == []
+
+
+def test_parse_feed_old_style_id_and_missing_pdf_link():
+    xml = """<?xml version="1.0"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry><id>http://arxiv.org/abs/math.GT/0107001v3</id>
+  <published>2001-07-01T00:00:00Z</published>
+  <title>Some\n   Old  Paper</title><summary>  An abstract.\n</summary>
+  </entry>
+</feed>"""
+    (p,) = parse_feed(xml)
+    assert p["id"] == "math.GT/0107001"
+    assert p["version"] == "v3"
+    assert p["title"] == "Some Old Paper"
+    assert p["abstract"] == "An abstract."
+    assert p["authors"] == []
+    assert p["pdf_url"] == "https://arxiv.org/pdf/math.GT/0107001v3"

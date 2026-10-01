@@ -70,7 +70,7 @@ Package = `src/paper_triage/` (abbrev `pt/` below means `src/paper_triage/`).
 **Goal**: topic or ids/URLs -> ranked list with summary, critique, rank+reason.
 **Independent test**: `MOCK_LLM=1`, POST `/api/triage` "diffusion distillation" -> 5 ranked results.
 
-- [ ] T009 [US1] Test first `tests/test_fetcher.py` (search), then `pt/fetcher.py` part 1:
+- [x] T009 [US1] Test first `tests/test_fetcher.py` (search), then `pt/fetcher.py` part 1:
   `search(topic, n)` and `by_ids(ids)` hitting arXiv API through injected client + shared
   `Throttle`; Atom parse with `xml.etree`; id/version normalization; `arxiv_cache` read-through;
   unknown id -> error entry `{"input", "reason": "not found"}`.
