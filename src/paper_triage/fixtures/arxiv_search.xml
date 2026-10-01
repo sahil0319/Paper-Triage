@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom" xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">
   <title type="html">ArXiv Query: search_query=all:diffusion distillation</title>
-  <opensearch:totalResults>5</opensearch:totalResults>
+  <opensearch:totalResults>15</opensearch:totalResults>
   <entry>
     <id>http://arxiv.org/abs/2401.00001v1</id>
     <published>2024-01-02T10:00:00Z</published>
@@ -49,5 +49,95 @@
     <author><name>John McCarthy</name></author>
     <link href="http://arxiv.org/abs/2401.00005v1" rel="alternate" type="text/html"/>
     <link title="pdf" href="http://arxiv.org/pdf/2401.00005v1" rel="related" type="application/pdf"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2401.00006v1</id>
+    <published>2024-01-07T14:00:00Z</published>
+    <title>Basalt Columns as a Metaphor for Step Reduction in Samplers</title>
+    <summary>We study how stacked sampler stages behave like basalt columns and report a modest gain in sample diversity on CIFAR-10.</summary>
+    <author><name>Katherine Johnson</name></author>
+    <link href="http://arxiv.org/abs/2401.00006v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2401.00006v1" rel="related" type="application/pdf"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2401.00007v1</id>
+    <published>2024-01-08T15:00:00Z</published>
+    <title>Cobalt: Low-Rank Adapters for Distilled Image Generators</title>
+    <summary>We attach low-rank adapters to distilled generators and recover most of the lost detail with under two percent extra parameters.</summary>
+    <author><name>Tim Berners-Lee</name></author>
+    <link href="http://arxiv.org/abs/2401.00007v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2401.00007v1" rel="related" type="application/pdf"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2401.00008v1</id>
+    <published>2024-01-09T16:00:00Z</published>
+    <title>Quartz Schedules for Few-Step Noise Scheduling</title>
+    <summary>We propose fixed noise schedules tuned for four-step sampling and compare them against cosine and linear baselines.</summary>
+    <author><name>Claude Shannon</name></author>
+    <link href="http://arxiv.org/abs/2401.00008v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2401.00008v1" rel="related" type="application/pdf"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2401.00009v1</id>
+    <published>2024-01-10T17:00:00Z</published>
+    <title>Granite Benchmarks for Diffusion Sampler Evaluation</title>
+    <summary>We release a benchmark suite measuring sampler speed, memory use and fidelity across five datasets.</summary>
+    <author><name>Vint Cerf</name></author>
+    <link href="http://arxiv.org/abs/2401.00009v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2401.00009v1" rel="related" type="application/pdf"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2401.00010v1</id>
+    <published>2024-01-11T08:00:00Z</published>
+    <title>Obsidian Latents: Sharper Reconstructions from Compact Codes</title>
+    <summary>We train compact latent codes that reconstruct fine texture, reporting improved sharpness over a standard autoencoder.</summary>
+    <author><name>Radia Perlman</name></author>
+    <link href="http://arxiv.org/abs/2401.00010v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2401.00010v1" rel="related" type="application/pdf"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2401.00011v1</id>
+    <published>2024-01-12T09:00:00Z</published>
+    <title>Feldspar Teachers for Student Sampler Training</title>
+    <summary>We select teacher checkpoints by validation loss and show that student samplers train faster with the selected teachers.</summary>
+    <author><name>Leslie Lamport</name></author>
+    <link href="http://arxiv.org/abs/2401.00011v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2401.00011v1" rel="related" type="application/pdf"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2401.00012v1</id>
+    <published>2024-01-13T10:00:00Z</published>
+    <title>Gypsum Pruning of Attention Layers in Image Generators</title>
+    <summary>We prune attention heads from pretrained generators and measure the quality drop at several sparsity levels.</summary>
+    <author><name>Dennis Ritchie</name></author>
+    <link href="http://arxiv.org/abs/2401.00012v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2401.00012v1" rel="related" type="application/pdf"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2401.00013v1</id>
+    <published>2024-01-14T11:00:00Z</published>
+    <title>Marble Textures: Controllable Style Transfer with Few Steps</title>
+    <summary>We add a style conditioning branch to a fast sampler and evaluate user preference on a small panel of raters.</summary>
+    <author><name>Ken Thompson</name></author>
+    <link href="http://arxiv.org/abs/2401.00013v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2401.00013v1" rel="related" type="application/pdf"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2401.00014v1</id>
+    <published>2024-01-15T12:00:00Z</published>
+    <title>Dolomite Caching for Repeated Denoising Calls</title>
+    <summary>We cache intermediate activations across denoising calls and report a thirty percent latency reduction without retraining.</summary>
+    <author><name>Fran Allen</name></author>
+    <link href="http://arxiv.org/abs/2401.00014v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2401.00014v1" rel="related" type="application/pdf"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2401.00015v1</id>
+    <published>2024-01-16T13:00:00Z</published>
+    <title>Pumice Quantization of Generator Weights</title>
+    <summary>We quantize generator weights to four bits with a calibration set and describe the failure cases we observed.</summary>
+    <author><name>Barbara Perlis</name></author>
+    <link href="http://arxiv.org/abs/2401.00015v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2401.00015v1" rel="related" type="application/pdf"/>
   </entry>
 </feed>

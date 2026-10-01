@@ -27,7 +27,7 @@ def test_index_served(client):
 
 
 def test_triage_topic_returns_five_ranked(client):
-    r = client.post("/api/triage", json={"query": "diffusion distillation"})
+    r = client.post("/api/triage", json={"query": "diffusion distillation", "max_results": 5})
     assert r.status_code == 200
     body = r.json()
     assert body["topic"] == "diffusion distillation" and body["errors"] == []
@@ -162,7 +162,9 @@ def test_new_app_instance_same_db_returns_same_results_without_fetch(tmp_db, mon
 
     monkeypatch.setenv("PAPER_TRIAGE_DB", tmp_db)
     with TestClient(create_app()) as c1:
-        first = c1.post("/api/triage", json={"query": "diffusion distillation"}).json()
+        first = c1.post(
+            "/api/triage", json={"query": "diffusion distillation", "max_results": 5}
+        ).json()
     assert len(first["results"]) == 5
 
     def no_network(request):
@@ -174,7 +176,9 @@ def test_new_app_instance_same_db_returns_same_results_without_fetch(tmp_db, mon
         assert status["mock"] is True and status["paper_count"] == 5
         stored = c2.get("/api/papers").json()
         assert stored == {"topic": "diffusion distillation", "results": first["results"]}
-        again = c2.post("/api/triage", json={"query": "diffusion distillation"}).json()
+        again = c2.post(
+            "/api/triage", json={"query": "diffusion distillation", "max_results": 5}
+        ).json()
         assert again["results"] == first["results"]
 
 

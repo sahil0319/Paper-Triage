@@ -37,7 +37,7 @@ def _norm_id(s: str) -> str:
     return re.sub(r"v\d+$", "", s.strip())
 
 
-def _feed(ids: list[str] | None, n: int | None) -> str:
+def _feed(ids: list[str] | None, n: int | None, start: int = 0) -> str:
     xml = (FIXTURES / "arxiv_search.xml").read_text()
     entries = _ENTRY.findall(xml)
     head = xml[: xml.index(entries[0])]
@@ -46,8 +46,11 @@ def _feed(ids: list[str] | None, n: int | None) -> str:
         entries = [
             e for e in entries if _norm_id(re.search(r"/abs/([^<]+)<", e).group(1)) in wanted
         ]
-    elif n is not None:
-        entries = entries[:n]
+        total = len(entries)
+    else:
+        total = len(entries)
+        entries = entries[start:] if n is None else entries[start : start + n]
+    head = re.sub(r"(<opensearch:totalResults>)\d+", rf"\g<1>{total}", head)
     return head + "".join(entries) + "</feed>\n"
 
 
@@ -58,8 +61,9 @@ def _mock_handler(request: httpx.Request) -> httpx.Response:
             q = parse_qs(url.query.decode())
             ids = q["id_list"][0].split(",") if "id_list" in q else None
             n = int(q["max_results"][0]) if "max_results" in q else None
+            start = int(q["start"][0]) if "start" in q else 0
             return httpx.Response(
-                200, text=_feed(ids, n), headers={"content-type": "application/atom+xml"}
+                200, text=_feed(ids, n, start), headers={"content-type": "application/atom+xml"}
             )
         if url.path.startswith("/pdf/"):
             if _norm_id(url.path.removeprefix("/pdf/")) == INVALID_PDF_ID:

@@ -33,7 +33,7 @@ def env(tmp_db):
 
 def test_search_returns_normalized_papers(env):
     f, _, _, _ = env
-    papers = f.search("diffusion distillation", 10)
+    papers = f.search("diffusion distillation", 5)
     assert len(papers) == 5
     p = papers[0]
     assert p["id"] == "2401.00001"
@@ -156,7 +156,7 @@ SAMPLE = (Path(__file__).parent.parent / "src/paper_triage/fixtures/sample.pdf")
 
 def test_fetch_topic_fulltext_and_abstract_fallback(env):
     f, _, th, conn = env
-    papers, errors = f.fetch("diffusion distillation", [], 10)
+    papers, errors = f.fetch("diffusion distillation", [], 5)
     assert errors == []
     by_id = {p["id"]: p for p in papers}
     assert len(papers) == 5

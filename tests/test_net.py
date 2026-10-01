@@ -1,3 +1,5 @@
+import re
+
 import httpx
 from pypdf import PdfReader
 
@@ -57,12 +59,30 @@ def test_make_http_real_config_no_network():
     client.close()
 
 
-def test_mock_search_returns_five_entries():
+def test_mock_search_returns_max_results_entries():
     client, th = make_http(True)
     assert th.min_interval == 0
     r = client.get(API, params={"search_query": "all:diffusion", "max_results": 10})
     assert r.status_code == 200
-    assert r.text.count("<entry>") == 5
+    assert r.text.count("<entry>") == 10
+    assert "<opensearch:totalResults>15<" in r.text
+
+
+def test_mock_search_honours_start():
+    client, _ = make_http(True)
+    r = client.get(API, params={"search_query": "all:diffusion", "start": 10, "max_results": 5})
+    ids = re.findall(r"<id>http://arxiv.org/abs/(\d{4}\.\d{5})v", r.text)
+    assert ids == [f"2401.{i:05d}" for i in range(11, 16)]
+    assert "<opensearch:totalResults>15<" in r.text
+    r = client.get(API, params={"search_query": "all:diffusion", "start": 15, "max_results": 5})
+    assert r.text.count("<entry>") == 0
+    assert "<opensearch:totalResults>15<" in r.text
+
+
+def test_mock_id_list_total_is_matched_count():
+    client, _ = make_http(True)
+    r = client.get(API, params={"id_list": "2401.00001,2401.00002,9999.99999"})
+    assert "<opensearch:totalResults>2<" in r.text
 
 
 def test_mock_id_list_known_and_unknown():
@@ -97,3 +117,19 @@ def test_mock_other_urls():
     client, _ = make_http(True)
     assert client.get("https://example.org/papers/x.pdf").content.startswith(b"%PDF")
     assert client.get("https://down.invalid/x.pdf").status_code == 404
+
+
+def test_mock_feed_markers_unique_and_refusal_words_absent():
+    client, _ = make_http(True)
+    r = client.get(API, params={"search_query": "all:x", "max_results": 20})
+    entries = re.findall(r"<entry>.*?</entry>", r.text, re.DOTALL)
+    assert len(entries) == 15
+    titles = [re.search(r"<title>(.*?)</title>", e).group(1) for e in entries]
+    assert len({m for t in titles for m in [t.split()[0].strip(":")]}) == 15  # distinct first word
+    lowered = r.text.lower()
+    assert "capital" not in lowered and "france" not in lowered
+    # every entry has a title word (>= 6 letters) found in no other entry
+    for i, e in enumerate(entries):
+        others = " ".join(x.lower() for j, x in enumerate(entries) if j != i)
+        words = {w.lower() for w in re.findall(r"[A-Za-z]{6,}", titles[i])}
+        assert any(w not in others for w in words), titles[i]

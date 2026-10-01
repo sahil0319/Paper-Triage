@@ -33,7 +33,7 @@ def test_status_is_mock(client):
 
 def test_triage_topic_five_ranked_under_five_seconds(client):
     t0 = time.monotonic()
-    r = client.post("/api/triage", json={"query": "diffusion distillation"})
+    r = client.post("/api/triage", json={"query": "diffusion distillation", "max_results": 5})
     assert time.monotonic() - t0 < 5
     assert r.status_code == 200
     results = r.json()["results"]

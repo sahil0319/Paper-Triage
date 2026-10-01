@@ -173,7 +173,7 @@ rendering rule; keep the UI test hooks from plan.md. Every task ends with
   and passes the paper's `pdf_url` in `triage()`; `pt/db.py` `list_results` also selects
   `papers.pdf_url`. Files: `pt/models.py`, `pt/pipeline.py`, `pt/db.py`,
   `tests/test_models.py`, `tests/test_pipeline.py`, `tests/test_api.py`.
-- [ ] T028 [BE] [US1] Mock feed for paging. `pt/fixtures/arxiv_search.xml`: grow to 15 entries
+- [x] T028 [BE] [US1] Mock feed for paging. `pt/fixtures/arxiv_search.xml`: grow to 15 entries
   `2401.00001`..`2401.00015` (ids, abstracts and PDF links of entries 1-5 unchanged; invalid-PDF
   id `2401.00005` kept; entries 6-15 have valid PDF links); every title contains one unique
   marker word (>= 6 letters, e.g. "Basalt", "Cobalt") that appears nowhere else in the feed;

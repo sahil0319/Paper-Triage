@@ -47,7 +47,7 @@ def _validation_error():
 
 def test_triage_topic_five_ranked_results(env):
     conn, http = env
-    out = triage("diffusion distillation", 10, conn, http, MockClient())
+    out = triage("diffusion distillation", 5, conn, http, MockClient())
     assert out["topic"] == "diffusion distillation"
     assert out["errors"] == []
     rs = out["results"]
@@ -73,8 +73,8 @@ def test_triage_persists_results(env):
 def test_triage_n_limits_and_caps_at_20(env):
     conn, http = env
     assert len(triage("diffusion", 2, conn, http, MockClient())["results"]) == 2
-    # n above 20 is capped, not an error (feed only has 5)
-    assert len(triage("other topic", 99, conn, http, MockClient())["results"]) == 5
+    # n above 20 is capped, not an error (feed has 15)
+    assert len(triage("other topic", 99, conn, http, MockClient())["results"]) == 15
 
 
 def test_triage_ids_only_topic_empty_and_unknown_id_error(env):
