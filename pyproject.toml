@@ -14,7 +14,11 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest", "ruff"]
+dev = [
+    "pytest",
+    "pytest-playwright>=0.9.0",
+    "ruff",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -26,6 +30,7 @@ packages = ["src/paper_triage"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+markers = ["e2e: real-browser tests (need chromium)"]
 
 [tool.ruff]
 line-length = 100

@@ -13,3 +13,4 @@
 - no-mistakes init: BLOCKED by own deny rule (git remote add origin). Needs user decision: allow a local bare repo as origin, or skip the gate. Tester substitutes pytest+ruff+e2e until then
 - DESIGN.md: user replaced placeholder with real Apple-style spec (563 lines); builder notified
 - 2026-10-01: builder split into backend-builder + frontend-builder (parallel lanes, disjoint files, pathspec commits). Old builder.md removed. tasks.md tagged [BE]/[FE]; CLAUDE.md + commands updated (/build runs both lanes; /build-be, /build-fe added)
+- 2026-10-01: browser e2e tooling (user approved; constitution 1.1.0, research R12). Commands: `uv add --dev pytest-playwright`, `uv run playwright install chromium`. Purpose: real-browser UI tests (tests/e2e_harness.py, `-m e2e`). Browser download happens only at install time; tests run offline against a local mock-LLM server on 127.0.0.1 (E2E_PORT, default 8766) and fail on any non-local request

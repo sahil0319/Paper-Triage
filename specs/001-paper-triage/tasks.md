@@ -221,7 +221,7 @@ rendering rule; keep the UI test hooks from plan.md. Every task ends with
   set, `NO_SET_TEXT` per contract), `pt/config.py` `chat_max_ids = 50`, `pt/app.py`
   `ChatIn.paper_ids: list[str]` (required, dedupe, max 50), `pt/prompts/chat.md` (context is
   the user's current result set; anything else -> sentinel).
-- [ ] T032 [BE] Playwright harness (constitution 1.1.0 I/II, research R12). `pyproject.toml`:
+- [x] T032 [BE] Playwright harness (constitution 1.1.0 I/II, research R12). `pyproject.toml`:
   dev dep `pytest-playwright`, pytest marker `e2e: real-browser tests (need chromium)`;
   `uv lock`; run `uv run playwright install chromium` once; `SETUP_LOG.md`: date, both commands,
   purpose, "browser download only at install time; tests run offline". `tests/e2e_harness.py`:

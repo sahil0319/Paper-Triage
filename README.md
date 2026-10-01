@@ -62,6 +62,15 @@ uv run pytest -q
 uv run ruff check .
 ```
 
+Real-browser tests (marker `e2e`) drive the UI in Chromium against a local mock-LLM server on
+`127.0.0.1:8766` (`E2E_PORT` to change). They skip when Chromium is missing. Install it once
+(browser download happens only here; tests themselves stay offline):
+
+```sh
+uv run playwright install chromium
+MOCK_LLM=1 uv run pytest -q -m e2e
+```
+
 ## Notes
 
 - arXiv rate limit: live mode waits at least 3 s between arXiv requests (`net.py` `Throttle`),
