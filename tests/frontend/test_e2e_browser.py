@@ -65,6 +65,20 @@ def test_every_arxiv_row_links_to_abs_and_pdf(home):
             assert "noopener" in link.get_attribute("rel")
 
 
+def test_direct_pdf_row_shows_only_the_pdf_link(home):
+    page = home
+    url = "https://example.org/files/paper.pdf"
+    search(page, url, 1)
+    row = page.locator("#paper-list li.paper").first
+    assert row.get_attribute("id").startswith("paper-pdf:")
+    expect(row.locator("a[data-link]")).to_have_count(1)
+    expect(row.locator('a[data-link="abs"]')).to_have_count(0)
+    pdf_link = row.locator('a[data-link="pdf"]')
+    assert pdf_link.get_attribute("href") == url
+    assert pdf_link.get_attribute("target") == "_blank"
+    assert "noopener" in pdf_link.get_attribute("rel")
+
+
 def test_load_more_appends_five_then_ends(home):
     page = home
     search(page, TOPIC, 10)
@@ -99,26 +113,47 @@ def _marker_word(page, paper_id):
     return next(w for w in re.findall(r"[A-Za-z]+", title) if len(w) >= 6)
 
 
+def ask(page, question):
+    """Ask in the chat and return the finished turn."""
+    count = page.locator("#chat-log li.turn").count()
+    page.fill("#question", question)
+    page.click("#ask")
+    expect(page.locator("#chat-log li.turn")).to_have_count(count + 1)
+    expect(page.locator("#ask")).to_be_enabled(timeout=10_000)
+    return page.locator("#chat-log li.turn").last
+
+
 def test_chat_refuses_paper_outside_the_current_set(home):
     page = home
     search(page, TOPIC, 10)
     word = _marker_word(page, "2401.00002")
+    # Positive control: the same word is answered while 2401.00002 is in the set.
+    turn = ask(page, f"{word}?")
+    expect(turn.locator(".turn__a--refused")).to_have_count(0)
+    assert set(turn.locator("a.cite").all_inner_texts()) == {"2401.00002"}
+    # Now the set is just 2401.00001; 2401.00002 stays stored but out of scope.
     search(page, "2401.00001", 1)
-    page.fill("#question", f"{word}?")
-    page.click("#ask")
-    last = page.locator("#chat-log li.turn").last
-    expect(last.locator(".turn__a--refused")).to_be_visible(timeout=10_000)
-    expect(last.locator("a.cite")).to_have_count(0)
+    turn = ask(page, f"{word}?")
+    expect(turn.locator(".turn__a--refused")).to_be_visible()
+    expect(turn.locator("a.cite")).to_have_count(0)
 
 
 def test_chat_answer_cites_only_shown_papers(home):
     page = home
+    # Seed stored-but-not-shown papers: load-more stores 2401.00011..15, then a fresh search
+    # shows only the first page again.
+    search(page, TOPIC, 10)
+    page.click("#load-more")
+    expect(page.locator("#paper-list li.paper")).to_have_count(15)
+    outside_id = "2401.00015"
+    outside_word = _marker_word(page, outside_id)
     search(page, TOPIC, 10)
     shown = set(_ids(page))
-    word = _marker_word(page, "2401.00003")
-    page.fill("#question", f"{word}?")
-    page.click("#ask")
-    last = page.locator("#chat-log li.turn").last
-    expect(last.locator("a.cite").first).to_be_visible(timeout=10_000)
-    cited = last.locator("a.cite").all_inner_texts()
-    assert cited and set(cited) <= shown
+    assert outside_id not in shown
+    inside_word = _marker_word(page, "2401.00003")
+    # The question names one shown paper and one stored paper that is not shown.
+    turn = ask(page, f"{inside_word} {outside_word}?")
+    expect(turn.locator("a.cite").first).to_be_visible()
+    cited = set(turn.locator("a.cite").all_inner_texts())
+    assert cited == {"2401.00003"}
+    assert outside_id not in turn.inner_text()
