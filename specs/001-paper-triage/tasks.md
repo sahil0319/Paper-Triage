@@ -253,7 +253,7 @@ rendering rule; keep the UI test hooks from plan.md. Every task ends with
   hooks from plan.md that exist today are present in `index.html` (`#query`, `#submit`,
   `#paper-list`, `#question`, `#ask`, `#chat-log`, `#status`, `#alert`). Later FE tasks extend
   the hook list.
-- [ ] T035 [FE] [US1] Redesign shell (FR-012). Re-read DESIGN.md + PRODUCT.md + brief. Files
+- [x] T035 [FE] [US1] Redesign shell (FR-012). Re-read DESIGN.md + PRODUCT.md + brief. Files
   `pt/static/index.html`, `pt/static/app.css`: brief D1 tokens (whole `:root`), D2 font stacks
   (no `@font-face`), D3 base/focus/forced colors, D4 shell + grid + skip links, D5 nav, D6 query
   band, D7 results header (`#results-count`, `#status` sr-only), D13 notes box, D22 chat panel,

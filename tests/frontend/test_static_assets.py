@@ -13,6 +13,8 @@ REQUIRED_IDS = [
     "paper-list",
     "question",
     "ask",
+    "chat-scope",
+    "results-count",
     "chat-log",
     "status",
     "alert",

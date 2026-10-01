@@ -10,55 +10,69 @@
 </head>
 <body>
   <a class="skip" href="#results-heading">Skip to results</a>
+  <a class="skip" href="#chat-heading">Skip to chat</a>
 
   <header class="global-nav">
-    <div class="global-nav__inner">
+    <div class="container global-nav__inner">
       <span class="brand">Paper Triage</span>
       <div class="global-nav__meta">
         <p id="model" class="model" hidden></p>
-        <p id="mock-label" class="mock-label" hidden>Mock mode.<span class="mock-label__more"> Canned responses, no model calls.</span></p>
+        <p id="mock-label" class="mock-label" hidden><span class="badge">Mock mode</span><span class="mock-label__more">Canned responses, no model calls.</span></p>
       </div>
     </div>
   </header>
 
   <section class="intro" aria-labelledby="intro-heading">
-    <div class="intro__inner">
-      <h1 id="intro-heading">Find the papers worth reading.</h1>
-      <p class="lead">Rank a pile of papers by relevance, with a skeptical critique of each.</p>
-      <form id="triage-form" class="triage-form" role="search" novalidate>
-        <label class="sr-only" for="query">Topic, arXiv IDs, or PDF URLs</label>
-        <input id="query" name="query" type="search" autocomplete="off" spellcheck="false"
-               placeholder="Topic, arXiv IDs, or PDF URLs" aria-describedby="query-help" required>
-        <button id="submit" class="btn" type="submit">Triage papers</button>
-      </form>
-      <p id="query-help" class="help">Keywords search arXiv. Paste IDs or PDF links to triage exactly
-        those papers. Up to 10 papers per run.</p>
+    <div class="container">
+      <div class="intro__inner">
+        <h1 id="intro-heading">Find the papers worth reading.</h1>
+        <p class="lead">Rank a pile of papers by relevance, with a skeptical critique of each.</p>
+        <form id="triage-form" class="triage-form" role="search" novalidate>
+          <label class="sr-only" for="query">Topic, arXiv IDs, or PDF URLs</label>
+          <input id="query" name="query" type="search" autocomplete="off" spellcheck="false"
+                 placeholder="Topic, arXiv IDs, or PDF URLs" aria-describedby="query-help" required>
+          <button id="submit" class="btn btn--primary" type="submit">Triage papers</button>
+        </form>
+        <p id="query-help" class="help">Keywords search arXiv. Paste IDs or PDF links to triage exactly
+          those papers. Up to 10 papers per run.</p>
+      </div>
     </div>
   </section>
 
-  <main id="main" class="workspace">
+  <main id="main" class="container workspace">
     <section class="results" aria-labelledby="results-heading" aria-busy="false">
       <h2 id="results-heading">Ranked papers</h2>
-      <p id="status" class="status" role="status" aria-live="polite"></p>
+      <p id="results-count" class="results__count" hidden></p>
+      <p id="status" class="sr-only" role="status" aria-live="polite"></p>
+      <div id="working" class="working" role="group" aria-label="Triage in progress" hidden></div>
       <div id="alert" class="alert" role="alert" hidden></div>
-      <ul id="notes" class="notes" hidden></ul>
+      <div id="notes" class="notes" hidden></div>
       <ol id="paper-list" class="papers"></ol>
-      <p id="empty" class="empty">Nothing triaged yet. Enter a topic or paste arXiv IDs above.</p>
+      <div id="empty" class="empty">
+        <p class="empty__title">Nothing triaged yet.</p>
+        <p class="empty__body">Enter a topic, or paste arXiv IDs or PDF links. Each run fetches up to
+          10 papers, then summarizes, critiques and ranks them.</p>
+        <div class="empty__examples">
+          <p class="empty__label" id="examples-label">Examples</p>
+          <ul class="chips" aria-labelledby="examples-label">
+            <li><button type="button" class="btn btn--secondary btn--small" data-example="retrieval augmented generation evaluation">retrieval augmented generation evaluation</button></li>
+            <li><button type="button" class="btn btn--secondary btn--small" data-example="2401.01234 2312.00752">2401.01234 2312.00752</button></li>
+          </ul>
+        </div>
+      </div>
     </section>
 
     <aside id="chat" class="chat" aria-labelledby="chat-heading">
-      <div class="chat__inner">
-        <h2 id="chat-heading">Ask your papers</h2>
-        <p id="chat-help" class="help">Answers use only the papers you have triaged, and cite them by id.
-          If your papers do not cover a question, it says so.</p>
-        <ol id="chat-log" class="chat__log" role="log" aria-label="Conversation" tabindex="0"></ol>
-        <form id="chat-form" class="chat__form" novalidate>
-          <label class="sr-only" for="question">Question about your papers</label>
-          <input id="question" name="question" type="text" autocomplete="off"
-                 placeholder="Ask about your papers" aria-describedby="chat-help">
-          <button id="ask" class="btn" type="submit">Ask</button>
-        </form>
-      </div>
+      <h2 id="chat-heading">Ask your papers</h2>
+      <p id="chat-scope" class="chat__scope">Answers use only your stored papers, up to the top 10 by rank.</p>
+      <p id="chat-help" class="chat__scope">Questions outside these papers get a plain refusal, not a guess.</p>
+      <ol id="chat-log" class="chat__log" role="log" aria-label="Conversation" tabindex="0"></ol>
+      <form id="chat-form" class="chat__form" novalidate>
+        <label class="sr-only" for="question">Question about your papers</label>
+        <input id="question" name="question" type="text" autocomplete="off"
+               placeholder="Ask about these papers" aria-describedby="chat-scope chat-help">
+        <button id="ask" class="btn btn--primary btn--ask" type="submit">Ask</button>
+      </form>
     </aside>
   </main>
 </body>
