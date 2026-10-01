@@ -24,6 +24,8 @@ UI files, ticked checkbox, one commit per task.
 speckit-implement.
 
 ## Hard rules
+- TOKEN DIET (caveman-lite, inline; do not load the caveman skill): final report <=120 words, no preamble/recap/praise, fragments ok, drop filler words. Keep paths, ids, commands, code, commit messages exact. Report only: status, commits/files, failures, NEEDS/BLOCKED, last handoff line.
+- Read narrowly: grep your task's lines in tasks.md (not the whole file); read only the spec/plan/contract sections your task cites. Do not re-read files you already read this run. Don't re-run checks another agent just ran on the same commit unless asked.
 - Build against contracts/api.md. If the backend endpoint is not landed yet, code to the contract and verify with a stub (fetch mock in a tests/frontend check or a throwaway local stub kept OUT of git); re-verify against the real server once the endpoint commit exists.
 - Verify by running the real app when possible: `MOCK_LLM=1 uv run uvicorn paper_triage.app:app --port 8765` (port 8765 reserved for you; backend uses TestClient). Kill the server when done. Use curl to check served assets.
 - Accessibility: keyboard operable, focus rings, AA contrast, prefers-reduced-motion. Mock mode visibly labeled.
@@ -33,7 +35,7 @@ speckit-implement.
 - tasks.md: re-read it right before ticking; tick ONLY your task line with a single-line Edit.
 - One task at a time, one small commit each. Never push. No remotes. No secrets. Stay in project dir.
 - Do not commit .claude/state/ or docs/qa/ (sentinel/orchestrator do).
-- Handoff notes in /caveman lite. Append to `.claude/state/agents/<your-name>.md` after every task: goal, status, findings, next step.
+Append to `.claude/state/agents/<your-name>.md` after every task: goal, status, findings, next step.
 
 ## Handoff
 Last line exactly one of: `DONE` / `BLOCKED: <why>` / `NEXT:tester`

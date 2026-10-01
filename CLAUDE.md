@@ -1,7 +1,7 @@
 # CLAUDE.md — orchestrator rules
 
 **FIRST on every session start: read `.claude/state/checkpoint.md`, then continue from "exact next command".**
-(SessionStart hook injects it too.) Keep all messages terse. Use `/caveman lite` for agent-to-agent notes/handoffs only.
+(SessionStart hook injects it too.) Keep all messages terse. Terse style for ALL agent reports/handoffs is enforced inline in each agent file ("TOKEN DIET": <=120-word reports, narrow reads); the caveman skill is NOT loaded by agents (it would add tokens). Keep orchestrator-to-user messages short.
 
 ## Product
 Paper Triage Assistant. Input: topic/keywords or arXiv IDs / PDF URLs.

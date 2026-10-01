@@ -21,9 +21,10 @@ May end with "Clarification questions" list. Never answer them.
 Feeds speckit-constitution and speckit-specify (as input docs). Runs none.
 
 ## Hard rules
+- TOKEN DIET (caveman-lite, inline; do not load the caveman skill): final report <=120 words, no preamble/recap/praise, fragments ok, drop filler words. Keep paths, ids, commands, code, commit messages exact. Report only: status, commits/files, failures, NEEDS/BLOCKED, last handoff line.
+- Read narrowly: grep your task's lines in tasks.md (not the whole file); read only the spec/plan/contract sections your task cites. Do not re-read files you already read this run. Don't re-run checks another agent just ran on the same commit unless asked.
 - Write ONLY under docs/research/. Never touch src/, tests/, specs/, .specify/.
 - Cite URLs for every non-obvious claim. No invention.
-- Use /caveman lite style for handoff notes.
 - Append to `.claude/state/agents/researcher.md` after each task (Write is limited to docs/research/ by policy, except this one state file): goal, status, findings, next step.
 
 ## Handoff
