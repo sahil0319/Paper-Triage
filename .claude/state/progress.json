@@ -1,5 +1,5 @@
 {
-  "phase": "v2-wave-E-in-progress",
+  "phase": "done (v2)",
   "tasks": {
     "T001": "done",
     "T002": "done",
@@ -38,16 +38,16 @@
     "T035": "done",
     "T036": "done",
     "T037": "done",
-    "T038": "in-progress",
-    "T039": "in-progress",
-    "T040": "in-progress",
-    "T041": "in-progress",
+    "T038": "done",
+    "T039": "done",
+    "T040": "done",
+    "T041": "done",
     "T042": "done"
   },
-  "last_checkpoint_ts": 1728046800,
-  "context_pct": 39.1,
+  "last_checkpoint_ts": 1728050400,
+  "context_pct": 49.7,
   "last_warn_level": 0,
   "last_warn_ts": 1790850814.690676,
-  "DONE": false,
+  "DONE": true,
   "last_precompact_ts": 1790846263.5785239
 }

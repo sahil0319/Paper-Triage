@@ -38,3 +38,6 @@ T032 b818725 (pytest-playwright + chromium installed, harness tests/e2e_harness.
 
 ## T042 README v2
 done (README.md only). Covers links, load-more, scoped chat, searching indicator, e2e setup (E2E_PORT 8766). UI wording ("Load 5 more", working card) taken from brief; FE wave E to confirm copy matches. next: tester.
+
+## F-002 / F-005
+F-002 6cd65e0: db.touch_results refreshes created_at of reused results in pipeline.triage; regression tests in test_pipeline/test_db. F-005 (next commit): LiveServer bind-checks port before env change + waits for server.started; test added. pytest 229 pass, -m e2e 8 pass, ruff clean. Verified foreign server on 8766 now gives "already in use". next: tester.
