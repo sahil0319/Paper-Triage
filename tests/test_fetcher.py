@@ -33,8 +33,8 @@ def env(tmp_db):
 
 def test_search_returns_normalized_papers(env):
     f, _, _, _ = env
-    papers = f.search("diffusion distillation", 5)
-    assert len(papers) == 5
+    papers, total = f.search("diffusion distillation", 5)
+    assert len(papers) == 5 and total == 15
     p = papers[0]
     assert p["id"] == "2401.00001"
     assert p["version"] == "v1"
@@ -51,7 +51,7 @@ def test_search_returns_normalized_papers(env):
 
 def test_search_respects_n_and_query_params(env):
     f, requests, _, _ = env
-    assert len(f.search("diffusion distillation", 3)) == 3
+    assert len(f.search("diffusion distillation", 3)[0]) == 3
     q = requests[0].url.params
     assert q["search_query"] == "all:diffusion AND all:distillation"
     assert q["max_results"] == "3"
@@ -65,7 +65,7 @@ def test_search_throttled_and_cached(env):
     assert a == b
     assert len(requests) == 1
     assert th.waits == 1
-    assert db.cache_get(conn, "q:diffusion distillation:5") is not None
+    assert db.cache_get(conn, "q:diffusion distillation:5:0") is not None
     f.search("diffusion distillation", 4)  # different n -> new request
     assert len(requests) == 2
 
@@ -156,7 +156,7 @@ SAMPLE = (Path(__file__).parent.parent / "src/paper_triage/fixtures/sample.pdf")
 
 def test_fetch_topic_fulltext_and_abstract_fallback(env):
     f, _, th, conn = env
-    papers, errors = f.fetch("diffusion distillation", [], 5)
+    papers, errors, _ = f.fetch("diffusion distillation", [], 5)
     assert errors == []
     by_id = {p["id"]: p for p in papers}
     assert len(papers) == 5
@@ -173,13 +173,13 @@ def test_fetch_topic_fulltext_and_abstract_fallback(env):
 
 def test_fetch_full_text_capped(env):
     f, _, _, _ = env
-    papers, _ = f.fetch("", [("arxiv", "2401.00001")], 10)
+    papers, _, _ = f.fetch("", [("arxiv", "2401.00001")], 10)
     assert len(papers[0]["full_text"]) <= 200_000
 
 
 def test_fetch_ids_unknown_reported_others_continue(env):
     f, _, _, _ = env
-    papers, errors = f.fetch("", [("arxiv", "2401.00002"), ("arxiv", "9999.99999")], 10)
+    papers, errors, _ = f.fetch("", [("arxiv", "2401.00002"), ("arxiv", "9999.99999")], 10)
     assert [p["id"] for p in papers] == ["2401.00002"]
     assert errors == [{"input": "9999.99999", "reason": "not found"}]
 
@@ -187,7 +187,7 @@ def test_fetch_ids_unknown_reported_others_continue(env):
 def test_fetch_pdf_url(env):
     f, _, th, conn = env
     url = "https://example.org/papers/x.pdf"
-    papers, errors = f.fetch("", [("pdf", url)], 10)
+    papers, errors, _ = f.fetch("", [("pdf", url)], 10)
     assert errors == []
     (p,) = papers
     assert p["id"] == "pdf:" + hashlib.sha256(url.encode()).hexdigest()[:12]
@@ -207,7 +207,7 @@ def test_fetch_pdf_title_falls_back_to_url_basename(tmp_db):
     db.init_schema(conn)
     pdf = SAMPLE.replace(b" /Info 6 0 R", b"")
     client = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, content=pdf)))
-    (p,), _ = Fetcher(conn, client, CountingThrottle()).fetch(
+    (p,), _, _ = Fetcher(conn, client, CountingThrottle()).fetch(
         "", [("pdf", "https://example.org/dir/my-paper.pdf")], 10
     )
     assert p["title"] == "my-paper.pdf"
@@ -217,7 +217,7 @@ def test_fetch_unreachable_url_is_error_others_continue(env):
     f, _, _, _ = env
     good = "https://example.org/a.pdf"
     bad = "https://down.invalid/x.pdf"
-    papers, errors = f.fetch("", [("pdf", bad), ("pdf", good)], 10)
+    papers, errors, _ = f.fetch("", [("pdf", bad), ("pdf", good)], 10)
     assert [p["source"] for p in papers] == ["pdf"]
     assert errors == [{"input": bad, "reason": errors[0]["reason"]}]
     assert errors[0]["reason"]
@@ -228,7 +228,7 @@ def test_fetch_non_pdf_bytes_url_is_error(tmp_db):
     db.init_schema(conn)
     html = httpx.MockTransport(lambda r: httpx.Response(200, content=b"<html>"))
     client = httpx.Client(transport=html)
-    papers, errors = Fetcher(conn, client, CountingThrottle()).fetch(
+    papers, errors, _ = Fetcher(conn, client, CountingThrottle()).fetch(
         "", [("pdf", "https://example.org/page")], 10
     )
     assert papers == []
@@ -238,7 +238,7 @@ def test_fetch_non_pdf_bytes_url_is_error(tmp_db):
 def test_fetch_mixed_items_keep_input_order(env):
     f, _, _, _ = env
     url = "https://example.org/a.pdf"
-    papers, _ = f.fetch("", [("pdf", url), ("arxiv", "2401.00003"), ("arxiv", "2401.00001")], 10)
+    papers, _, _ = f.fetch("", [("pdf", url), ("arxiv", "2401.00003"), ("arxiv", "2401.00001")], 10)
     assert [p["id"] for p in papers][1:] == ["2401.00003", "2401.00001"]
     assert papers[0]["source"] == "pdf"
 
@@ -248,20 +248,72 @@ def test_fetch_reuses_stored_papers_without_network(env):
     url = "https://example.org/a.pdf"
     f.fetch("", [("pdf", url), ("arxiv", "2401.00001")], 10)
     n = len(requests)
-    papers, errors = f.fetch("", [("pdf", url), ("arxiv", "2401.00001")], 10)
+    papers, errors, _ = f.fetch("", [("pdf", url), ("arxiv", "2401.00001")], 10)
     assert len(papers) == 2 and errors == []
     assert len(requests) == n
 
 
 def test_fetch_caps_items_at_n(env):
     f, _, _, _ = env
-    papers, _ = f.fetch("", [("arxiv", f"2401.0000{i}") for i in (1, 2, 3, 4)], 2)
+    papers, _, _ = f.fetch("", [("arxiv", f"2401.0000{i}") for i in (1, 2, 3, 4)], 2)
     assert len(papers) == 2
 
 
 def test_fetch_hostless_url_is_error_others_continue(env):
     f, _, _, _ = env
-    papers, errors = f.fetch("", [("pdf", "http://"), ("arxiv", "2401.00001")], 10)
+    papers, errors, _ = f.fetch("", [("pdf", "http://"), ("arxiv", "2401.00001")], 10)
     assert [p["id"] for p in papers] == ["2401.00001"]
     assert errors[0]["input"] == "http://"
     assert errors[0]["reason"]
+
+
+# ---- v2 paging ----
+
+
+def test_search_offset_sends_start_and_keys_cache(env):
+    f, requests, _, conn = env
+    papers, total = f.search("diffusion distillation", 5, 10)
+    assert [p["id"] for p in papers] == [f"2401.{i:05d}" for i in range(11, 16)]
+    assert total == 15
+    assert requests[0].url.params["start"] == "10"
+    assert db.cache_get(conn, "q:diffusion distillation:5:10") is not None
+    f.search("diffusion distillation", 5, 10)
+    assert len(requests) == 1
+    f.search("diffusion distillation", 5)  # offset 0 is a different key
+    assert len(requests) == 2
+
+
+def test_search_missing_total_is_none(tmp_db):
+    xml = (Path(__file__).parent.parent / "src/paper_triage/fixtures/arxiv_search.xml").read_text()
+    xml = xml.replace("<opensearch:totalResults>15</opensearch:totalResults>", "")
+    conn = db.connect(tmp_db)
+    db.init_schema(conn)
+    db.cache_put(conn, "q:x:5:0", xml)
+    client, _ = make_http(True)
+    papers, total = Fetcher(conn, client, CountingThrottle()).search("x", 5)
+    assert len(papers) == 15 and total is None
+
+
+def test_fetch_topic_page_info(env):
+    f, _, _, _ = env
+    _, _, page = f.fetch("diffusion distillation", [], 10)
+    assert page == {"next_offset": 10, "has_more": True}
+    _, _, page = f.fetch("diffusion distillation", [], 5, 10)
+    assert page == {"next_offset": 15, "has_more": False}
+    _, _, page = f.fetch("diffusion distillation", [], 5, 15)
+    assert page == {"next_offset": 15, "has_more": False}
+
+
+def test_fetch_page_fallback_without_total(env, monkeypatch):
+    f, _, _, _ = env
+    monkeypatch.setattr(f, "search", lambda t, n, o=0: (f.__class__.search(f, t, n, o)[0], None))
+    _, _, page = f.fetch("diffusion", [], 5)
+    assert page == {"next_offset": 5, "has_more": True}  # full page -> assume more
+    _, _, page = f.fetch("diffusion", [], 20)
+    assert page["has_more"] is False  # only 15 returned < 20
+
+
+def test_fetch_items_have_no_paging(env):
+    f, _, _, _ = env
+    _, _, page = f.fetch("", [("arxiv", "2401.00001")], 10)
+    assert page == {"next_offset": None, "has_more": False}

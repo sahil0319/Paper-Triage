@@ -115,18 +115,26 @@ def _process_all(conn: sqlite3.Connection, todo: list[dict], topic: str, llm: LL
             _save(conn, paper["id"], topic, fut.result())
 
 
-def triage(query: str, n: int, conn: sqlite3.Connection, http, llm: LLMClient) -> dict:
+def triage(
+    query: str, n: int, conn: sqlite3.Connection, http, llm: LLMClient, offset: int = 0
+) -> dict:
     """Run a triage. http = (httpx.Client, Throttle) from net.make_http.
 
-    Returns {"topic", "results", "errors"}; raises ValueError on an empty query.
+    Returns {"topic", "results", "errors", "offset", "next_offset", "has_more"}; raises ValueError
+    on an empty query, or on offset > 0 for a query with items (paging is for topic searches).
     """
     topic, items = parse_query(query)
+    if items and offset > 0:
+        raise ValueError("offset only applies to topic searches")
     n = max(1, min(int(n), get_settings().max_papers))
     client, throttle = http
     try:
-        papers, errors = Fetcher(conn, client, throttle).fetch(topic, items, n)
+        papers, errors, page = Fetcher(conn, client, throttle).fetch(topic, items, n, offset)
     except FetchError as e:
-        return {"topic": topic, "results": [], "errors": [{"input": topic, "reason": str(e)}]}
+        return {
+            "topic": topic, "results": [], "errors": [{"input": topic, "reason": str(e)}],
+            "offset": offset, "next_offset": None, "has_more": False,
+        }
     todo = []
     for paper in papers:
         existing = db.get_result(conn, paper["id"], topic)
@@ -141,4 +149,7 @@ def triage(query: str, n: int, conn: sqlite3.Connection, http, llm: LLMClient) -
                     "source": paper["source"], "basis": paper["basis"],
                     "pdf_url": paper.get("pdf_url")})
         )
-    return {"topic": topic, "results": sort_results(results), "errors": errors}
+    return {
+        "topic": topic, "results": sort_results(results), "errors": errors, "offset": offset,
+        **page,
+    }

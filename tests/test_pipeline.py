@@ -117,6 +117,7 @@ def test_triage_search_failure_is_reported_not_raised(tmp_db):
     out = triage("diffusion", 5, conn, (bad, Throttle(0)), MockClient())
     assert out["results"] == []
     assert out["errors"][0]["input"] == "diffusion"
+    assert (out["offset"], out["next_offset"], out["has_more"]) == (0, None, False)
 
 
 def test_validation_error_retried_once_then_ok(env):
@@ -320,3 +321,23 @@ def test_triage_results_carry_source_links(env):
     assert by_src["arxiv"]["pdf_url"] == "https://arxiv.org/pdf/2401.00001"
     assert by_src["pdf"]["abs_url"] is None
     assert by_src["pdf"]["pdf_url"] == "https://example.org/a.pdf"
+
+
+def test_triage_paging_fields(env):
+    conn, http = env
+    out = triage("diffusion", 10, conn, http, MockClient())
+    assert (out["offset"], out["next_offset"], out["has_more"]) == (0, 10, True)
+    out = triage("diffusion", 5, conn, http, MockClient(), 10)
+    assert [r["paper_id"] for r in out["results"]] and len(out["results"]) == 5
+    assert {r["paper_id"] for r in out["results"]} == {f"2401.{i:05d}" for i in range(11, 16)}
+    assert (out["offset"], out["next_offset"], out["has_more"]) == (10, 15, False)
+
+
+def test_triage_items_no_paging_and_offset_rejected(env):
+    conn, http = env
+    out = triage("2401.00001", 10, conn, http, MockClient())
+    assert (out["offset"], out["next_offset"], out["has_more"]) == (0, None, False)
+    with pytest.raises(ValueError, match="offset only applies to topic searches"):
+        triage("2401.00001", 10, conn, http, MockClient(), 5)
+    with pytest.raises(ValueError, match="offset only applies to topic searches"):
+        triage("diffusion 2401.00001", 10, conn, http, MockClient(), 5)

@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from . import db
 from .chat import answer as chat_answer
@@ -23,6 +23,7 @@ STATIC = Path(__file__).parent / "static"
 class TriageIn(BaseModel):
     query: str
     max_results: int = 10
+    offset: int = Field(default=0, ge=0, le=1000)
 
 
 class ChatIn(BaseModel):
@@ -75,7 +76,9 @@ def create_app() -> FastAPI:
         st = request.app.state
         with st.lock:
             try:
-                return triage(body.query, body.max_results, st.conn, st.http, st.llm)
+                return triage(
+                    body.query, body.max_results, st.conn, st.http, st.llm, body.offset
+                )
             except ValueError as e:
                 raise HTTPException(422, str(e)) from e
 

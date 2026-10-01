@@ -191,3 +191,39 @@ def test_source_links_on_triage_and_papers(client):
         assert by_src["arxiv"]["pdf_url"] == "https://arxiv.org/pdf/2401.00001"
         assert by_src["pdf"]["abs_url"] is None
         assert by_src["pdf"]["pdf_url"] == "https://example.org/a.pdf"
+
+
+def test_triage_paging_fields_and_load_more(client):
+    a = client.post("/api/triage", json={"query": "diffusion", "max_results": 10}).json()
+    assert (a["offset"], a["next_offset"], a["has_more"]) == (0, 10, True)
+    assert len(a["results"]) == 10
+    b = client.post(
+        "/api/triage", json={"query": "diffusion", "max_results": 5, "offset": 10}
+    ).json()
+    assert {r["paper_id"] for r in b["results"]} == {f"2401.{i:05d}" for i in range(11, 16)}
+    assert (b["offset"], b["next_offset"], b["has_more"]) == (10, 15, False)
+
+
+@pytest.mark.parametrize("offset", [-1, 1001])
+def test_triage_offset_range_422(client, offset):
+    r = client.post("/api/triage", json={"query": "diffusion", "offset": offset})
+    assert r.status_code == 422
+
+
+def test_triage_items_with_offset_422(client):
+    r = client.post("/api/triage", json={"query": "2401.00001", "offset": 5})
+    assert r.status_code == 422
+    assert r.json() == {"detail": "offset only applies to topic searches"}
+    ok = client.post("/api/triage", json={"query": "2401.00001"}).json()
+    assert (ok["offset"], ok["next_offset"], ok["has_more"]) == (0, None, False)
+
+
+def test_triage_fetch_error_has_more_false(client):
+    import httpx
+
+    from paper_triage.net import Throttle
+
+    bad = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(500)))
+    client.app.state.http = (bad, Throttle(0))
+    body = client.post("/api/triage", json={"query": "diffusion"}).json()
+    assert body["results"] == [] and body["has_more"] is False and body["next_offset"] is None

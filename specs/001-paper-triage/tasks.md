@@ -185,7 +185,7 @@ rendering rule; keep the UI test hooks from plan.md. Every task ends with
   `2401.00011`..`2401.00015`, totalResults 15; `start=15` -> 0 entries. Audit and fix tests
   that assumed "default 10 returns 5" (pin `max_results=5` or expect 10): `tests/test_api.py`,
   `tests/test_pipeline.py`, `tests/test_fetcher.py`, `tests/test_e2e_mock.py`.
-- [ ] T029 [BE] [US1] B2 offset paging (FR-013, contracts/api.md POST /api/triage). Test first
+- [x] T029 [BE] [US1] B2 offset paging (FR-013, contracts/api.md POST /api/triage). Test first
   `tests/test_fetcher.py`: `search(topic, n, offset)` sends `start=offset`; cache key
   `q:<terms>:<n>:<offset>`; total read from `opensearch:totalResults`; missing total -> fallback.
   `tests/test_pipeline.py`: topic offset 0 n 10 -> `offset 0, next_offset 10, has_more true`;
