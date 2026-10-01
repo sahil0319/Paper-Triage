@@ -371,7 +371,7 @@
   ];
   var SHOW_DELAY_MS = 300;
   var VERB_MS = 2400;
-  var VERB_MS_REDUCED = 5000;
+  // Reduced motion: the verb never changes (FR-012); a neutral label replaces the stage loop.
 
   var work = { el: null, compact: false, t0: 0, showT: null, tickT: null, verbT: null, verbI: 0,
     verbEl: null, timeEl: null, noteEl: null, minutes: 0 };
@@ -428,14 +428,16 @@
     var el = work.el;
     clear(el);
     work.verbI = 0;
-    work.verbEl = h("span", { class: "working__verb", "aria-hidden": "true" }, VERBS[0]);
+    var still = reducedMotion();
+    work.verbEl = h("span", { class: "working__verb", "aria-hidden": "true" },
+      still ? (work.compact ? "Loading more papers…" : "Triaging papers…") : VERBS[0]);
     work.timeEl = h("span", { class: "working__time", "aria-hidden": "true" }, clock(elapsedSec()));
     work.noteEl = work.compact ? null : h("p", { class: "working__note" }, noteFor(elapsedSec()));
     el.appendChild(h("div", { class: "working__row" },
       h("span", { class: "working__glyph" }, rayGlyph(work.compact ? 16 : 20)), work.verbEl, work.timeEl));
     if (work.noteEl) el.appendChild(work.noteEl);
     el.hidden = false;
-    work.verbT = window.setInterval(nextVerb, reducedMotion() ? VERB_MS_REDUCED : VERB_MS);
+    if (!still) work.verbT = window.setInterval(nextVerb, VERB_MS);
   }
 
   function startWorking(el, compact) {

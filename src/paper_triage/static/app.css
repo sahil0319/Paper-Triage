@@ -567,5 +567,5 @@ a.cite:active { background: var(--color-hairline); color: var(--color-ink); }
   .ray { opacity: 1; }
   .working__verb.is-out { transition: none; }
   .paper--cited { animation: none; outline: 2px solid var(--color-info-border); }
-  .paper--new { animation: none; box-shadow: inset 3px 0 0 var(--color-cream); }
+  .paper--new { animation: none; background-color: var(--color-cream); padding-inline: var(--space-sm); margin-inline: calc(-1 * var(--space-sm)); }
 }
