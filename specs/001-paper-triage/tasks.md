@@ -20,7 +20,7 @@ Package = `src/paper_triage/` (abbrev `pt/` below means `src/paper_triage/`).
 
 ## Phase 1: Setup
 
-- [ ] T001 Create `pyproject.toml` (uv project `paper-triage`, Python >=3.11, deps fastapi, uvicorn,
+- [x] T001 Create `pyproject.toml` (uv project `paper-triage`, Python >=3.11, deps fastapi, uvicorn,
   httpx, pydantic>=2, anthropic, pypdf; dev pytest, ruff; src layout; pytest `pythonpath=["src"]`,
   ruff line-length 100), `.env.example` (ANTHROPIC_API_KEY=, ANTHROPIC_MODEL=, MOCK_LLM=1,
   PAPER_TRIAGE_DB=), `src/paper_triage/__init__.py`, `tests/conftest.py` (sets `MOCK_LLM=1`,

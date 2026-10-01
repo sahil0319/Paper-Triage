@@ -6,7 +6,10 @@ Usage:
   token_watch.py --hook     PostToolUse hook: reads hook JSON on stdin, may emit additionalContext
 Writes context_pct into .claude/state/progress.json.
 """
-import json, os, sys, time
+import json
+import os
+import sys
+import time
 from pathlib import Path
 
 ROOT = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parent.parent)
