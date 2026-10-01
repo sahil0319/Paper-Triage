@@ -112,7 +112,7 @@ Package = `src/paper_triage/` (abbrev `pt/` below means `src/paper_triage/`).
 **Independent test**: stored fixture papers, mock mode: in-scope -> valid citations; out of
 scope -> `refused: true`; empty store -> refused, LLM not called.
 
-- [ ] T018 [BE] [US2] Test first `tests/test_chat.py`, then `pt/prompts/chat.md` + `pt/chat.py`:
+- [x] T018 [BE] [US2] Test first `tests/test_chat.py`, then `pt/prompts/chat.md` + `pt/chat.py`:
   `answer(question, conn, client) -> ChatAnswer`; empty store -> refusal without calling client
   (assert via spy); context = top-k papers as `<paper id title>` with abstract, summary,
   critique; regex `\[([^\[\]\s]+)\]` validation, strip unknown ids into `dropped_citations`;
