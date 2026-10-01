@@ -25,7 +25,7 @@ Package = `src/paper_triage/` (abbrev `pt/` below means `src/paper_triage/`).
   ruff line-length 100), `.env.example` (ANTHROPIC_API_KEY=, ANTHROPIC_MODEL=, MOCK_LLM=1,
   PAPER_TRIAGE_DB=), `src/paper_triage/__init__.py`, `tests/conftest.py` (sets `MOCK_LLM=1`,
   fixture `tmp_db` path), `tests/test_smoke.py` (imports package). Verify `uv sync` + pytest.
-- [ ] T002 Test first `tests/test_config_llm.py::test_config_*`, then `pt/config.py`: `Settings`
+- [x] T002 Test first `tests/test_config_llm.py::test_config_*`, then `pt/config.py`: `Settings`
   read from env at call time: `model` (env `ANTHROPIC_MODEL`, default `"claude-opus-5-5"` – the
   only model id in code), `mock` (`MOCK_LLM=="1"`), `db_path` (default `./paper_triage.db`),
   `max_papers=20`, `default_papers=10`, `text_cap=40000`, `chat_top_k=20`.
