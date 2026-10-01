@@ -61,7 +61,7 @@ Package = `src/paper_triage/` (abbrev `pt/` below means `src/paper_triage/`).
 - [x] T007 [P] Test first `tests/test_extract.py`, then `pt/extract.py`:
   `extract_text(pdf_bytes) -> str` via pypdf; `ExtractError` on failure or <500 chars;
   `prepare_for_llm(text, cap)` drops trailing "References" section (heading after 50%) and caps.
-- [ ] T008 [P] Test first `tests/test_input_parse.py`, then `pt/input_parse.py`:
+- [x] T008 [P] Test first `tests/test_input_parse.py`, then `pt/input_parse.py`:
   `parse_query(q) -> (topic, items)` per contracts/api.md (new/old arXiv ids, arxiv abs/pdf URLs
   -> normalized id, other URLs -> pdf items, rest -> topic; empty -> ValueError).
 
