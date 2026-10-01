@@ -54,7 +54,7 @@ def test_mixed_ids_and_url_input(client):
 
 def test_chat_in_scope_cites_only_stored_ids(client):
     client.post("/api/triage", json={"query": "diffusion distillation"})
-    body = client.post("/api/chat", json={"question": "Which paper is strongest?"}).json()
+    body = client.post("/api/chat", json={"question": "Which paper is progressive?"}).json()
     assert body["refused"] is False
     assert body["citations"] and set(body["citations"]) <= _stored_ids(client)
     assert body["dropped_citations"] == []
@@ -62,7 +62,7 @@ def test_chat_in_scope_cites_only_stored_ids(client):
 
 def test_chat_out_of_scope_refused(client):
     client.post("/api/triage", json={"query": "diffusion distillation"})
-    body = client.post("/api/chat", json={"question": "out of scope: who won the 2018 World Cup?"})
+    body = client.post("/api/chat", json={"question": "What is the capital of France?"})
     assert body.json()["refused"] is True and body.json()["citations"] == []
 
 

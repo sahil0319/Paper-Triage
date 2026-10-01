@@ -80,15 +80,46 @@ def test_llm_mock_rank_varies_across_papers():
     assert len(ranks) > 1
 
 
-def test_llm_mock_chat_cites_first_paper():
-    out = MockClient().text("sys", f"{P1}\n{P2}\nWhat is it?")
-    assert "[2401.00001]" in out and "[2401.00002]" not in out
+def _chat_prompt(question):
+    return (
+        '<paper id="2401.00001" title="Basalt Columns">\nAbstract: Stacked sampler stages.\n'
+        'Summary: Mock summary of 2401.00001.\n</paper>\n'
+        '<paper id="2401.00002" title="Cobalt Adapters">\nAbstract: Low-rank adapters.\n</paper>\n'
+        f"<question>\n{question}\n</question>"
+    )
 
 
-def test_llm_mock_chat_refuses():
+def test_llm_mock_chat_refuses_unrelated_question():
+    out = MockClient().text("sys", _chat_prompt("What is the capital of France?"))
+    assert out.startswith(SENTINEL)
+
+
+def test_llm_mock_chat_cites_paper_with_title_word():
     m = MockClient()
-    assert m.text("sys", f"{P1}\nThis is out of scope").startswith(SENTINEL)
+    out = m.text("sys", _chat_prompt("Tell me about cobalt?"))
+    assert out.endswith("[2401.00002].") and "[2401.00001]" not in out
+    out = m.text("sys", _chat_prompt("Which paper discusses sampler stages?"))
+    assert "[2401.00001]" in out  # abstract word
+
+
+def test_llm_mock_chat_cites_named_id_first():
+    out = MockClient().text("sys", _chat_prompt("What does 2401.00002 claim, besides basalt?"))
+    assert "[2401.00002]" in out and "[2401.00001]" not in out
+
+
+def test_llm_mock_chat_ignores_stop_words_and_prompt_text():
+    m = MockClient()
+    # stop words and words that only occur in summary text or the question itself never match
+    assert m.text("sys", _chat_prompt("Which paper does this talk about?")).startswith(SENTINEL)
+    assert m.text("sys", _chat_prompt("mock summary?")).startswith(SENTINEL)
+    assert m.text("sys", _chat_prompt("ok")).startswith(SENTINEL)  # < 4 letters
+
+
+def test_llm_mock_chat_no_paper_tags_or_question_refuses():
+    m = MockClient()
     assert m.text("sys", "No papers here. Question?").startswith(SENTINEL)
+    assert m.text("sys", "<question>\nbasalt\n</question>").startswith(SENTINEL)
+    assert m.text("sys", P1).startswith(SENTINEL)  # no <question>
 
 
 class FakeMessages:

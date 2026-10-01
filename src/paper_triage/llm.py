@@ -17,6 +17,16 @@ T = TypeVar("T", bound=BaseModel)
 SENTINEL = "NOT_IN_STORED_PAPERS"
 MAX_TOKENS = 16000
 _PAPER_TAG = re.compile(r'<paper id="([^"]*)"(?:[^>]*?basis="(fulltext|abstract)")?')
+_CHAT_PAPER = re.compile(r'<paper id="([^"]*)"(?: title="([^"]*)")?[^>]*>(.*?)</paper>', re.DOTALL)
+_QUESTION = re.compile(r"<question>(.*?)</question>", re.DOTALL)
+_WORD = re.compile(r"[a-z]{4,}")
+_STOP_TEXT = (
+    "about above after also been being both cannot could does done each from have here into "
+    "just like made make many more most much must only other over paper papers said same shall "
+    "should show some such tell than that their them then there these they this those very want "
+    "were what when where which while whom whose will with would your"
+)
+_MOCK_STOP_WORDS = frozenset(_STOP_TEXT.split())
 
 
 class LLMError(Exception):
@@ -60,10 +70,25 @@ class MockClient:
         return obj  # type: ignore[return-value]
 
     def text(self, system: str, user: str) -> str:
-        m = _PAPER_TAG.search(user)
-        if m is None or "out of scope" in user.lower():
-            return f"{SENTINEL} The stored papers do not cover this."
-        return f"Mock answer based on the stored papers [{m.group(1)}]."
+        """Answer only if the question names a context paper id or shares a content word
+        (>= 4 lowercase letters, not a stop word) with a context paper's title or abstract."""
+        refusal = f"{SENTINEL} The stored papers do not cover this."
+        q = _QUESTION.search(user)
+        papers = _CHAT_PAPER.findall(user[: q.start()] if q else user)
+        if q is None or not papers:
+            return refusal
+        question = q.group(1).lower()
+        words = set(_WORD.findall(question)) - _MOCK_STOP_WORDS
+        hit = next((pid for pid, _, _ in papers if pid.lower() in question), None)
+        for pid, title, body in papers:
+            if hit:
+                break
+            abstract = next(
+                (ln[len("Abstract:"):] for ln in body.splitlines() if ln.startswith("Abstract:")), ""
+            )
+            if words & set(_WORD.findall(f"{title} {abstract}".lower())):
+                hit = pid
+        return f"Mock answer based on the stored papers [{hit}]." if hit else refusal
 
 
 class AnthropicClient:

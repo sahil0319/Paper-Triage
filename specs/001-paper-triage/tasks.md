@@ -197,7 +197,7 @@ rendering rule; keep the UI test hooks from plan.md. Every task ends with
   n, offset=0) -> (papers, errors, page)` with `page = {"next_offset", "has_more"}`),
   `pt/pipeline.py` (`triage(..., offset=0)` returns `offset`, `next_offset`, `has_more`),
   `pt/app.py` (`TriageIn.offset: int = 0`, range 0..1000).
-- [ ] T030 [BE] [US2] MockClient scope fix (FR-010, contracts/api.md mock rule). Test first
+- [x] T030 [BE] [US2] MockClient scope fix (FR-010, contracts/api.md mock rule). Test first
   `tests/test_config_llm.py`: with a chat prompt of two `<paper id title>` blocks and
   `<question>` "What is the capital of France?" -> text starts with `NOT_IN_STORED_PAPERS`;
   question containing paper B's title marker word -> `"... [B]"`; question naming id A ->

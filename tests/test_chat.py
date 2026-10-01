@@ -49,8 +49,8 @@ def test_empty_store_refuses_without_llm_call(conn):
 
 
 def test_in_scope_cites_stored_id(conn):
-    _paper(conn, "2401.00001")
-    out = answer("what is this about?", conn, MockClient())
+    _paper(conn, "2401.00001", title="Basalt Study")
+    out = answer("what is basalt about?", conn, MockClient())
     assert out.refused is False and out.citations == ["2401.00001"]
     assert out.dropped_citations == []
 

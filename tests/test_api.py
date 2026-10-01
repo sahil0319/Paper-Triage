@@ -115,7 +115,7 @@ def test_chat_empty_store_refused_and_persisted(client):
 def test_chat_in_scope_cites_stored_ids_only(client):
     client.post("/api/triage", json={"query": "diffusion", "max_results": 3})
     stored = {r[0] for r in client.app.state.conn.execute("SELECT id FROM papers")}
-    body = client.post("/api/chat", json={"question": "what do they find?"}).json()
+    body = client.post("/api/chat", json={"question": "what is progressive about?"}).json()
     assert body["refused"] is False and body["citations"]
     assert set(body["citations"]) <= stored
     assert "[" in body["answer"]
@@ -126,7 +126,7 @@ def test_chat_in_scope_cites_stored_ids_only(client):
 
 def test_chat_out_of_scope_refused(client):
     client.post("/api/triage", json={"query": "diffusion", "max_results": 2})
-    body = client.post("/api/chat", json={"question": "out of scope: capital of France"}).json()
+    body = client.post("/api/chat", json={"question": "What is the capital of France?"}).json()
     assert body["refused"] is True and body["citations"] == []
     assert len(_turns(client)) == 1
 
