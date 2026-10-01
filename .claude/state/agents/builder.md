@@ -16,3 +16,15 @@
 - status: done + ticked + committed (F-001 e52a67a, T011, T012, T013 see git log). 101 tests pass offline, ruff clean.
 - findings: F-001 root cause deeper than hostname None: httpx raises ValueError (cookie code) for "http://"; `_download` now catches (HTTPError, InvalidURL, ValueError) -> FetchError. New shared `prompting.py`: `load_prompt(name)`, `paper_block(paper, with_text=True)` -> `<paper id basis>` w/ title, abstract, capped text (fulltext basis only). `summarize(paper, client)`, `critique(paper, client)` (basis overwritten from paper), `rank(paper, summary, topic, client)` (empty topic -> "overall reading priority", no "Topic:"). Agents propagate LLMError/ValidationError unwrapped; T014 pipeline owns retry. paper arg = db paper dict (id,title,abstract,full_text,basis).
 - next: T014 pipeline (tester gate first). Handoff NEXT:tester.
+
+## 2026-10-01 T014-T015 (+T016 committed, T017 in-flight, then split)
+- goal: pipeline, API, UI structure, UI triage flow.
+- status: T014 c2860d8, T015 acf51b1, T016 406cfe7 all ticked+committed. T017: src/paper_triage/static/app.js written, NOT committed, T017 NOT ticked (orchestrator split: frontend-builder owns static/**). 132 tests pass, ruff clean.
+- findings: pipeline.triage(query,n,conn,http=(client,throttle),llm)->{topic,results,errors}; owns single retry (LLMError|LLMRefusal|ValidationError); to_out/sort_results helpers reused by app. app.create_app() factory + module `app`; lifespan opens db from PAPER_TRIAGE_DB; state: conn/http/llm/lock. 422 handler returns plain-string detail. /api/papers returns {topic, results} (object, not bare list).
+- next: frontend-builder takes T017 (review/finish app.js), T020, T021 UI, T023. backend: T018, T019, T021 api, T022, T024.
+
+## 2026-10-01 Wave A/B checkpoint
+- goal: checkpoint state after BE wave A verified, FE wave A committed, T024 README done, T023 in flight
+- status: T001-T022 + T024 ticked + committed; T023 pending (frontend-builder active)
+- findings: BE wave A (T014,T015,T018,T019,T021api,T022) verified green by tester + e2e smoke 6/6. FE T016,T017,T020,T021ui,T024 committed but not yet tested. Ticks vs git log verified 25/25 match. No failures. Context 67.8%, post-watch will update.
+- next: T023 complete, then tester final pass (FE+README+full suite). Handoff NEXT:tester.
