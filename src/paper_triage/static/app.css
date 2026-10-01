@@ -362,6 +362,16 @@ input:disabled { opacity: 0.55; cursor: default; }
 }
 .paper__id { font: 400 13px/1.2 var(--font-mono); color: var(--color-muted); }
 
+.paper__links { margin-left: auto; display: flex; flex-wrap: wrap; gap: var(--space-xs) var(--space-md); }
+.ext-link {
+  display: inline-flex; align-items: center; gap: var(--space-xxs);
+  font: var(--type-caption); letter-spacing: var(--tracking-caption);
+  color: var(--color-link); text-decoration: none;
+  padding: 6px 4px; margin: -6px -4px;
+}
+.ext-link:active { color: var(--color-link-active); }
+.ext { flex: none; }
+
 .rank { color: var(--color-ink); }
 .rank__line { display: flex; align-items: baseline; gap: 2px; }
 .rank__n { font: var(--type-title-lg); letter-spacing: 0; color: var(--color-ink); }
@@ -512,6 +522,7 @@ a.cite:active { background: var(--color-hairline); color: var(--color-ink); }
 
 @media (max-width: 767px) {
   .triage-form .btn { width: 100%; }
+  .paper__links { margin-left: 0; flex-basis: 100%; }
 }
 
 /* ---- forced colors ---- */

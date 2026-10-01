@@ -176,6 +176,50 @@
       box);
   }
 
+  // ---- source links (D10) ----
+
+  function safeUrl(u) {
+    if (typeof u !== "string" || !u) return null;
+    try {
+      var parsed = new URL(u);
+      return parsed.protocol === "https:" || parsed.protocol === "http:" ? u : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function arxivPath(id) {
+    return String(id).split("/").map(encodeURIComponent).join("/");
+  }
+
+  function arrowIcon() {
+    return svg("svg", { class: "ext", width: "12", height: "12", viewBox: "0 0 12 12",
+      "aria-hidden": "true", focusable: "false" },
+      svg("path", { d: "M3.5 8.5 8.5 3.5M4 3.5h4.5V8", fill: "none", stroke: "currentColor",
+        "stroke-width": "1.5", "stroke-linecap": "round", "stroke-linejoin": "round" }));
+  }
+
+  function linkEl(kind, text, href, title) {
+    return h("a", { class: "ext-link", href: href, "data-link": kind, target: "_blank",
+      rel: "noopener noreferrer", "aria-label": text + ": " + title + " (opens in new tab)" },
+      text, arrowIcon());
+  }
+
+  function paperLinks(r) {
+    var abs = null;
+    var pdf = null;
+    if (r.source === "arxiv") {
+      abs = safeUrl(r.abs_url) || safeUrl("https://arxiv.org/abs/" + arxivPath(r.paper_id));
+      pdf = safeUrl(r.pdf_url) || safeUrl("https://arxiv.org/pdf/" + arxivPath(r.paper_id));
+    } else {
+      pdf = safeUrl(r.pdf_url);
+    }
+    if (!abs && !pdf) return null;
+    return h("div", { class: "paper__links" },
+      abs ? linkEl("abs", "arXiv page", abs, r.title) : null,
+      pdf ? linkEl("pdf", "PDF", pdf, r.title) : null);
+  }
+
   // ---- paper rows (D8, D9, D11) ----
 
   function rankBlock(r, failed) {
@@ -194,7 +238,8 @@
     var meta = h("div", { class: "paper__meta" },
       h("span", { class: "paper__id" }, r.paper_id),
       r.basis === "abstract" ? h("span", { class: "flag" }, "Abstract only") : null,
-      failed ? h("span", { class: "flag flag--failed" }, "Failed") : null);
+      failed ? h("span", { class: "flag flag--failed" }, "Failed") : null,
+      paperLinks(r));
     var reason = failed
       ? h("p", { class: "paper__reason paper__reason--failed" }, r.error || "This paper could not be processed.")
       : h("p", { class: "paper__reason" }, r.rank_reason || "");

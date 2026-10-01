@@ -281,7 +281,7 @@ rendering rule; keep the UI test hooks from plan.md. Every task ends with
 
 ### Wave E — FE lane (needs landed BE API) || BE README
 
-- [ ] T038 [FE] [US1] Paper links (FR-014, SC-007), brief D10. Needs T027. `app.js` + `app.css`:
+- [x] T038 [FE] [US1] Paper links (FR-014, SC-007), brief D10. Needs T027. `app.js` + `app.css`:
   arXiv rows render `a[data-link="abs"]` "arXiv page" and `a[data-link="pdf"]` "PDF" from
   `r.abs_url`/`r.pdf_url` (fallback derive per D10), `pdf` rows only `a[data-link="pdf"]`;
   `target="_blank" rel="noopener noreferrer"`, aria-labels per D10; `href` set only for
