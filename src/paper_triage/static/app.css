@@ -337,6 +337,7 @@ input:disabled { opacity: 0.55; cursor: default; }
 .chat__form { display: flex; gap: var(--space-xs); margin-top: var(--space-md); }
 .chat__form input { height: 44px; flex: 1; }
 .btn--ask { min-height: 44px; padding: 10px 20px; }
+.btn--ask:disabled { cursor: default; }
 
 /* ---- paper rows (D8, D9, D11, D12) ---- */
 

@@ -36,6 +36,7 @@
     lastQuery: "",
     running: false,
     mock: false,
+    stored: false,      // rows came from GET /api/papers (reload), not a run in this page
     query: "",          // query sent to /api/triage for the current result set
     topic: "",
     nextOffset: null,   // offset for the next load-more call
@@ -333,6 +334,7 @@
     var rs = data.results || [];
     state.rows = rs.slice();
     state.topic = data.topic || "";
+    state.stored = !!stored;
     state.query = stored ? state.topic : state.lastQuery;
     // After a reload the server sends no paging fields: next offset = rows shown (data-model).
     state.nextOffset = stored ? rs.length : (data.next_offset === undefined ? null : data.next_offset);
@@ -357,7 +359,7 @@
       showEmpty("none", data.topic);
       statusEl.textContent = "No papers found.";
     }
-    refreshSuggestions();
+    refreshChat();
     refreshLoadMore();
   }
 
@@ -652,7 +654,22 @@
     })));
   chatEl.insertBefore(suggestEl, logEl);
 
+  var chatBusy = false;
+  var scopeEl = document.getElementById("chat-scope");
+
+  // The chat is scoped to the papers shown (first page + load-more pages), sent as paper_ids.
   function refreshChat() {
+    var n = state.rows.filter(function (r) { return r.status !== "failed"; }).length;
+    var empty = !state.rows.length;
+    clear(scopeEl);
+    if (empty) {
+      scopeEl.textContent = "Run a search first. Chat only answers from papers triaged here.";
+    } else {
+      append(scopeEl, ["Chatting about ", h("strong", {}, plural(n, "paper")),
+        state.stored ? " from your last run." : " from this search."]);
+    }
+    question.disabled = empty;
+    askBtn.disabled = empty || chatBusy;
     refreshSuggestions();
   }
 
@@ -754,6 +771,7 @@
   function askInto(turn, q) {
     var pending = pendingEl();
     turn.appendChild(pending);
+    chatBusy = true;
     askBtn.disabled = true;
     var ids = state.rows.map(function (r) { return r.paper_id; }).slice(0, 50);
     postJSON("/api/chat", { question: q, paper_ids: ids })
@@ -765,7 +783,7 @@
         turn.removeChild(pending);
         var again = h("button", { type: "button", class: "btn btn--secondary btn--small" }, "Ask again");
         again.addEventListener("click", function () {
-          if (askBtn.disabled) return;
+          if (chatBusy) return;
           turn.removeChild(errBox);
           askInto(turn, q);
         });
@@ -774,7 +792,8 @@
         turn.appendChild(errBox);
       })
       .then(function () {
-        askBtn.disabled = false;
+        chatBusy = false;
+        askBtn.disabled = !state.rows.length;
         turn.scrollIntoView({ block: "nearest" });
         question.focus();
       });
@@ -784,7 +803,7 @@
     ev.preventDefault();
     var q = question.value.trim();
     if (!q) { question.focus(); return; }
-    if (askBtn.disabled) return;
+    if (askBtn.disabled || chatBusy) return;
     question.value = "";
     askInto(newTurn(q), q);
   });
@@ -828,6 +847,7 @@
     });
   }
 
+  refreshChat();
   loadStatus();
   loadStored();
 })();

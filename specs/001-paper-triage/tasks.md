@@ -299,7 +299,7 @@ rendering rule; keep the UI test hooks from plan.md. Every task ends with
   triage, when `has_more` false, or when 50 ids are shown. After reload (`/api/papers`):
   `nextOffset` = shown count, shown when topic non-empty. Acceptance: T034 green; manual mock
   run 10 -> 15 rows, then button gone.
-- [ ] T040 [FE] [US2] Chat scope wiring (FR-008-FR-010), brief D23. Needs T031, T039. `app.js`,
+- [x] T040 [FE] [US2] Chat scope wiring (FR-008-FR-010), brief D23. Needs T031, T039. `app.js`,
   `index.html`, `app.css`: `paper_ids` = result-set ids (first page + load-more, max 50, display
   order); new search replaces the set; `#chat-scope` copy "Chatting about N papers from this
   search." / "… from your last run." (N = shown rows with status ok); empty set: "Run a search
