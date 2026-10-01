@@ -135,3 +135,16 @@ def test_persistence_across_reconnect(tmp_db):
     assert db.cache_get(c2, "k") == "body"
     assert c2.execute("select count(*) from chat_turns").fetchone()[0] == 1
     c2.close()
+
+
+def test_papers_by_ids_input_order_unknown_skipped_latest_result(conn):
+    for pid in ("a", "b", "c"):
+        db.upsert_paper(conn, paper(pid))
+    save_ok(conn, "a", "t", 4)
+    save_ok(conn, "b", "t", 9)
+    got = db.papers_by_ids(conn, ["c", "zzz", "b", "a"])
+    assert [p["id"] for p in got] == ["c", "b", "a"]
+    assert got[0]["summary"] is None and got[0]["abstract"] is not None
+    assert got[1]["summary"]["summary"] == "s" and got[1]["critique"]["basis"] == "abstract"
+    assert got[1]["authors"] == paper("b")["authors"]
+    assert db.papers_by_ids(conn, []) == []

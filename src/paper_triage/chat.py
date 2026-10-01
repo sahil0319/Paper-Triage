@@ -4,13 +4,14 @@ import re
 import sqlite3
 
 from . import db
-from .config import get_settings
 from .llm import SENTINEL, LLMClient
 from .models import ChatAnswer
 from .prompting import load_prompt
 
 REFUSAL_TEXT = "I can only answer from the stored papers, and they do not cover that."
-EMPTY_STORE_TEXT = "No papers are stored yet. Run a triage first, then ask about the results."
+NO_SET_TEXT = (
+    "No search results to ask about yet. Run a search first, then ask about its results."
+)
 _CITE = re.compile(r"\[([^\[\]\s]+)\]")
 
 
@@ -37,11 +38,14 @@ def _context(papers: list[dict]) -> str:
     return "\n".join(blocks)
 
 
-def answer(question: str, conn: sqlite3.Connection, client: LLMClient) -> ChatAnswer:
-    stored = set(db.paper_ids(conn))
+def answer(
+    question: str, paper_ids: list[str], conn: sqlite3.Connection, client: LLMClient
+) -> ChatAnswer:
+    """Answer from the given result set only (stored papers among paper_ids), never the whole store."""
+    papers = db.papers_by_ids(conn, paper_ids)
+    stored = {p["id"] for p in papers}
     if not stored:
-        return ChatAnswer(answer=EMPTY_STORE_TEXT, refused=True)
-    papers = db.top_papers(conn, get_settings().chat_top_k)
+        return ChatAnswer(answer=NO_SET_TEXT, refused=True)
     user = f"{_context(papers)}\n<question>\n{question}\n</question>"
     text = client.text(load_prompt("chat"), user).strip()
 

@@ -28,6 +28,7 @@ class TriageIn(BaseModel):
 
 class ChatIn(BaseModel):
     question: str
+    paper_ids: list[str]  # the current result set; required (may be empty)
 
     @field_validator("question")
     @classmethod
@@ -36,6 +37,11 @@ class ChatIn(BaseModel):
         if not v:
             raise ValueError("question must not be empty")
         return v
+
+    @field_validator("paper_ids")
+    @classmethod
+    def _dedupe(cls, v: list[str]) -> list[str]:
+        return list(dict.fromkeys(v))
 
 
 def create_app() -> FastAPI:
@@ -93,10 +99,12 @@ def create_app() -> FastAPI:
 
     @app.post("/api/chat")
     def post_chat(body: ChatIn, request: Request):
+        if len(body.paper_ids) > get_settings().chat_max_ids:
+            raise HTTPException(422, f"paper_ids: at most {get_settings().chat_max_ids} ids")
         st = request.app.state
         with st.lock:
             try:
-                out = chat_answer(body.question, st.conn, st.llm)
+                out = chat_answer(body.question, body.paper_ids, st.conn, st.llm)
             except LLMError as e:
                 raise HTTPException(502, f"model call failed: {e}") from e
             db.save_chat_turn(st.conn, body.question, out.answer, out.citations, out.refused)

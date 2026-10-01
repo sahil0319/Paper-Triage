@@ -17,6 +17,7 @@ class Settings:
     default_papers: int = 10
     text_cap: int = 40000
     chat_top_k: int = 20
+    chat_max_ids: int = 50  # max paper_ids per chat request
     concurrency: int = 4  # papers processed in parallel (TRIAGE_CONCURRENCY, min 1)
 
 

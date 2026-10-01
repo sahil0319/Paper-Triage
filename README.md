@@ -1,7 +1,7 @@
 # Paper Triage Assistant
 
 Give it a topic or arXiv IDs / PDF URLs. It fetches papers, summarizes each, critiques it, and
-ranks it 0-10 with a reason. Then ask questions in a chat grounded only in the stored papers: it
+ranks it 0-10 with a reason. Then ask questions in a chat grounded only in the current search results: it
 cites paper ids and refuses anything outside them. Single user, no auth, SQLite storage.
 
 Pipeline: Fetcher -> Summarizer -> Critic -> Ranker -> grounded Chat.

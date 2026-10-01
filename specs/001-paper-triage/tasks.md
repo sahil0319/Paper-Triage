@@ -207,7 +207,7 @@ rendering rule; keep the UI test hooks from plan.md. Every task ends with
   relied on the old "out of scope" substring or on generic questions being answered
   (`tests/test_chat.py`, `tests/test_api.py`, `tests/test_e2e_mock.py`) to use a fixture title
   word for in-scope questions.
-- [ ] T031 [BE] [US2] B3 chat scope (FR-008-FR-010, contracts/api.md POST /api/chat). Test first
+- [x] T031 [BE] [US2] B3 chat scope (FR-008-FR-010, contracts/api.md POST /api/chat). Test first
   `tests/test_chat.py`: `paper_ids=[]` -> refused, client spy not called; ids none stored ->
   refused, no call; a stored paper not in `paper_ids` never appears in the prompt (spy) and a
   citation of it lands in `dropped_citations`; a load-more id in the set can be cited.

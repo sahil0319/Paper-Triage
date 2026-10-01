@@ -52,20 +52,29 @@ def test_mixed_ids_and_url_input(client):
     assert client.get("/api/status").json()["paper_count"] == len(ids)
 
 
+def _triage_ids(client, query="diffusion distillation", **kw):
+    r = client.post("/api/triage", json={"query": query, **kw})
+    return [x["paper_id"] for x in r.json()["results"]]
+
+
 def test_chat_in_scope_cites_only_stored_ids(client):
-    client.post("/api/triage", json={"query": "diffusion distillation"})
-    body = client.post("/api/chat", json={"question": "Which paper is progressive?"}).json()
+    ids = _triage_ids(client, max_results=5)
+    body = client.post(
+        "/api/chat", json={"question": "Which paper is progressive?", "paper_ids": ids}
+    ).json()
     assert body["refused"] is False
     assert body["citations"] and set(body["citations"]) <= _stored_ids(client)
     assert body["dropped_citations"] == []
 
 
 def test_chat_out_of_scope_refused(client):
-    client.post("/api/triage", json={"query": "diffusion distillation"})
-    body = client.post("/api/chat", json={"question": "What is the capital of France?"})
+    ids = _triage_ids(client, max_results=5)
+    body = client.post(
+        "/api/chat", json={"question": "What is the capital of France?", "paper_ids": ids}
+    )
     assert body.json()["refused"] is True and body.json()["citations"] == []
 
 
 def test_chat_before_any_triage_refused(client):
-    body = client.post("/api/chat", json={"question": "anything"}).json()
+    body = client.post("/api/chat", json={"question": "anything", "paper_ids": []}).json()
     assert body["refused"] is True and body["citations"] == []

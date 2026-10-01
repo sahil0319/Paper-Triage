@@ -187,6 +187,28 @@ def top_papers(conn: sqlite3.Connection, k: int) -> list[dict]:
     return [_result_dict(r) for r in rows]
 
 
+def papers_by_ids(conn: sqlite3.Connection, ids: list[str]) -> list[dict]:
+    """Each stored paper with its latest result's summary/critique, in input order.
+
+    Unknown ids are skipped; repeated ids yield one entry.
+    """
+    out, seen = [], set()
+    for pid in ids:
+        if pid in seen:
+            continue
+        seen.add(pid)
+        row = conn.execute(
+            """SELECT p.*, r.summary, r.critique
+               FROM papers p LEFT JOIN results r ON r.paper_id = p.id
+               WHERE p.id = ?
+               ORDER BY r.created_at DESC, r.rowid DESC LIMIT 1""",
+            (pid,),
+        ).fetchone()
+        if row:
+            out.append(_result_dict(row))
+    return out
+
+
 def save_chat_turn(
     conn: sqlite3.Connection, question: str, answer: str, citations: list[str], refused: bool
 ) -> int:
