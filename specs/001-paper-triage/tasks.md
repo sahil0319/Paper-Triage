@@ -45,7 +45,7 @@ Package = `src/paper_triage/` (abbrev `pt/` below means `src/paper_triage/`).
   not, drop effort); text via `messages.create`; no temperature; `stop_reason=="refusal"` ->
   `LLMRefusal`; SDK errors wrapped as `LLMError`); `get_client()` returns mock when
   `MOCK_LLM=1`. Tests use a fake SDK object for AnthropicClient (no network, no key).
-- [ ] T005 [P] Test first `tests/test_db.py`, then `pt/db.py`: `connect(path)`, `init_schema`
+- [x] T005 [P] Test first `tests/test_db.py`, then `pt/db.py`: `connect(path)`, `init_schema`
   (papers, arxiv_cache, results, chat_turns per data-model.md), `upsert_paper`, `get_paper`,
   `cache_get/put`, `save_result`, `get_result(paper_id, topic)`, `list_results(topic)` (rank
   desc, failed last), `latest_topic()`, `top_papers(k)`, `paper_ids()`, `save_chat_turn`. Test
