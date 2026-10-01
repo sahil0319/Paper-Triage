@@ -88,7 +88,7 @@ Package = `src/paper_triage/` (abbrev `pt/` below means `src/paper_triage/`).
 - [x] T013 [P] [US1] Test first `tests/test_agents.py::test_ranker*`, then
   `pt/prompts/ranker.md` + `pt/ranker.py`: `rank(paper, summary, topic, client) -> Rank`;
   rubric anchors; empty topic -> "overall reading priority" wording; clamp.
-- [ ] T014 [US1] Test first `tests/test_pipeline.py`, then `pt/pipeline.py`:
+- [x] T014 [US1] Test first `tests/test_pipeline.py`, then `pt/pipeline.py`:
   `triage(query, n, conn, http, llm) -> {topic, results, errors}`: parse -> fetch -> per paper
   summarize/critique/rank (one retry on validation error; `LLMError`/`LLMRefusal` -> result
   `failed` with reason, others continue); reuse existing (paper_id, topic) result; cap n<=20;
