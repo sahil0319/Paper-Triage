@@ -119,7 +119,7 @@ scope -> `refused: true`; empty store -> refused, LLM not called.
   sentinel or zero valid citations -> `refused: true`.
 - [x] T019 [BE] [US2] Extend `tests/test_api.py`, then `pt/app.py`: `POST /api/chat` (422 on empty
   question), persists `chat_turns`.
-- [ ] T020 [FE] [US2] Chat UI (re-read DESIGN.md + PRODUCT.md; frontend-design / impeccable):
+- [x] T020 [FE] [US2] Chat UI (re-read DESIGN.md + PRODUCT.md; frontend-design / impeccable):
   `pt/static/index.html`, `app.css`, `app.js`: question input + send; answers in an
   `aria-live` log; citations rendered as links to `#paper-<id>`; refusal is a distinct,
   calm, intentional state (not an error look); keyboard send.

@@ -49,7 +49,15 @@
     <aside id="chat" class="chat" aria-labelledby="chat-heading">
       <div class="chat__inner">
         <h2 id="chat-heading">Ask your papers</h2>
-        <p class="help">Chat is not available yet.</p>
+        <p id="chat-help" class="help">Answers use only the papers you have triaged, and cite them by id.
+          If your papers do not cover a question, it says so.</p>
+        <ol id="chat-log" class="chat__log" role="log" aria-label="Conversation" tabindex="0"></ol>
+        <form id="chat-form" class="chat__form" novalidate>
+          <label class="sr-only" for="question">Question about your papers</label>
+          <input id="question" name="question" type="text" autocomplete="off"
+                 placeholder="Ask about your papers" aria-describedby="chat-help">
+          <button id="ask" class="btn" type="submit">Ask</button>
+        </form>
       </div>
     </aside>
   </main>

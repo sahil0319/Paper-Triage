@@ -201,6 +201,117 @@
       .then(function () { setBusy(false); });
   });
 
+  // ---- chat ----
+
+  var chatForm = document.getElementById("chat-form");
+  var question = document.getElementById("question");
+  var askBtn = document.getElementById("ask");
+  var logEl = document.getElementById("chat-log");
+
+  function paperRow(id) {
+    return document.getElementById("paper-" + id);
+  }
+
+  function cite(id, text) {
+    var row = paperRow(id);
+    if (!row) {
+      return h("span", { class: "cite cite--off", title: "Not in the list shown above" }, text);
+    }
+    var a = h("a", { class: "cite", href: "#paper-" + encodeURIComponent(id) }, text);
+    a.addEventListener("click", function (ev) {
+      var target = paperRow(id);
+      if (!target) return;
+      ev.preventDefault();
+      target.scrollIntoView({ block: "start" });
+      target.focus();
+      if (window.history && history.replaceState) history.replaceState(null, "", a.getAttribute("href"));
+    });
+    return a;
+  }
+
+  // Inline [id] markers become links only for ids the server validated; markers the server
+  // dropped (unknown ids) are removed so no made-up id is shown.
+  function answerNodes(text, citations, dropped) {
+    var ok = citations || [];
+    var bad = dropped || [];
+    return String(text).split(/(\[[^\[\]\s]+\])/).map(function (part, i) {
+      if (i % 2 === 0) return part;
+      var id = part.slice(1, -1);
+      if (ok.indexOf(id) !== -1) return cite(id, part);
+      if (bad.indexOf(id) !== -1) return "";
+      return part;
+    });
+  }
+
+  function sources(ids) {
+    if (!ids || !ids.length) return null;
+    return h("div", { class: "sources" },
+      h("h3", {}, ids.length === 1 ? "Cited paper" : "Cited papers"),
+      h("ul", {}, ids.map(function (id) {
+        var row = paperRow(id);
+        var t = row && row.querySelector(".paper__title");
+        return h("li", {}, cite(id, id), t ? " " + t.textContent : "");
+      })));
+  }
+
+  function turnFor(q) {
+    var turn = h("li", { class: "turn" }, h("p", { class: "turn__q" }, q));
+    logEl.appendChild(turn);
+    turn.scrollIntoView({ block: "nearest" });
+    return turn;
+  }
+
+  function finishTurn(turn, pending, data) {
+    turn.removeChild(pending);
+    if (data.refused) {
+      turn.classList.add("turn--refused");
+      turn.appendChild(h("div", { class: "turn__a" },
+        h("span", { class: "turn__refused-title" }, "Not covered by your papers"),
+        data.answer));
+    } else {
+      turn.appendChild(h("div", { class: "turn__a" },
+        answerNodes(data.answer, data.citations, data.dropped_citations)));
+      var src = sources(data.citations);
+      if (src) turn.appendChild(src);
+    }
+    turn.scrollIntoView({ block: "nearest" });
+  }
+
+  function failTurn(turn, pending, message) {
+    turn.removeChild(pending);
+    turn.appendChild(h("p", { class: "turn__err", role: "alert" },
+      h("strong", {}, "Could not answer. "), message));
+  }
+
+  chatForm.addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var q = question.value.trim();
+    if (!q) { question.focus(); return; }
+    if (askBtn.disabled) return;
+    askBtn.disabled = true;
+    question.value = "";
+    var turn = turnFor(q);
+    var pending = h("p", { class: "turn__pending" }, "Reading your papers…");
+    turn.appendChild(pending);
+    fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: q })
+    })
+      .then(function (res) {
+        return res.json().catch(function () { return null; }).then(function (body) {
+          if (!res.ok) throw new Error(errorText(res, body));
+          return body;
+        });
+      })
+      .then(function (data) { finishTurn(turn, pending, data); })
+      .catch(function (err) {
+        failTurn(turn, pending, err instanceof TypeError
+          ? "Could not reach the server. Check that the app is running." : err.message);
+      })
+      .then(function () { askBtn.disabled = false; question.focus(); });
+  });
+
   // ---- on load: backend status and stored results (no refetching from arXiv) ----
 
   function getJSON(url) {
