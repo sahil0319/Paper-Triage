@@ -74,7 +74,7 @@ Package = `src/paper_triage/` (abbrev `pt/` below means `src/paper_triage/`).
   `search(topic, n)` and `by_ids(ids)` hitting arXiv API through injected client + shared
   `Throttle`; Atom parse with `xml.etree`; id/version normalization; `arxiv_cache` read-through;
   unknown id -> error entry `{"input", "reason": "not found"}`.
-- [ ] T010 [US1] Extend `tests/test_fetcher.py`, then `pt/fetcher.py` part 2: download PDF
+- [x] T010 [US1] Extend `tests/test_fetcher.py`, then `pt/fetcher.py` part 2: download PDF
   (throttled for arxiv.org), `extract_text`, store `full_text` + `basis="fulltext"`, else
   `basis="abstract"`; non-arXiv URL -> id `pdf:<sha256(url)[:12]>`, title from PDF `/Title` or
   URL basename, abstract = first 1,500 chars; unreachable URL -> error entry, others continue.

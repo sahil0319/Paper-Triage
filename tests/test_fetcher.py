@@ -1,3 +1,6 @@
+import hashlib
+from pathlib import Path
+
 import httpx
 import pytest
 
@@ -144,3 +147,113 @@ def test_parse_feed_old_style_id_and_missing_pdf_link():
     assert p["abstract"] == "An abstract."
     assert p["authors"] == []
     assert p["pdf_url"] == "https://arxiv.org/pdf/math.GT/0107001v3"
+
+
+# ---- part 2: PDFs, full text, orchestration ----
+
+SAMPLE = (Path(__file__).parent.parent / "src/paper_triage/fixtures/sample.pdf").read_bytes()
+
+
+def test_fetch_topic_fulltext_and_abstract_fallback(env):
+    f, _, th, conn = env
+    papers, errors = f.fetch("diffusion distillation", [], 10)
+    assert errors == []
+    by_id = {p["id"]: p for p in papers}
+    assert len(papers) == 5
+    for pid in ("2401.00001", "2401.00002", "2401.00003", "2401.00004"):
+        assert by_id[pid]["basis"] == "fulltext"
+        assert len(by_id[pid]["full_text"]) > 500
+    assert by_id["2401.00005"]["basis"] == "abstract"
+    assert by_id["2401.00005"]["full_text"] is None
+    assert th.waits == 6  # 1 search + 5 arxiv PDF downloads
+    stored = db.get_paper(conn, "2401.00001")
+    assert stored["basis"] == "fulltext" and stored["full_text"]
+    assert db.get_paper(conn, "2401.00005")["basis"] == "abstract"
+
+
+def test_fetch_full_text_capped(env):
+    f, _, _, _ = env
+    papers, _ = f.fetch("", [("arxiv", "2401.00001")], 10)
+    assert len(papers[0]["full_text"]) <= 200_000
+
+
+def test_fetch_ids_unknown_reported_others_continue(env):
+    f, _, _, _ = env
+    papers, errors = f.fetch("", [("arxiv", "2401.00002"), ("arxiv", "9999.99999")], 10)
+    assert [p["id"] for p in papers] == ["2401.00002"]
+    assert errors == [{"input": "9999.99999", "reason": "not found"}]
+
+
+def test_fetch_pdf_url(env):
+    f, _, th, conn = env
+    url = "https://example.org/papers/x.pdf"
+    papers, errors = f.fetch("", [("pdf", url)], 10)
+    assert errors == []
+    (p,) = papers
+    assert p["id"] == "pdf:" + hashlib.sha256(url.encode()).hexdigest()[:12]
+    assert p["source"] == "pdf"
+    assert p["basis"] == "fulltext"
+    assert p["title"] == "Sample Paper on Diffusion Distillation"
+    assert p["pdf_url"] == url
+    assert 0 < len(p["abstract"]) <= 1500
+    assert p["abstract"].startswith("Sample Paper on Diffusion Distillation")
+    assert len(p["full_text"]) > 500
+    assert th.waits == 0  # non-arXiv hosts are not arXiv-throttled
+    assert db.get_paper(conn, p["id"])["title"] == p["title"]
+
+
+def test_fetch_pdf_title_falls_back_to_url_basename(tmp_db):
+    conn = db.connect(tmp_db)
+    db.init_schema(conn)
+    pdf = SAMPLE.replace(b" /Info 6 0 R", b"")
+    client = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, content=pdf)))
+    (p,), _ = Fetcher(conn, client, CountingThrottle()).fetch(
+        "", [("pdf", "https://example.org/dir/my-paper.pdf")], 10
+    )
+    assert p["title"] == "my-paper.pdf"
+
+
+def test_fetch_unreachable_url_is_error_others_continue(env):
+    f, _, _, _ = env
+    good = "https://example.org/a.pdf"
+    bad = "https://down.invalid/x.pdf"
+    papers, errors = f.fetch("", [("pdf", bad), ("pdf", good)], 10)
+    assert [p["source"] for p in papers] == ["pdf"]
+    assert errors == [{"input": bad, "reason": errors[0]["reason"]}]
+    assert errors[0]["reason"]
+
+
+def test_fetch_non_pdf_bytes_url_is_error(tmp_db):
+    conn = db.connect(tmp_db)
+    db.init_schema(conn)
+    html = httpx.MockTransport(lambda r: httpx.Response(200, content=b"<html>"))
+    client = httpx.Client(transport=html)
+    papers, errors = Fetcher(conn, client, CountingThrottle()).fetch(
+        "", [("pdf", "https://example.org/page")], 10
+    )
+    assert papers == []
+    assert errors[0]["input"] == "https://example.org/page"
+
+
+def test_fetch_mixed_items_keep_input_order(env):
+    f, _, _, _ = env
+    url = "https://example.org/a.pdf"
+    papers, _ = f.fetch("", [("pdf", url), ("arxiv", "2401.00003"), ("arxiv", "2401.00001")], 10)
+    assert [p["id"] for p in papers][1:] == ["2401.00003", "2401.00001"]
+    assert papers[0]["source"] == "pdf"
+
+
+def test_fetch_reuses_stored_papers_without_network(env):
+    f, requests, _, _ = env
+    url = "https://example.org/a.pdf"
+    f.fetch("", [("pdf", url), ("arxiv", "2401.00001")], 10)
+    n = len(requests)
+    papers, errors = f.fetch("", [("pdf", url), ("arxiv", "2401.00001")], 10)
+    assert len(papers) == 2 and errors == []
+    assert len(requests) == n
+
+
+def test_fetch_caps_items_at_n(env):
+    f, _, _, _ = env
+    papers, _ = f.fetch("", [("arxiv", f"2401.0000{i}") for i in (1, 2, 3, 4)], 2)
+    assert len(papers) == 2

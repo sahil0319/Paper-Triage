@@ -31,3 +31,12 @@ def prepare_for_llm(text: str, cap: int) -> str:
             text = text[: m.start()]
             break
     return text[:cap]
+
+
+def pdf_title(pdf_bytes: bytes) -> str | None:
+    """PDF /Title metadata, or None."""
+    try:
+        title = PdfReader(io.BytesIO(pdf_bytes)).metadata.title
+    except Exception:  # noqa: BLE001 - any parse failure just means no title
+        return None
+    return " ".join(title.split()) if title and title.strip() else None

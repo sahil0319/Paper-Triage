@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from paper_triage.extract import ExtractError, extract_text, prepare_for_llm
+from paper_triage.extract import ExtractError, extract_text, pdf_title, prepare_for_llm
 
 SAMPLE = Path(__file__).parent.parent / "src/paper_triage/fixtures/sample.pdf"
 
@@ -64,3 +64,9 @@ def test_prepare_no_references_unchanged():
 
 def test_prepare_caps_length():
     assert len(prepare_for_llm("x" * 1000, 100)) == 100
+
+
+def test_pdf_title():
+    assert pdf_title(SAMPLE.read_bytes()) == "Sample Paper on Diffusion Distillation"
+    assert pdf_title(SAMPLE.read_bytes().replace(b" /Info 6 0 R", b"")) is None
+    assert pdf_title(b"junk") is None
