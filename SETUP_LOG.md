@@ -11,3 +11,4 @@
 - hooks/commands/CLAUDE.md/scripts: written; hook scripts smoke-tested (token_watch thresholds, precompact snapshot, session_start). Committed 662eb16
 - dev agents (.claude/agents/*.md) not registered in the running session (loaded at startup) -> orchestrator spawns general-purpose agents told to follow the agent file. Restart session to use native subagent_types
 - no-mistakes init: BLOCKED by own deny rule (git remote add origin). Needs user decision: allow a local bare repo as origin, or skip the gate. Tester substitutes pytest+ruff+e2e until then
+- DESIGN.md: user replaced placeholder with real Apple-style spec (563 lines); builder notified
