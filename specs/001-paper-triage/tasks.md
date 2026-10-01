@@ -305,7 +305,7 @@ rendering rule; keep the UI test hooks from plan.md. Every task ends with
   search." / "… from your last run." (N = shown rows with status ok); empty set: "Run a search
   first…" and `#question`/`#ask` disabled; server refusals render per D26. Acceptance: manual
   mock run: "What is the capital of France?" -> refusal; title word of a shown paper -> cited.
-- [ ] T041 [FE] Browser e2e specs `tests/frontend/test_e2e_browser.py` (`@pytest.mark.e2e`,
+- [x] T041 [FE] Browser e2e specs `tests/frontend/test_e2e_browser.py` (`@pytest.mark.e2e`,
   fixtures `live_server`, `offline_page`, `base_url` from T032; selectors only from plan.md UI
   test hooks). Needs T032, T037-T040. Cases: (1) indicator: `set_triage_delay(1.5)`, submit
   "diffusion distillation" -> `#working` visible, then hidden within 10 s, 10 `li.paper`
