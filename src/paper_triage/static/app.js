@@ -377,6 +377,8 @@
     work.minutes = 0;
     work.showT = window.setTimeout(showWorking, SHOW_DELAY_MS);
     work.tickT = window.setInterval(updateClock, 1000);
+    // The first-run empty state would contradict the running indicator.
+    emptyEl.hidden = true;
     // Previous list stays visible but inert while a new run is in flight (D18).
     [listEl, notesEl].forEach(function (el) {
       el.setAttribute("inert", "");
@@ -420,6 +422,7 @@
       .catch(function (err) {
         showAlert(failMessage(err));
         statusEl.textContent = "";
+        if (!state.rows.length) showEmpty("first");
       })
       .then(function () { setBusy(false); });
   }
