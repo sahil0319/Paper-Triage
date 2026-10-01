@@ -58,7 +58,7 @@ Package = `src/paper_triage/` (abbrev `pt/` below means `src/paper_triage/`).
   (Atom, 5 entries with ids, titles, authors, abstracts, pdf links), `sample.pdf` (minimal
   hand-written 1-page PDF, >500 chars of extractable text). Mock routing: arXiv query/id_list ->
   feed (unknown id -> empty feed); 4 PDF links -> sample.pdf; 1 PDF link -> invalid bytes.
-- [ ] T007 [P] Test first `tests/test_extract.py`, then `pt/extract.py`:
+- [x] T007 [P] Test first `tests/test_extract.py`, then `pt/extract.py`:
   `extract_text(pdf_bytes) -> str` via pypdf; `ExtractError` on failure or <500 chars;
   `prepare_for_llm(text, cap)` drops trailing "References" section (heading after 50%) and caps.
 - [ ] T008 [P] Test first `tests/test_input_parse.py`, then `pt/input_parse.py`:
