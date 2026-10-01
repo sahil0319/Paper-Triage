@@ -137,6 +137,8 @@ ul, ol { padding: 0; list-style: none; }
 .rank__of { display: block; margin-top: var(--xxs); font-size: 12px; letter-spacing: -0.12px;
   color: var(--ink-2); }
 .paper__title { font: 600 17px/1.24 var(--font); letter-spacing: -0.374px; max-width: var(--measure); }
+.paper__authors { margin-top: var(--xxs); font-size: 14px; line-height: 1.43;
+  letter-spacing: -0.224px; color: var(--ink-2); max-width: var(--measure); }
 .paper__meta { margin-top: var(--xxs); display: flex; flex-wrap: wrap; align-items: center;
   gap: var(--xs); font-size: 14px; line-height: 1.43; letter-spacing: -0.224px; color: var(--ink-2); }
 .paper__id { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }

@@ -100,7 +100,7 @@ Package = `src/paper_triage/` (abbrev `pt/` below means `src/paper_triage/`).
   impeccable guidance. `pt/static/index.html` + `pt/static/app.css`: one page, header with mock
   label slot, query input + submit on top, ranked list region, chat region (beside wide / below
   narrow, empty for now); system font stack, one accent, generous whitespace; semantic landmarks.
-- [ ] T017 [FE] [US1] `pt/static/app.js` triage flow (re-read DESIGN.md + PRODUCT.md): submit ->
+- [x] T017 [FE] [US1] `pt/static/app.js` triage flow (re-read DESIGN.md + PRODUCT.md): submit ->
   `POST /api/triage`; loading, empty ("No papers found"), and per-item error states; each row
   shows rank, title, id, reason at a glance, "abstract only" flag; critique in `<details>`
   (weak claims / overclaims / missing baselines / "not stated"); rows have `id="paper-<id>"`;
