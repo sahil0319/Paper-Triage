@@ -129,7 +129,7 @@ scope -> `refused: true`; empty store -> refused, LLM not called.
 **Goal**: reload shows stored results without refetching.
 **Independent test**: triage, new app instance on same db, `GET /api/papers` returns same list.
 
-- [ ] T021 [BE+FE] [US3] Extend `tests/test_api.py` (new TestClient on same db file returns same
+- [x] T021 [BE+FE] [US3] Extend `tests/test_api.py` (new TestClient on same db file returns same
   results, no fetch), then (re-read DESIGN.md + PRODUCT.md) `pt/static/app.js`: on load call `/api/status` (toggle mock label,
   show model) and `/api/papers` to render stored list.
 

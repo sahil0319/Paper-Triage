@@ -13,6 +13,8 @@
   var listEl = document.getElementById("paper-list");
   var emptyEl = document.getElementById("empty");
   var heading = document.getElementById("results-heading");
+  var mockEl = document.getElementById("mock-label");
+  var modelEl = document.getElementById("model");
 
   function h(tag, attrs) {
     var el = document.createElement(tag);
@@ -134,7 +136,7 @@
     notesEl.hidden = !notesEl.firstChild;
   }
 
-  function render(data) {
+  function render(data, stored) {
     var rs = data.results || [];
     clear(listEl);
     rs.forEach(function (r) { listEl.appendChild(row(r)); });
@@ -143,7 +145,8 @@
     if (rs.length) {
       emptyEl.hidden = true;
       var failed = rs.filter(function (r) { return r.status === "failed"; }).length;
-      statusEl.textContent = plural(rs.length, "paper") + ", ranked by relevance." +
+      statusEl.textContent = (stored ? "Showing " + plural(rs.length, "stored paper") + " from your last run, "
+        : plural(rs.length, "paper") + ", ") + "ranked by relevance." +
         (failed ? " " + failed + " could not be processed." : "");
     } else {
       emptyEl.hidden = false;
@@ -189,7 +192,7 @@
           return body;
         });
       })
-      .then(render)
+      .then(function (data) { render(data, false); })
       .catch(function (err) {
         var offline = err instanceof TypeError;
         showAlert(offline ? "Could not reach the server. Check that the app is running." : err.message);
@@ -197,4 +200,37 @@
       })
       .then(function () { setBusy(false); });
   });
+
+  // ---- on load: backend status and stored results (no refetching from arXiv) ----
+
+  function getJSON(url) {
+    return fetch(url).then(function (res) {
+      if (!res.ok) throw new Error(String(res.status));
+      return res.json();
+    });
+  }
+
+  function loadStatus() {
+    return getJSON("/api/status").then(function (s) {
+      mockEl.hidden = !s.mock;
+      modelEl.textContent = s.model ? "Model: " + s.model : "";
+      modelEl.hidden = !s.model;
+    }).catch(function () {
+      // Unknown state: stay quiet rather than claim live or mock.
+      mockEl.hidden = true;
+      modelEl.hidden = true;
+    });
+  }
+
+  function loadStored() {
+    return getJSON("/api/papers").then(function (data) {
+      if (button.disabled) return; // a triage run started meanwhile; its result wins
+      if (data && data.results && data.results.length) render(data, true);
+    }).catch(function () {
+      // Nothing stored or server unreachable: keep the empty state.
+    });
+  }
+
+  loadStatus();
+  loadStored();
 })();
