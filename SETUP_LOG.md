@@ -8,3 +8,6 @@
 - caveman: `npx skills add JuliusBrussee/caveman -g -y` ok (global ~/.claude/skills + ~/.agents/skills; PromptScript target skipped, irrelevant)
 - no-mistakes v1.84.0: installed to ~/.no-mistakes/bin, symlink ~/.local/bin. `no-mistakes init` DEFERRED: needs `origin` remote; will use local bare repo inside project (.local/origin.git, gitignored), never a real remote
 - DESIGN.md: not present -> placeholder created
+- hooks/commands/CLAUDE.md/scripts: written; hook scripts smoke-tested (token_watch thresholds, precompact snapshot, session_start). Committed 662eb16
+- dev agents (.claude/agents/*.md) not registered in the running session (loaded at startup) -> orchestrator spawns general-purpose agents told to follow the agent file. Restart session to use native subagent_types
+- no-mistakes init: BLOCKED by own deny rule (git remote add origin). Needs user decision: allow a local bare repo as origin, or skip the gate. Tester substitutes pytest+ruff+e2e until then
