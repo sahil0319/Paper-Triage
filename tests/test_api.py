@@ -77,3 +77,16 @@ def test_papers_same_shape_and_order_as_triage(client):
     t = client.post("/api/triage", json={"query": "diffusion"}).json()
     p = client.get("/api/papers", params={"topic": "diffusion"}).json()
     assert p["results"] == t["results"]
+
+
+def test_index_has_page_landmarks(client):
+    html = client.get("/").text
+    for needle in ('<main id="main"', 'id="triage-form"', 'id="paper-list"', 'id="chat"',
+                   'id="mock-label"', 'href="app.css"'):
+        assert needle in html
+
+
+def test_static_css_served(client):
+    r = client.get("/app.css")
+    assert r.status_code == 200 and "text/css" in r.headers["content-type"]
+    assert "http://" not in r.text and "https://" not in r.text  # no CDN, no external fonts

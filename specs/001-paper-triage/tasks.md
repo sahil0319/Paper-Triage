@@ -96,7 +96,7 @@ Package = `src/paper_triage/` (abbrev `pt/` below means `src/paper_triage/`).
 - [x] T015 [US1] Test first `tests/test_api.py` (status, triage, papers, 422s), then
   `pt/app.py`: FastAPI app; startup opens db + `init_schema`; deps from `config`/`get_client`/
   `make_http`; `GET /api/status`, `POST /api/triage`, `GET /api/papers`; static mount at `/`.
-- [ ] T016 [US1] UI structure. Re-read DESIGN.md + PRODUCT.md first; apply frontend-design /
+- [x] T016 [US1] UI structure. Re-read DESIGN.md + PRODUCT.md first; apply frontend-design /
   impeccable guidance. `pt/static/index.html` + `pt/static/app.css`: one page, header with mock
   label slot, query input + submit on top, ranked list region, chat region (beside wide / below
   narrow, empty for now); system font stack, one accent, generous whitespace; semantic landmarks.

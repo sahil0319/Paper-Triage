@@ -1,3 +1,54 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Paper Triage</title></head>
-<body><h1>Paper Triage</h1></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Paper Triage</title>
+  <meta name="description" content="Rank a pile of papers by relevance, with an honest critique of each.">
+  <link rel="stylesheet" href="app.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#results-heading">Skip to results</a>
+
+  <header class="global-nav">
+    <div class="global-nav__inner">
+      <span class="brand">Paper Triage</span>
+      <p id="mock-label" class="mock-label" hidden>Mock mode. No network, no model calls.</p>
+    </div>
+  </header>
+
+  <section class="intro" aria-labelledby="intro-heading">
+    <div class="intro__inner">
+      <h1 id="intro-heading">Find the papers worth reading.</h1>
+      <p class="lead">Rank a pile of papers by relevance, with a skeptical critique of each.</p>
+      <form id="triage-form" class="triage-form" role="search" novalidate>
+        <label class="sr-only" for="query">Topic, arXiv IDs, or PDF URLs</label>
+        <input id="query" name="query" type="search" autocomplete="off" spellcheck="false"
+               placeholder="Topic, arXiv IDs, or PDF URLs" aria-describedby="query-help" required>
+        <button id="submit" class="btn" type="submit">Triage papers</button>
+      </form>
+      <p id="query-help" class="help">Keywords search arXiv. Paste IDs or PDF links to triage exactly
+        those papers. Up to 10 papers per run.</p>
+    </div>
+  </section>
+
+  <main id="main" class="workspace">
+    <section class="results" aria-labelledby="results-heading" aria-busy="false">
+      <h2 id="results-heading">Ranked papers</h2>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+      <div id="alert" class="alert" role="alert" hidden></div>
+      <ul id="notes" class="notes" hidden></ul>
+      <ol id="paper-list" class="papers"></ol>
+      <p id="empty" class="empty">Nothing triaged yet. Enter a topic or paste arXiv IDs above.</p>
+    </section>
+
+    <aside id="chat" class="chat" aria-labelledby="chat-heading">
+      <div class="chat__inner">
+        <h2 id="chat-heading">Ask your papers</h2>
+        <p class="help">Chat is not available yet.</p>
+      </div>
+    </aside>
+  </main>
+</body>
+</html>
