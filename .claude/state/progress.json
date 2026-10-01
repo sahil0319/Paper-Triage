@@ -1,0 +1,10 @@
+{
+  "phase": "setup",
+  "tasks": {},
+  "last_checkpoint_ts": null,
+  "context_pct": 31.6,
+  "last_warn_level": 0,
+  "last_warn_ts": 1790846263.400008,
+  "DONE": false,
+  "last_precompact_ts": 1790846263.5785239
+}
