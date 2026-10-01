@@ -93,7 +93,7 @@ Package = `src/paper_triage/` (abbrev `pt/` below means `src/paper_triage/`).
   summarize/critique/rank (one retry on validation error; `LLMError`/`LLMRefusal` -> result
   `failed` with reason, others continue); reuse existing (paper_id, topic) result; cap n<=20;
   return sorted per contracts/api.md.
-- [ ] T015 [US1] Test first `tests/test_api.py` (status, triage, papers, 422s), then
+- [x] T015 [US1] Test first `tests/test_api.py` (status, triage, papers, 422s), then
   `pt/app.py`: FastAPI app; startup opens db + `init_schema`; deps from `config`/`get_client`/
   `make_http`; `GET /api/status`, `POST /api/triage`, `GET /api/papers`; static mount at `/`.
 - [ ] T016 [US1] UI structure. Re-read DESIGN.md + PRODUCT.md first; apply frontend-design /

@@ -1,0 +1,79 @@
+import pytest
+from fastapi.testclient import TestClient
+
+from paper_triage.app import create_app
+
+
+@pytest.fixture
+def client(tmp_db, monkeypatch):
+    monkeypatch.setenv("PAPER_TRIAGE_DB", tmp_db)
+    with TestClient(create_app()) as c:
+        yield c
+
+
+def test_status_mock(client):
+    r = client.get("/api/status")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["mock"] is True and body["model"] and body["paper_count"] == 0
+
+
+def test_index_served(client):
+    r = client.get("/")
+    assert r.status_code == 200 and "text/html" in r.headers["content-type"]
+
+
+def test_triage_topic_returns_five_ranked(client):
+    r = client.post("/api/triage", json={"query": "diffusion distillation"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["topic"] == "diffusion distillation" and body["errors"] == []
+    ranks = [x["rank"] for x in body["results"]]
+    assert len(ranks) == 5 and ranks == sorted(ranks, reverse=True)
+    assert client.get("/api/status").json()["paper_count"] == 5
+
+
+def test_triage_max_results(client):
+    r = client.post("/api/triage", json={"query": "diffusion", "max_results": 2})
+    assert len(r.json()["results"]) == 2
+
+
+def test_triage_ids_with_unknown(client):
+    r = client.post("/api/triage", json={"query": "2401.00001 9999.99999"})
+    body = r.json()
+    assert [x["paper_id"] for x in body["results"]] == ["2401.00001"]
+    assert body["errors"] == [{"input": "9999.99999", "reason": "not found"}]
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"query": ""},
+        {"query": "   "},
+        {},
+        {"query": "x", "max_results": 0},
+        {"query": "x", "max_results": 21},
+        {"query": "x", "max_results": "many"},
+    ],
+)
+def test_triage_422_plain_detail(client, payload):
+    r = client.post("/api/triage", json=payload)
+    assert r.status_code == 422
+    assert isinstance(r.json()["detail"], str) and r.json()["detail"]
+
+
+def test_papers_empty_then_latest_topic(client):
+    assert client.get("/api/papers").json() == {"topic": "", "results": []}
+    client.post("/api/triage", json={"query": "first topic", "max_results": 2})
+    client.post("/api/triage", json={"query": "second topic", "max_results": 3})
+    latest = client.get("/api/papers").json()
+    assert latest["topic"] == "second topic" and len(latest["results"]) == 3
+    first = client.get("/api/papers", params={"topic": "first topic"}).json()
+    assert len(first["results"]) == 2
+    assert client.get("/api/papers", params={"topic": "nope"}).json()["results"] == []
+
+
+def test_papers_same_shape_and_order_as_triage(client):
+    t = client.post("/api/triage", json={"query": "diffusion"}).json()
+    p = client.get("/api/papers", params={"topic": "diffusion"}).json()
+    assert p["results"] == t["results"]
