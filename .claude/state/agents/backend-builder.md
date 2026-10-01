@@ -20,3 +20,6 @@
 - status: done, commit "T025: openai provider"
 - API facts: GET /api/status now {mock, model, provider, paper_count}; provider additive ("anthropic"|"openai"). No other shape change.
 - next: tester
+
+## backend-builder T026
+goal: concurrent triage + ranker calibration. status: done (commit T026). findings: .env.example read/write denied by permissions, TRIAGE_CONCURRENCY not appended. next: tester; user re-run live.

@@ -76,3 +76,12 @@ In mock mode the chat refuses only when the question contains the sentinel "out 
 - OpenAIClient: APIError->LLMError, refusal/content_filter->LLMRefusal, no-parsed->LLMError, ValidationError propagates, text() returns content or "". Covered by tests.
 - tasks.md T025 ticked, matches commit. README, contracts/api.md, .env.example consistent. No secrets/.env tracked.
 - Failures: none.
+
+## T026 (bc81813) concurrent triage + ranker calibration
+- pytest full: 174 pass; ruff clean; e2e 6 pass; test_pipeline.py x3: 22 pass each (no flake).
+- sqlite: _compute has no DB access; _save runs on calling thread in paper order. OK.
+- TRIAGE_CONCURRENCY: ''->4, 0->1, -3->1, abc->4, 2.5->4, 8->8. OK.
+- Order: results rebuilt from `papers` order after save. Failure isolation: LLMError/ValidationError caught per paper -> failed row with partials. OK. Non-LLM exceptions in a worker would propagate via fut.result() and abort the batch (pre-existing behavior, low risk).
+- Behavior change: with concurrency>1 a summarizer failure still saves critique (partial); sequential mode does not. Spec has no FR on partials; acceptable.
+- [BE] minor: tasks.md T026 claims `.env.example` updated; commit did not touch it (TRIAGE_CONCURRENCY only in README/tasks.md).
+- No secrets in diff.

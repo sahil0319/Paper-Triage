@@ -20,3 +20,4 @@
 - advisory: mock chat only refuses on "out of scope" sentinel; generic OOS q gets canned cite. Not SC-003 violation. Optional [BE].
 - details: docs/qa/final.md. next: none -> DONE.
 T025 verify: PASS, 167 tests, ruff clean, no failures. DONE
+- T026 verified: green; minor [BE] .env.example not updated
