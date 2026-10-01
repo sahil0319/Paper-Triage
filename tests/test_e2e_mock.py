@@ -78,3 +78,54 @@ def test_chat_out_of_scope_refused(client):
 def test_chat_before_any_triage_refused(client):
     body = client.post("/api/chat", json={"question": "anything", "paper_ids": []}).json()
     assert body["refused"] is True and body["citations"] == []
+
+
+# ---- v2 smoke: links, paging, set-scoped chat (SC-001, SC-002, SC-003, SC-008 API half) ----
+
+
+def test_v2_search_load_more_and_scoped_chat(client):
+    t0 = time.monotonic()
+    first = client.post("/api/triage", json={"query": "diffusion", "max_results": 10}).json()
+    assert time.monotonic() - t0 < 5  # SC-001
+    assert len(first["results"]) == 10
+    for r in first["results"]:
+        assert r["abs_url"] == f"https://arxiv.org/abs/{r['paper_id']}"
+        assert r["pdf_url"] == f"https://arxiv.org/pdf/{r['paper_id']}"
+    assert first["has_more"] is True and first["next_offset"] == 10
+
+    more = client.post(
+        "/api/triage", json={"query": "diffusion", "max_results": 5, "offset": 10}
+    ).json()
+    first_ids = {r["paper_id"] for r in first["results"]}
+    more_ids = [r["paper_id"] for r in more["results"]]
+    assert len(more_ids) == 5 and not first_ids & set(more_ids)  # SC-008 API half
+    assert more["has_more"] is False and more["next_offset"] == 15
+
+    ids = [r["paper_id"] for r in first["results"]] + more_ids
+    assert len(ids) == 15
+    # SC-002: marker word of a load-more paper (2401.00015 "Pumice") cites only set ids
+    body = client.post("/api/chat", json={"question": "Pumice?", "paper_ids": ids}).json()
+    assert body["refused"] is False and body["citations"] == ["2401.00015"]
+    assert set(body["citations"]) <= set(ids) and body["dropped_citations"] == []
+    refused = client.post(
+        "/api/chat", json={"question": "What is the capital of France?", "paper_ids": ids}
+    ).json()
+    assert refused["refused"] is True and refused["citations"] == []
+
+
+def test_v2_id_only_set_refuses_question_about_other_stored_paper(client):
+    client.post("/api/triage", json={"query": "diffusion", "max_results": 10})
+    client.post("/api/triage", json={"query": "2401.00001"})
+    # SC-003: 2401.00002 ("Consistency") is stored but not in the current set
+    body = client.post(
+        "/api/chat", json={"question": "Consistency?", "paper_ids": ["2401.00001"]}
+    ).json()
+    assert body["refused"] is True and body["citations"] == []
+    assert _stored_ids(client) >= {"2401.00001", "2401.00002"}
+
+
+def test_v2_pdf_url_item_links(client):
+    r = client.post("/api/triage", json={"query": "https://example.org/a.pdf"}).json()
+    (item,) = r["results"]
+    assert item["abs_url"] is None and item["pdf_url"] == "https://example.org/a.pdf"
+    assert r["has_more"] is False and r["next_offset"] is None

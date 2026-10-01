@@ -238,7 +238,7 @@ rendering rule; keep the UI test hooks from plan.md. Every task ends with
   `README.md`: test commands incl. `MOCK_LLM=1 uv run pytest -q -m e2e`. Files: `pyproject.toml`,
   `uv.lock`, `SETUP_LOG.md`, `README.md`, `tests/e2e_harness.py`, `tests/conftest.py`,
   `tests/test_e2e_harness.py`.
-- [ ] T033 [BE] API-level v2 smoke, offline (`tests/test_e2e_mock.py`, socket guard on):
+- [x] T033 [BE] API-level v2 smoke, offline (`tests/test_e2e_mock.py`, socket guard on):
   topic triage `max_results` 10 -> 10 results, all with `abs_url`/`pdf_url`, `has_more` true,
   `next_offset` 10; `offset` 10 + `max_results` 5 -> 5 new ids, `has_more` false (SC-008 API
   half); chat with the 15 ids and a title marker word cites only set ids (SC-002); "What is the
