@@ -9,3 +9,13 @@
 - tasks: 24 (T001-T024), MVP = T001-T017.
 - next: builder T001.
 NEXT:builder
+
+## 2026-10-01 v2 amendment (wave 1 planning)
+- goal: amend spec/plan/contracts/data-model/tasks for redesign, searching indicator, links, load-more, chat scope, Playwright e2e.
+- status: done via Skill speckit-constitution/specify/clarify/plan/tasks/analyze + .specify/scripts/bash helpers. Constitution 1.0.0 -> 1.1.0 (pytest-playwright dev dep; offline browser e2e; chat scope = current result set).
+- tasks: T027-T042. Wave D: BE T027-T033 || FE T034-T037. Wave E: FE T038-T041 || BE T042.
+- decisions: chat `paper_ids` required (max 50); paging `offset`/`next_offset`/`has_more`; mock feed 15 entries with unique title marker words; FE T036 sends paper_ids early; harness triage-delay middleware in tests/ only.
+- analyze: 0 CRITICAL, 0 HIGH open (2 HIGH + 5 MEDIUM fixed), 5 LOW. analysis.md write denied by harness ("subagents return findings as text"); full report in handoff for orchestrator to persist.
+- next: router spawns Wave D (backend-builder || frontend-builder).
+- retry: analysis.md Write rejected again (same harness message). No workaround, no commit. R1 marked noted (FE T039 follows contract) in the report text only.
+BLOCKED: analysis.md write denied by harness

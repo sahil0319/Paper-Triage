@@ -1,5 +1,5 @@
 {
-  "phase": "done+live-hardening",
+  "phase": "v2-wave-E-in-progress",
   "tasks": {
     "T001": "done",
     "T002": "done",
@@ -26,12 +26,28 @@
     "T023": "done",
     "T024": "done",
     "T025": "done",
-    "T026": "done"
+    "T026": "done",
+    "T027": "done",
+    "T028": "done",
+    "T029": "done",
+    "T030": "done",
+    "T031": "done",
+    "T032": "done",
+    "T033": "done",
+    "T034": "done",
+    "T035": "done",
+    "T036": "done",
+    "T037": "done",
+    "T038": "in-progress",
+    "T039": "in-progress",
+    "T040": "in-progress",
+    "T041": "in-progress",
+    "T042": "done"
   },
-  "last_checkpoint_ts": 1727740800,
-  "context_pct": 88.5,
-  "last_warn_level": 2,
+  "last_checkpoint_ts": 1728046800,
+  "context_pct": 39.1,
+  "last_warn_level": 0,
   "last_warn_ts": 1790850814.690676,
-  "DONE": true,
+  "DONE": false,
   "last_precompact_ts": 1790846263.5785239
 }

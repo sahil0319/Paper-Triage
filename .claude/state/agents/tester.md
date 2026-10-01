@@ -21,3 +21,7 @@
 - details: docs/qa/final.md. next: none -> DONE.
 T025 verify: PASS, 167 tests, ruff clean, no failures. DONE
 - T026 verified: green; minor [BE] .env.example not updated
+## Wave D (T027-T037) 2026-10-01
+- pytest 219 pass, e2e 1 pass, ruff clean. Live API smoke 8766: links, paging (15 unique, has_more false), offset 422, chat paper_ids 422/scoped/refusals all PASS. Own Playwright run: indicator ok (aria-live, reduced motion, no external reqs, contrast ok).
+- advisories only: A1 detect false positives, A2 empty-state under working card [FE], A3 mock cites first keyword match [BE info]. No failures logged.
+- checklist specs/001-paper-triage/checklists/v2-requirements.md (28 items). report docs/qa/wave-d.md. Servers killed. Next: DONE.

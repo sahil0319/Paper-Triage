@@ -23,3 +23,18 @@
 
 ## backend-builder T026
 goal: concurrent triage + ranker calibration. status: done (commit T026). findings: .env.example read/write denied by permissions, TRIAGE_CONCURRENCY not appended. next: tester; user re-run live.
+
+## Wave D BE: T027 1228e61, T028 a3e39c4, T029 cec5ee7, T030 4e0d601, T031 f3de788
+API facts v2 (matches contracts/api.md, no divergence):
+- POST /api/triage req `{query, max_results=10 (1..20), offset=0 (0..1000)}`. Item query (id/URL) + offset>0 -> 422 `{"detail":"offset only applies to topic searches"}`.
+- resp adds `offset`, `next_offset` (int|null), `has_more` (bool). Topic: next_offset = offset + entries returned; has_more = total > next_offset. Items or FetchError: `null`/`false`. Load-more: same query, max_results 5, offset = prev next_offset. Mock feed: 15 papers 2401.00001..15, so 10 + 5.
+- every result item (triage + GET /api/papers) has `abs_url`, `pdf_url`: arxiv -> https://arxiv.org/abs|pdf/<id>; pdf source -> abs_url null, pdf_url = input URL.
+- POST /api/chat req `{question, paper_ids: [str]}`; paper_ids REQUIRED (missing -> 422), dupes ignored, >50 -> 422 `{"detail":"paper_ids: at most 50 ids"}`. Resp unchanged `{answer, citations, refused, dropped_citations}`.
+- chat context = paper_ids only. Empty/unstored set -> refused, no LLM, answer "No search results to ask about yet. Run a search first, then ask about its results.". Citation outside set -> dropped_citations. Mock chat answers only if question has a set id or content word (>=4 letters, not stop word) in a set title/abstract; marker words: Progressive, Consistency, Adversarial, Guidance, Survey, Basalt, Cobalt, Quartz, Granite, Obsidian, Feldspar, Gypsum, Marble, Dolomite, Pumice (ids 1..15 in order).
+- next: T032, T033. env note: .venv/bin/pytest shebang was broken (pointed to other project); fixed via `uv sync --reinstall-package pytest`.
+
+## Wave D BE complete
+T032 b818725 (pytest-playwright + chromium installed, harness tests/e2e_harness.py port E2E_PORT=8766, `-m e2e`), T033 committed. pytest 219 pass (+1 e2e), ruff clean. No contract deviation. top_papers/chat_top_k left in db/config unused by chat (tested, harmless). next: tester.
+
+## T042 README v2
+done (README.md only). Covers links, load-more, scoped chat, searching indicator, e2e setup (E2E_PORT 8766). UI wording ("Load 5 more", working card) taken from brief; FE wave E to confirm copy matches. next: tester.
