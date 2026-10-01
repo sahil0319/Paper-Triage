@@ -247,7 +247,7 @@ rendering rule; keep the UI test hooks from plan.md. Every task ends with
 
 ### Wave D — FE lane (no new API needed)
 
-- [ ] T034 [FE] Static asset guard test first `tests/frontend/test_static_assets.py` (stdlib
+- [x] T034 [FE] Static asset guard test first `tests/frontend/test_static_assets.py` (stdlib
   only, no browser): `pt/static/index.html`, `app.css`, `app.js` reference no external URL
   (no `http(s)://` in `src`/`href`, no `@import`, no `@font-face`, no `url(http`); the UI test
   hooks from plan.md that exist today are present in `index.html` (`#query`, `#submit`,
