@@ -4,6 +4,7 @@ searching indicator can be observed."""
 
 import asyncio
 import os
+import socket
 import threading
 import time
 
@@ -45,7 +46,19 @@ class LiveServer:
     def set_triage_delay(self, seconds: float) -> None:
         self.triage_delay = float(seconds)
 
+    def _check_port_free(self) -> None:
+        """Fail fast when something else already listens, so tests never hit a foreign server."""
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                s.bind(("127.0.0.1", self.port))
+            except OSError as e:
+                raise RuntimeError(
+                    f"port {self.port} is already in use; stop that server or set E2E_PORT"
+                ) from e
+
     def start(self) -> None:
+        self._check_port_free()
         for key, value in (("MOCK_LLM", "1"), ("PAPER_TRIAGE_DB", self.db_path)):
             self._saved_env[key] = os.environ.get(key)
             os.environ[key] = value
@@ -61,7 +74,10 @@ class LiveServer:
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline:
             try:
-                if httpx.get(f"{self.url}/api/status", timeout=1).status_code == 200:
+                if (
+                    self._server.started
+                    and httpx.get(f"{self.url}/api/status", timeout=1).status_code == 200
+                ):
                     return
             except httpx.HTTPError:
                 pass

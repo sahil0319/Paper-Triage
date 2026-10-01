@@ -29,3 +29,19 @@ def test_triage_delay_applies_to_triage_only(live_server):
 def test_index_loads_offline(live_server, offline_page):
     offline_page.goto("/")
     assert offline_page.title() == "Paper Triage"
+
+
+def test_start_fails_fast_when_port_in_use(tmp_path):
+    import os
+    import socket
+
+    from e2e_harness import LiveServer
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as busy:
+        busy.bind(("127.0.0.1", 0))
+        busy.listen()
+        before = dict(os.environ)
+        server = LiveServer(str(tmp_path / "x.db"), port=busy.getsockname()[1])
+        with pytest.raises(RuntimeError, match="already in use"):
+            server.start()
+        assert dict(os.environ) == before  # env untouched on failure
