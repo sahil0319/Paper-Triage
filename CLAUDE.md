@@ -1,7 +1,7 @@
 # CLAUDE.md — orchestrator rules
 
 **FIRST on every session start: read `.claude/state/checkpoint.md`, then continue from "exact next command".**
-(SessionStart hook injects it too.) Keep all messages terse. Terse style for ALL agent reports/handoffs is enforced inline in each agent file ("TOKEN DIET": <=120-word reports, narrow reads); the caveman skill is NOT loaded by agents (it would add tokens). Keep orchestrator-to-user messages short.
+(SessionStart hook injects it too.) Keep all messages terse. Caveman lite is preloaded into every dev agent via `skills: [caveman]` frontmatter (reports/handoffs/state notes only; code, commits, specs, docs stay normal). Orchestrator replies to the user also use caveman lite.
 
 ## Product
 Paper Triage Assistant. Input: topic/keywords or arXiv IDs / PDF URLs.
@@ -44,6 +44,9 @@ Each agent appends to `.claude/state/agents/<name>.md` after every task: goal, s
 - PostToolUse hook runs `scripts/token_watch.py` (estimates context vs `CONTEXT_WINDOW`, default 200000). >=70%: invoke sentinel, finish current task only. >=85%: checkpoint immediately and stop.
 - PreCompact -> `scripts/save_checkpoint.sh`. SessionStart injects checkpoint.md.
 - `scripts/run_loop.sh` restarts on usage limit/crash (max 20 iters, stops on DONE). No `--dangerously-skip-permissions`.
+
+## Spec-kit (do it properly)
+Planner runs speckit-constitution/specify/clarify/plan/tasks/analyze through the Skill tool and the `.specify/scripts/bash/` helpers, and persists the analyze report to specs/<feature>/analysis.md. Builders start from Skill speckit-implement. Tester owns speckit-checklist (output in specs/<feature>/checklists/). New tasks added mid-build (e.g. T025/T026) must be re-checked with speckit-analyze.
 
 ## Hard rules
 - One task = one small commit (per lane). Never push; no real remotes. no-mistakes gate is local only (bare repo in `.local/`).

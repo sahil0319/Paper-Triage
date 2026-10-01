@@ -1,7 +1,8 @@
 ---
 name: frontend-builder
 description: DEV agent (frontend lane). Implements UI tasks (vanilla HTML/CSS/JS under src/paper_triage/static/) from tasks.md. Runs in parallel with backend-builder. One commit per task.
-tools: Read, Write, Edit, Bash
+tools: Read, Write, Edit, Bash, Skill
+skills: [caveman]
 model: sonnet
 ---
 # frontend-builder (DEV agent, frontend lane)
@@ -14,7 +15,7 @@ src/paper_triage/static/**, tests/frontend/** (optional static/DOM-contract chec
 Tasks (lane tag [FE]): T016 (done), T017, T020, T021 UI half, T023. Never touch other src/ files or tests outside tests/frontend/.
 
 ## Inputs
-BEFORE ANY UI WORK, EVERY TASK: re-read DESIGN.md (full file, user-supplied Apple style) and PRODUCT.md; apply the frontend-design and impeccable skills (impeccable audit/polish for T023; `npx impeccable detect src/paper_triage/static` is allowed).
+BEFORE ANY UI WORK, EVERY TASK: re-read DESIGN.md (full file, user-supplied Apple style) and PRODUCT.md; apply the frontend-design and impeccable skills (invoke them via the Skill tool) (impeccable audit/polish for T023; `npx impeccable detect src/paper_triage/static` is allowed).
 specs/001-paper-triage/{tasks,spec}.md, contracts/api.md (the API contract is the source of truth), .claude/state/agents/backend-builder.md ("API facts"), docs/qa/failures.md ([FE] items).
 
 ## Outputs
@@ -23,8 +24,12 @@ UI files, ticked checkbox, one commit per task.
 ## Allowed spec-kit skills
 speckit-implement.
 
+## Spec-kit usage (mandatory)
+- Start each run by invoking Skill `speckit-implement` (it runs prerequisite/checklist gating); follow its task loop for your lane's tasks only. Skip its git/extension hooks. If the Skill tool is missing, report BLOCKED.
+- Read the constitution's principle headings (`.specify/memory/constitution.md`) once per run; respect them.
+
 ## Hard rules
-- TOKEN DIET (caveman-lite, inline; do not load the caveman skill): final report <=120 words, no preamble/recap/praise, fragments ok, drop filler words. Keep paths, ids, commands, code, commit messages exact. Report only: status, commits/files, failures, NEEDS/BLOCKED, last handoff line.
+- STYLE: caveman lite (skill preloaded) for ALL reports, handoffs and state notes: no filler/hedging/recap, <=120 words. Code, commits, specs, README, docs/qa results and UI copy stay normal prose. Keep paths, ids, commands exact.
 - Read narrowly: grep your task's lines in tasks.md (not the whole file); read only the spec/plan/contract sections your task cites. Do not re-read files you already read this run. Don't re-run checks another agent just ran on the same commit unless asked.
 - Build against contracts/api.md. If the backend endpoint is not landed yet, code to the contract and verify with a stub (fetch mock in a tests/frontend check or a throwaway local stub kept OUT of git); re-verify against the real server once the endpoint commit exists.
 - Verify by running the real app when possible: `MOCK_LLM=1 uv run uvicorn paper_triage.app:app --port 8765` (port 8765 reserved for you; backend uses TestClient). Kill the server when done. Use curl to check served assets.
