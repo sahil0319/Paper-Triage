@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">
+  <title type="html">ArXiv Query: search_query=all:diffusion distillation</title>
+  <opensearch:totalResults>5</opensearch:totalResults>
+  <entry>
+    <id>http://arxiv.org/abs/2401.00001v1</id>
+    <published>2024-01-02T10:00:00Z</published>
+    <title>Progressive Distillation for Fast Sampling of Diffusion Models</title>
+    <summary>We distill diffusion samplers into four-step generators, reporting an eight times speedup with small FID loss on ImageNet.</summary>
+    <author><name>Ada Lovelace</name></author>
+    <author><name>Alan Turing</name></author>
+    <link href="http://arxiv.org/abs/2401.00001v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2401.00001v1" rel="related" type="application/pdf"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2401.00002v2</id>
+    <published>2024-01-03T11:00:00Z</published>
+    <title>Consistency Models for One-Step Image Generation</title>
+    <summary>We introduce consistency models that map noise directly to data, enabling one-step generation and reporting the largest speedup among distillation baselines.</summary>
+    <author><name>Grace Hopper</name></author>
+    <link href="http://arxiv.org/abs/2401.00002v2" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2401.00002v2" rel="related" type="application/pdf"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2401.00003v1</id>
+    <published>2024-01-04T12:00:00Z</published>
+    <title>Adversarial Diffusion Distillation</title>
+    <summary>We combine score distillation with an adversarial loss to produce high-fidelity images in one to four sampling steps.</summary>
+    <author><name>Edsger Dijkstra</name></author>
+    <author><name>Barbara Liskov</name></author>
+    <link href="http://arxiv.org/abs/2401.00003v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2401.00003v1" rel="related" type="application/pdf"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2401.00004v1</id>
+    <published>2024-01-05T13:00:00Z</published>
+    <title>Guidance Distillation for Classifier-Free Diffusion</title>
+    <summary>We distill classifier-free guidance into a single network, halving the cost of each sampling step at similar quality.</summary>
+    <author><name>Donald Knuth</name></author>
+    <link href="http://arxiv.org/abs/2401.00004v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2401.00004v1" rel="related" type="application/pdf"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2401.00005v1</id>
+    <published>2024-01-06T14:00:00Z</published>
+    <title>A Survey of Few-Step Diffusion Sampling</title>
+    <summary>We survey solvers and distillation techniques for accelerating diffusion sampling and discuss open evaluation problems.</summary>
+    <author><name>Margaret Hamilton</name></author>
+    <author><name>John McCarthy</name></author>
+    <link href="http://arxiv.org/abs/2401.00005v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2401.00005v1" rel="related" type="application/pdf"/>
+  </entry>
+</feed>

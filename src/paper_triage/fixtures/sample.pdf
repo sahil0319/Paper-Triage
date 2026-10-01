@@ -1,0 +1,55 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 1217 >>
+stream
+BT /F1 11 Tf 14 TL 50 740 Td
+(Sample Paper on Diffusion Distillation) Tj T*
+(Abstract. We study distillation of diffusion models into few-step generators.) Tj T*
+(Our method reduces sampling cost by a factor of eight while keeping image quality.) Tj T*
+(1 Introduction) Tj T*
+(Diffusion models produce high quality samples but require many network evaluations.) Tj T*
+(Distillation compresses the sampling trajectory into a small number of steps.) Tj T*
+(We propose a progressive scheme that halves the number of steps at every stage.) Tj T*
+(2 Method) Tj T*
+(A student network is trained to match two teacher steps with one student step.) Tj T*
+(The procedure is repeated until the student needs only four steps in total.) Tj T*
+(3 Experiments) Tj T*
+(We evaluate on ImageNet and report FID against the undistilled teacher baseline.) Tj T*
+(The distilled model achieves an eight times speedup with a small FID increase.) Tj T*
+(Ablations show that the loss weighting matters more than the schedule choice.) Tj T*
+(4 Conclusion) Tj T*
+(Progressive distillation offers a simple recipe for fast sampling from diffusion models.) Tj T*
+(References) Tj T*
+([1] Ho et al. Denoising diffusion probabilistic models.) Tj T*
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+6 0 obj
+<< /Title (Sample Paper on Diffusion Distillation) >>
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000001510 00000 n 
+0000001580 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R /Info 6 0 R >>
+startxref
+1649
+%%EOF

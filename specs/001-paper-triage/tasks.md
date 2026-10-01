@@ -50,7 +50,7 @@ Package = `src/paper_triage/` (abbrev `pt/` below means `src/paper_triage/`).
   `cache_get/put`, `save_result`, `get_result(paper_id, topic)`, `list_results(topic)` (rank
   desc, failed last), `latest_topic()`, `top_papers(k)`, `paper_ids()`, `save_chat_turn`. Test
   persistence across reconnect.
-- [ ] T006 [P] Test first `tests/test_net.py`, then `pt/net.py`: `Throttle(min_interval=3.0,
+- [x] T006 [P] Test first `tests/test_net.py`, then `pt/net.py`: `Throttle(min_interval=3.0,
   clock, sleep)` (injectable; test with fake clock that 3 calls are spaced >=3 s) and
   `make_http(mock: bool) -> (httpx.Client, Throttle)`: real client (timeout 20 s, follow
   redirects) + 3.0 s throttle, or `httpx.MockTransport` client serving `pt/fixtures/` + 0 s
