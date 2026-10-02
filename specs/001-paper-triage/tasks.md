@@ -420,7 +420,7 @@ hooks. Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest 
 
 ### Wave F — FE lane (static or stubbed data only)
 
-- [ ] T052 [FE] Vendor pdf.js + static guard (constitution 2.0.0 I, R13). Test first
+- [x] T052 [FE] Vendor pdf.js + static guard (constitution 2.0.0 I, R13). Test first
   `tests/frontend/test_static_assets.py`: scan every file under `pt/static/` except
   `pt/static/vendor/` for external URLs and forbidden APIs (`app.js` rule kept; `viewer.js`
   may use static `import` only, no `import(`); assert `vendor/pdfjs/{pdf.min.mjs,

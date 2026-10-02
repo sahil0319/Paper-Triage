@@ -97,3 +97,68 @@ def test_css_has_reduced_motion_rules():
     css = (STATIC / "app.css").read_text(encoding="utf-8")
     assert "prefers-reduced-motion: reduce" in css
     assert "@keyframes ray" in css and "@keyframes breathe" in css
+
+
+# ---- v3 (T052): scan every own file except static/vendor/, vendored pdf.js checks ----
+
+VENDOR = STATIC / "vendor"
+PDFJS = VENDOR / "pdfjs"
+PDFJS_VERSION = "6.3.289"
+
+
+def _own_files(*suffixes):
+    return [
+        p
+        for p in sorted(STATIC.rglob("*"))
+        if p.is_file() and VENDOR not in p.parents and p.suffix in suffixes
+    ]
+
+
+def test_own_scripts_load_nothing_external():
+    scripts = _own_files(".js", ".mjs")
+    assert scripts, "no own scripts found"
+    for p in scripts:
+        js = p.read_text(encoding="utf-8")
+        assert not re.search(r"""importScripts|XMLHttpRequest""", js), p.name
+        assert not re.search(r"""fetch\(\s*['"]\s*https?://""", js), p.name
+        assert not re.search(r"""\.src\s*=\s*['"]https?://""", js), p.name
+        # Static `import ... from "./x.mjs"` is allowed (viewer.js); dynamic import() is not.
+        assert not re.search(r"""\bimport\s*\(""", js), f"{p.name} uses dynamic import()"
+        for m in re.finditer(r"""\bimport\b[^;]*?\bfrom\s*['"]([^'"]+)['"]""", js):
+            assert not re.match(r"(?i)(https?:)?//", m.group(1)), f"{p.name} imports {m.group(1)}"
+
+
+def test_own_css_has_no_external_resources():
+    for p in _own_files(".css"):
+        css = p.read_text(encoding="utf-8")
+        assert "@import" not in css, p.name
+        assert "@font-face" not in css, p.name
+        assert not re.search(r"url\(\s*['\"]?\s*(https?:)?//", css, re.IGNORECASE), p.name
+
+
+def test_own_html_has_no_external_urls():
+    for p in _own_files(".html"):
+        c = _Collect()
+        c.feed(p.read_text(encoding="utf-8"))
+        for tag, key, url in c.urls:
+            assert not re.match(r"(?i)(https?:)?//", url), f"{p.name}: <{tag} {key}={url}>"
+
+
+def test_vendored_pdfjs_present():
+    for name in ("pdf.min.mjs", "pdf.worker.min.mjs", "LICENSE", "VERSION"):
+        f = PDFJS / name
+        assert f.is_file() and f.stat().st_size > 0, f"vendor/pdfjs/{name} missing"
+
+
+def test_vendored_pdfjs_version_pinned():
+    version = (PDFJS / "VERSION").read_text(encoding="utf-8")
+    assert f"pdfjs-dist {PDFJS_VERSION}" in version
+    assert "modern" in version.lower() or "build/" in version
+    assert "legacy" not in version.lower()
+    for name in ("pdf.min.mjs", "pdf.worker.min.mjs"):
+        head = (PDFJS / name).read_text(encoding="utf-8", errors="replace")
+        assert PDFJS_VERSION in head, f"{name} does not contain {PDFJS_VERSION}"
+
+
+def test_vendored_pdfjs_license_is_apache():
+    assert "Apache License" in (PDFJS / "LICENSE").read_text(encoding="utf-8")

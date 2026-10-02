@@ -1,0 +1,10 @@
+pdfjs-dist 6.3.289 (modern build/)
+License: Apache-2.0 (see LICENSE)
+Source: https://registry.npmjs.org/pdfjs-dist/-/pdfjs-dist-6.3.289.tgz
+Vendored 2026-10-03 for v3 PDF preview (constitution 2.0.0 principle I). No cmaps, standard_fonts, wasm or .map files.
+
+package/build/pdf.min.mjs        sha256 f80490490320511e5df18c580b9edd6b5db8058dceebaf6f161992e0a964b9e2
+package/build/pdf.worker.min.mjs sha256 8ab0e5e30031b4a06ecfddd5ae9562f0227f830ee7ec9ed1a968b134243d2386
+package/LICENSE                  sha256 0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594
+
+Library and worker versions must match exactly (pdf.js throws on mismatch). Update both together.
