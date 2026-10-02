@@ -212,3 +212,44 @@ def test_new_search_clears_chat_transcript(home):
     expect(page.locator("#chat-log li.turn")).to_have_count(0)
     expect(page.locator("#chat-note")).to_contain_text("Chat now covers 1 paper.")
     assert _chat_scope_ids(page, "What is the capital of France?") == ["2401.00001"]
+
+
+def test_new_search_reset_is_announced_once(home):
+    page = home
+    search(page, TOPIC, 10)
+    search(page, "2401.00001", 1)
+    status = page.locator("#status").inner_text()
+    assert status.count("Chat now covers 1 paper") == 1
+    assert "1 paper ranked" in status
+    assert page.locator("#chat-note").get_attribute("role") is None
+    assert page.locator("#chat-note").get_attribute("aria-live") is None
+
+
+def test_load_more_reset_is_announced_once(home):
+    page = home
+    search(page, TOPIC, 10)
+    page.click("#load-more")
+    expect(page.locator("#paper-list li.paper")).to_have_count(15)
+    assert page.locator("#status").inner_text().count("Chat now covers 15 papers") == 1
+
+
+def test_reset_frees_chat_while_stale_reply_in_flight(home):
+    page = home
+    search(page, TOPIC, 10)
+    held = []
+    page.route("**/api/chat", lambda route: held.append(route))
+    page.fill("#question", "What is the capital of France?")
+    page.click("#ask")
+    expect(page.locator("#chat-log li.turn")).to_have_count(1)
+    expect(page.locator("#ask")).to_be_disabled()
+    page.click("#load-more")
+    expect(page.locator("#paper-list li.paper")).to_have_count(15)
+    # The reset frees the chat for the new scope although the old request is still pending.
+    expect(page.locator("#chat-log li.turn")).to_have_count(0)
+    expect(page.locator("#ask")).to_be_enabled()
+    page.unroute("**/api/chat")
+    assert len(_chat_scope_ids(page, "What is the capital of France?")) == 15
+    # Releasing the stale reply must not touch the new transcript or busy state.
+    held[0].continue_()
+    expect(page.locator("#chat-log li.turn")).to_have_count(1)
+    expect(page.locator("#ask")).to_be_enabled()

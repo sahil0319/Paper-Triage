@@ -616,8 +616,7 @@
         }
         if (added.length) {
           // The result set grew: chat scope = every row now shown, transcript starts over.
-          var covered = resetChat(true);
-          statusEl.textContent += " " + covered;
+          resetChat(true);
         } else {
           refreshChat();
         }
@@ -675,15 +674,20 @@
 
   // Result set changed: clear the transcript, rescope the chat (askInto sends the current rows),
   // and say so. The visible line sits in the chat; #status announces it (polite live region).
-  // Returns the scope sentence.
+  // Callers set #status first; the scope sentence is appended here, once, so each reset is
+  // announced exactly once (the note itself is not a live region).
   function resetChat(announce) {
     chatGen++;
+    chatBusy = false; // a reply still in flight belongs to the old scope and is dropped
     clear(logEl);
-    var line = "Chat now covers " + plural(okCount(), "paper") + ". Earlier questions were cleared.";
+    var failed = failedCount(state.rows);
+    var line = "Chat now covers " + plural(okCount(), "paper") +
+      (failed ? " (" + failed + " could not be processed and cannot be asked about)" : "") +
+      ". Earlier questions were cleared.";
     noteEl.textContent = announce ? line : "";
     noteEl.hidden = !announce;
+    if (announce) statusEl.textContent += (statusEl.textContent ? " " : "") + line;
     refreshChat();
-    return line;
   }
 
   // The chat is scoped to the papers shown (first page + load-more pages), sent as paper_ids.
@@ -825,9 +829,9 @@
         turn.appendChild(errBox);
       })
       .then(function () {
+        if (gen !== chatGen) return; // reset already cleared the busy state for the new scope
         chatBusy = false;
         askBtn.disabled = !state.rows.length;
-        if (gen !== chatGen) return;
         turn.scrollIntoView({ block: "nearest" });
         question.focus();
       });
