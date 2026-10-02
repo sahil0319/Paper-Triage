@@ -177,3 +177,105 @@ def test_delete_counts_annotations(client):
 
 def test_delete_requires_paper_id(client):
     assert client.delete("/api/library").status_code == 422
+
+
+# ---- directories + move (T048) ---------------------------------------------------------------
+
+
+def mk_dir(client, name):
+    return client.post("/api/directories", json={"name": name})
+
+
+def saved_ids(client, n=3):
+    body = search(client, "diffusion models", n)
+    ids = [x["paper_id"] for x in body["results"]]
+    for pid in ids:
+        save(client, pid, "diffusion models")
+    return ids
+
+
+def test_create_directory_201(client):
+    r = mk_dir(client, "  network  ")
+    assert r.status_code == 201
+    assert r.json() == {"id": r.json()["id"], "name": "network", "count": 0}
+
+
+@pytest.mark.parametrize(
+    ("name", "code", "detail"),
+    [
+        ("", 422, "Enter a name."),
+        ("   ", 422, "Enter a name."),
+        ("x" * 41, 422, "Names can be up to 40 characters."),
+    ],
+)
+def test_directory_name_validation(client, name, code, detail):
+    r = mk_dir(client, name)
+    assert (r.status_code, r.json()) == (code, {"detail": detail})
+
+
+def test_directory_name_conflicts_409(client):
+    mk_dir(client, "Network")
+    for name in ("network", "NETWORK", "Unsorted", "all saved"):
+        r = mk_dir(client, name)
+        assert r.status_code == 409, name
+        assert r.json() == {"detail": f'"{name}" already exists.'}
+    assert mk_dir(client, "x" * 40).status_code == 201
+
+
+def test_missing_name_422(client):
+    assert client.post("/api/directories", json={}).status_code == 422
+
+
+def test_rename_keeps_members_and_conflicts(client):
+    ids = saved_ids(client, 2)
+    d = mk_dir(client, "net").json()
+    other = mk_dir(client, "other").json()
+    client.post("/api/library/move", json={"paper_id": ids[0], "directory_id": d["id"]})
+    r = client.patch(f"/api/directories/{d['id']}", json={"name": "graphs"})
+    assert r.status_code == 200 and r.json() == {"id": d["id"], "name": "graphs", "count": 1}
+    lib = client.get("/api/library").json()
+    member = next(p for p in lib["papers"] if p["paper_id"] == ids[0])
+    assert member["directory_id"] == d["id"]
+    assert client.patch(f"/api/directories/{d['id']}", json={"name": "OTHER"}).status_code == 409
+    assert client.patch(f"/api/directories/{d['id']}", json={"name": "Unsorted"}).status_code == 409
+    assert client.patch(f"/api/directories/{d['id']}", json={"name": " "}).status_code == 422
+    assert client.patch(f"/api/directories/{other['id'] + 50}", json={"name": "z"}).status_code == 404
+
+
+def test_delete_directory_moves_members_to_unsorted(client):
+    ids = saved_ids(client, 3)
+    d = mk_dir(client, "net").json()
+    for pid in ids[:2]:
+        client.post("/api/library/move", json={"paper_id": pid, "directory_id": d["id"]})
+    r = client.delete(f"/api/directories/{d['id']}")
+    assert r.status_code == 200 and r.json() == {"deleted": True, "moved": 2}
+    lib = client.get("/api/library").json()
+    assert all(p["directory_id"] is None for p in lib["papers"])
+    assert (lib["directories"], lib["unsorted_count"], lib["total"]) == ([], 3, 3)
+    assert client.delete(f"/api/directories/{d['id']}").status_code == 404
+
+
+def test_move_paper_and_counts(client):
+    ids = saved_ids(client, 3)
+    b = mk_dir(client, "b").json()
+    a = mk_dir(client, "A").json()
+    r = client.post("/api/library/move", json={"paper_id": ids[0], "directory_id": b["id"]})
+    assert r.status_code == 200 and r.json() == {"paper_id": ids[0], "directory_id": b["id"]}
+    client.post("/api/library/move", json={"paper_id": ids[1], "directory_id": b["id"]})
+    lib = client.get("/api/library").json()
+    assert lib["directories"] == [
+        {"id": a["id"], "name": "A", "count": 0}, {"id": b["id"], "name": "b", "count": 2},
+    ]
+    assert (lib["unsorted_count"], lib["total"]) == (1, 3)
+    r = client.post("/api/library/move", json={"paper_id": ids[0], "directory_id": None})
+    assert r.status_code == 200 and r.json()["directory_id"] is None
+    assert client.get("/api/library").json()["unsorted_count"] == 2
+
+
+def test_move_unknown_404(client):
+    ids = saved_ids(client, 1)
+    r = client.post("/api/library/move", json={"paper_id": ids[0], "directory_id": 999})
+    assert r.status_code == 404
+    d = mk_dir(client, "net").json()
+    r = client.post("/api/library/move", json={"paper_id": "nope", "directory_id": d["id"]})
+    assert r.status_code == 404

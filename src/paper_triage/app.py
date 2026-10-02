@@ -60,6 +60,25 @@ class SaveIn(BaseModel):
     topic: str = ""
 
 
+class DirIn(BaseModel):
+    name: str
+
+
+class MoveIn(BaseModel):
+    paper_id: str
+    directory_id: int | None = None
+
+
+def _dir_write(fn, *args):
+    """Run a directory create/rename; map name errors to 409 (taken) or 422 (invalid)."""
+    try:
+        return fn(*args)
+    except db.DuplicateName as e:
+        raise HTTPException(409, str(e)) from e
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+
+
 def _item(conn, saved: dict) -> dict:
     return LibraryItem(**library_item(conn, saved)).model_dump()
 
@@ -173,6 +192,38 @@ def create_app() -> FastAPI:
                 raise HTTPException(502, f"model call failed: {e}") from e
             db.save_chat_turn(st.conn, body.question, out.answer, out.citations, out.refused)
         return out.model_dump()
+
+    @app.post("/api/library/move")
+    def move_library(body: MoveIn, request: Request):
+        st = request.app.state
+        with st.lock:
+            if not db.move_paper(st.conn, body.paper_id, body.directory_id):
+                raise HTTPException(404, "unknown paper or directory")
+        return {"paper_id": body.paper_id, "directory_id": body.directory_id}
+
+    @app.post("/api/directories", status_code=201)
+    def post_directory(body: DirIn, request: Request):
+        st = request.app.state
+        with st.lock:
+            return _dir_write(db.create_directory, st.conn, body.name)
+
+    @app.patch("/api/directories/{directory_id}")
+    def patch_directory(directory_id: int, body: DirIn, request: Request):
+        st = request.app.state
+        with st.lock:
+            out = _dir_write(db.rename_directory, st.conn, directory_id, body.name)
+        if out is None:
+            raise HTTPException(404, "unknown directory")
+        return out
+
+    @app.delete("/api/directories/{directory_id}")
+    def delete_directory(directory_id: int, request: Request):
+        st = request.app.state
+        with st.lock:
+            moved = db.delete_directory(st.conn, directory_id)
+        if moved is None:
+            raise HTTPException(404, "unknown directory")
+        return {"deleted": True, "moved": moved}
 
     app.mount("/", StaticFiles(directory=STATIC, html=True), name="static")
     return app

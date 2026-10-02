@@ -382,7 +382,7 @@ hooks. Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest 
   rows survive. Then `pt/models.py` (`LibraryItem`, `PaperOut.saved`), `pt/pipeline.py`
   (`saved` flag, tag merge), `pt/app.py` routes. (PDF download wiring comes in T050; until then
   `pdf.status` stays `pending`.)
-- [ ] T048 [BE] [US7] Directories API + move (contracts "Directories", "POST
+- [x] T048 [BE] [US7] Directories API + move (contracts "Directories", "POST
   /api/library/move"). Test first `tests/test_library_api.py`: create -> 201 count 0; empty
   name -> 422 "Enter a name."; 41 chars -> 422 "Names can be up to 40 characters."; duplicate
   (case-insensitive), "Unsorted", "All saved" -> 409 `"<name>" already exists.`; rename keeps
