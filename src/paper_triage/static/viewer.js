@@ -101,8 +101,9 @@ function setPanelHidden() {
   PT.refreshSkipLinks();
 }
 
-function open(item) {
-  if (cur && cur.id === item.paper_id && cur.key === statusKey(item)) return;
+// `force` re-renders although the status key is unchanged (a retry that is shown as pending).
+function open(item, force) {
+  if (!force && cur && cur.id === item.paper_id && cur.key === statusKey(item)) return;
   const sameKey = cur && cur.id === item.paper_id;
   const keepZoom = sameKey ? cur.mode : null;
   close();
@@ -138,7 +139,9 @@ function showDownloading() {
 
 function poll(t) {
   if (stale(t)) return;
-  PT.loadLibrary().then(() => {
+  // reloadLibrary ignores the "unchanged" shortcut: a download that ended where it started
+  // (failed again after a retry) must still replace the pending view.
+  PT.reloadLibrary().then(() => {
     if (stale(t)) return;
     const it = PT.libItem(cur.id);
     if (!it) return;
@@ -160,9 +163,9 @@ function showUnavailable() {
     PT.postJSON("/api/library/retry", { paper_id: c.id })
       .then((data) => {
         if (stale(c.token)) return;
-        const it = PT.libItem(c.id) || c.item;
-        it.pdf = (data && data.pdf) || { status: "pending", error: null, pages: null };
-        open(it);
+        // Show pending from a copy: the cached library item keeps the server's last answer.
+        const pdf = (data && data.pdf) || { status: "pending", error: null, pages: null };
+        open({ ...(PT.libItem(c.id) || c.item), pdf }, true);
       })
       .catch((err) => {
         retry.removeAttribute("aria-disabled");
@@ -635,7 +638,10 @@ async function runFind() {
   PT.announce(`${line}.`);
   hits.forEach((hit) => {
     const b = h("button", { type: "button", class: "find-hit", "data-page": String(hit.page) }, `Page ${hit.page}: `, snippet(hit.text, hit.at, needle.length));
-    b.addEventListener("click", () => goToPage(hit.page, { flash: true }));
+    b.addEventListener("click", () => {
+      goToPage(hit.page, { flash: true });
+      el.well.focus({ preventScroll: true }); // brief L19: focus moves to the viewer region
+    });
     el.findResults.appendChild(h("li", {}, b));
   });
   el.findResults.hidden = false;

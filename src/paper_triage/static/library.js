@@ -45,7 +45,7 @@
   var DEBOUNCE_MS = 150;
   var LOADING_DELAY_MS = 300;
 
-  var ui = { tagsExpanded: false, tagsOverflow: false, loadingT: null, pollT: null, filterT: null };
+  var ui = { forced: {}, tagsExpanded: false, tagsOverflow: false, loadingT: null, pollT: null, filterT: null };
 
   // ---- helpers ----
 
@@ -901,9 +901,12 @@
     btn.setAttribute("aria-disabled", "true");
     PT.postJSON("/api/library/retry", { paper_id: it.paper_id })
       .then(function (data) {
+        // Pending is shown from a copy; the cached item keeps the server's last answer, and the
+        // next poll replaces it even when the download ends where it started.
         var cur = PT.libItem(it.paper_id) || it;
-        cur.pdf = (data && data.pdf) || { status: "pending", error: null, pages: null };
-        paintStatus(cur);
+        var shown = Object.assign({}, cur, { pdf: (data && data.pdf) || { status: "pending", error: null, pages: null } });
+        ui.forced[it.paper_id] = true;
+        paintStatus(shown);
         schedulePoll();
       })
       .catch(function (err) {
@@ -929,7 +932,9 @@
   }
 
   function pendingShown() {
-    return model().shown.filter(function (it) { return it.pdf && it.pdf.status === "pending"; });
+    return model().shown.filter(function (it) {
+      return (it.pdf && it.pdf.status === "pending") || ui.forced[it.paper_id];
+    });
   }
 
   function schedulePoll() {
@@ -945,14 +950,15 @@
       ui.pollT = null;
       return;
     }
-    PT.loadLibrary().then(function () {
+    PT.reloadLibrary().then(function () {
       if (PT.route().view !== "library") return;
-      pendingShown(); // keep the shown set in sync with the refreshed data
+      var forced = ui.forced;
+      ui.forced = {};
       model().shown.forEach(function (it) {
         var li = rowOf(it.paper_id);
         var cur = li && li.querySelector(".lib-pdf");
         var now = (it.pdf && it.pdf.status) || "none";
-        if (cur && cur.getAttribute("data-pdf-status") !== now) paintStatus(it);
+        if (cur && (cur.getAttribute("data-pdf-status") !== now || forced[it.paper_id])) paintStatus(it);
       });
       if (!pendingShown().length) {
         window.clearInterval(ui.pollT);

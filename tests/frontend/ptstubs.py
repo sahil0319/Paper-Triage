@@ -58,6 +58,8 @@ class LibraryStub:
         self.pdf = pdf
         self.fail = {}  # (METHOD, path) -> (status, detail): next matching call fails once
         self.delay_ms = 0
+        self.after_retry = None  # pdf dict a retried item takes on the first GET after the retry
+        self._flip = None
         page.route(LIB_PATHS, self._handle)
 
     # -- helpers --
@@ -86,6 +88,12 @@ class LibraryStub:
             status, detail = self.fail.pop(key)
             return _json(route, {"detail": detail}, status)
         if key == ("GET", "/api/library"):
+            if self._flip:
+                pid, pdf = self._flip
+                self._flip = None
+                for it in self.items:
+                    if it["paper_id"] == pid:
+                        it["pdf"] = pdf
             return _json(route, self.listing())
         if key == ("POST", "/api/library"):
             return self._save(route, body)
@@ -114,6 +122,8 @@ class LibraryStub:
                 if it["pdf"]["status"] != "failed":
                     return _json(route, {"detail": "PDF is not in a failed state"}, 409)
                 it["pdf"] = {"status": "pending", "error": None, "pages": None}
+                if self.after_retry:
+                    self._flip = (it["paper_id"], self.after_retry)
                 return _json(route, {"pdf": it["pdf"]}, 202)
         return _json(route, {"detail": "not in the library"}, 404)
 

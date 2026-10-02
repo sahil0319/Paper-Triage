@@ -1372,3 +1372,49 @@ def test_small_screen_uses_select_and_manage_panel(app, real_library):
     expect(sel).to_have_value("Unsorted")
     sel.select_option("")
     expect(rows(page)).to_have_count(2)
+
+
+# ---- F-009 / F-011 regressions ----
+
+
+def test_viewer_retry_that_fails_again_ends_in_unavailable_not_stuck(app):
+    page = app
+    failed = {"status": "failed", "error": "Not a PDF.", "pages": None}
+    stub = preview(page, [lib_item(1, pdf=dict(failed))])
+    stub.after_retry = dict(failed)
+    alert = page.locator("#pv-stage .alert")
+    expect(alert).to_contain_text("This PDF could not be downloaded.")
+    alert.get_by_role("button", name="Try again").click()
+    expect(page.locator("#pv-stage .working")).to_be_visible()
+    # The server already failed again: the next poll must replace "Downloading" with the failure.
+    expect(page.locator("#pv-stage .alert")).to_contain_text(
+        "This PDF could not be downloaded.", timeout=5_000
+    )
+    expect(page.locator("#pv-stage .working")).to_have_count(0)
+    # And a second retry that succeeds renders the pages.
+    stub.after_retry = {"status": "ready", "error": None, "pages": 3}
+    page.locator("#pv-stage .alert").get_by_role("button", name="Try again").click()
+    expect(page.locator(".pdf-page")).to_have_count(3, timeout=10_000)
+
+
+def test_library_retry_that_fails_again_ends_in_unavailable(app):
+    page = app
+    failed = {"status": "failed", "error": "Not a PDF.", "pages": None}
+    stub = lib_page(page, [lib_item(1, pdf=dict(failed))])
+    stub.after_retry = dict(failed)
+    li = rows(page).first
+    li.get_by_role("button", name="Try again").click()
+    expect(li.locator("[data-pdf-status]")).to_have_attribute("data-pdf-status", "pending")
+    expect(li.locator("[data-pdf-status]")).to_have_attribute(
+        "data-pdf-status", "failed", timeout=5_000
+    )
+    expect(li.get_by_role("button", name="Try again")).to_be_visible()
+
+
+def test_find_result_moves_focus_to_the_viewer_region(app):
+    page = app
+    preview(page, [lib_item(1)])
+    open_find(page)
+    find(page, "Quartzite")
+    page.locator("#pv-find-results .find-hit").first.click()
+    expect(page.locator("#pv-pages")).to_be_focused()
