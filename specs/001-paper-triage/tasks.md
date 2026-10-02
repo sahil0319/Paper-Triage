@@ -324,6 +324,220 @@ rendering rule; keep the UI test hooks from plan.md. Every task ends with
   results, searching indicator, browser e2e setup (`uv run playwright install chromium`, see
   `SETUP_LOG.md`) and run command, `E2E_PORT`. Needs T033.
 
+## Phase 8: v3 amendment (save, Library, tags, directories, PDF preview, annotations, paper chat)
+
+**Sources**: spec.md US4-US9, FR-015..FR-029, SC-009..SC-016, Clarifications "2026-10-03 (v3)";
+plan.md "v3 Amendment" (touch map, design notes, v3 UI test hooks); contracts/api.md "v3
+Library endpoints" (authoritative shapes, status codes, copy of server refusals);
+data-model.md "v3 tables" (column rules); research R13-R18; brief
+`docs/design/v3-library-brief.md` **Rev 2** (L1-L24). `pt/` = `src/paper_triage/`.
+FR-008a is already shipped (F-006/F-007/F-008): no task. Every FE task: re-read DESIGN.md,
+PRODUCT.md and the brief (Rev 2) first; textContent-only rendering; keep v2 and v3 UI test
+hooks. Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest -q` and
+`uv run ruff check .` green; one commit with only its own paths plus `tasks.md`.
+
+### Wave F — BE lane (storage and API first)
+
+- [ ] T043 [BE] [US6] Tag normalizer (FR-021, R17). Test first `tests/test_tags.py`:
+  `keywords("Diffusion models, for VIDEO generation")` -> `["diffusion", "models", "video",
+  "generation"]`; surrounding punctuation stripped (`"(rag)."` -> `"rag"`), inner hyphen kept
+  (`"self-supervised"`); 1-character tokens and stop words dropped; duplicates removed keeping
+  first order; `""` and `"the of and"` -> `[]`. Then `pt/tags.py` `keywords(topic: str) ->
+  list[str]` with a fixed English stop-word frozenset in the module.
+- [ ] T044 [BE] [US5] Multi-page fixture + mock PDF cases (R14, R16). Regenerate
+  `pt/fixtures/sample.pdf` as 3 pages (< 50 KB, pypdf-readable): page 1 text identical to the
+  current single page; page 2 contains the marker word "Quartzite"; page 3 contains
+  "Obsidian"; neither marker appears on other pages or in `arxiv_search.xml`. Keep the
+  generator as `pt/fixtures/make_sample_pdf.py` (stdlib only, writes raw PDF objects).
+  Test first `tests/test_extract.py`: 3 pages; existing `extract_text` assertions still hold.
+  `pt/net.py` mock: keep `2401.00005` non-PDF bytes; hosts ending `.invalid` -> 404 (already);
+  `export.arxiv.org/pdf/<id>` served like `/pdf/` (host check). Audit tests that assumed one
+  page.
+- [ ] T045 [BE] [US4] Config + Library schema/CRUD (data-model "v3 tables": directories,
+  saved_papers, saved_tags). `pt/config.py`: `data_dir` from `PAPER_TRIAGE_DATA_DIR` (default
+  `./paper_triage_data`), `pdf_max_bytes = 52_428_800`, `paper_chat_cap = 300_000`,
+  `paper_chat_history = 6`. `pt/db.py` tables exactly per data-model (`name` "trimmed, 1..40
+  chars", `name_key` "UNIQUE casefold", `directory_id` "ON DELETE SET NULL", tags PK
+  `(paper_id, tag)` with `INSERT OR IGNORE`) and functions: `save_paper(conn, paper_id,
+  snapshot, topic, tags) -> bool created`, `merge_tags`, `get_saved`, `list_saved` (saved_at
+  desc), `saved_ids(conn, ids) -> set`, `delete_saved`, `create_directory`,
+  `rename_directory`, `delete_directory -> moved count`, `list_directories` (A-Z by name_key,
+  with counts), `move_paper`. Test first `tests/test_db.py`: idempotent save keeps snapshot +
+  saved_at and merges tags; directory delete moves members to NULL; unique casefold names.
+  `.gitignore` adds `paper_triage_data/`; `.env.example` adds `PAPER_TRIAGE_DATA_DIR=`.
+- [ ] T046 [BE] [US5] [US8] Files/pages/annotations schema + CRUD (data-model: paper_files,
+  paper_pages, annotations; all `ON DELETE CASCADE` from saved_papers). `pt/db.py`:
+  `set_file_status(conn, paper_id, status, **fields)` (`status` "pending | ready | failed"),
+  `get_file`, `pending_files`, `put_pages(conn, paper_id, texts)`, `get_pages`,
+  `create_annotation`, `update_annotation`, `delete_annotation`, `list_annotations` (order
+  page, top, id), `annotation_count`. Test first `tests/test_db.py`: unsave cascades to file
+  row, pages and annotations; `top` = min rect y (0 for notes).
+- [ ] T047 [BE] [US4] Library API (contracts "GET/POST/DELETE /api/library", "v3 change to
+  POST /api/triage and GET /api/papers"). Test first `tests/test_library_api.py`: save after a
+  mock topic search -> 201, item has snapshot fields, tags = `keywords(topic)`,
+  `directory_id null`; save again with another topic -> 200 `created false`, original
+  `saved_at`/rank kept, tags merged; item query topic `""` -> no tags; unknown pair -> 404;
+  failed result -> 409; triage/papers items carry `saved`; a topic search returning a saved
+  paper merges its tags; DELETE -> 200 with `annotations` count, then 404; `papers`/`results`
+  rows survive. Then `pt/models.py` (`LibraryItem`, `PaperOut.saved`), `pt/pipeline.py`
+  (`saved` flag, tag merge), `pt/app.py` routes. (PDF download wiring comes in T050; until then
+  `pdf.status` stays `pending`.)
+- [ ] T048 [BE] [US7] Directories API + move (contracts "Directories", "POST
+  /api/library/move"). Test first `tests/test_library_api.py`: create -> 201 count 0; empty
+  name -> 422 "Enter a name."; 41 chars -> 422 "Names can be up to 40 characters."; duplicate
+  (case-insensitive), "Unsorted", "All saved" -> 409 `"<name>" already exists.`; rename keeps
+  members; delete -> `moved` n and members `directory_id null`; move to unknown dir -> 404;
+  `GET /api/library` `directories` A-Z with counts, `unsorted_count`, `total`. Files
+  `pt/app.py`, `pt/models.py`, `tests/test_library_api.py`.
+- [ ] T049 [BE] [US5] PDF store module (R14, contracts "PDF download rules"). Test first
+  `tests/test_pdfstore.py` with the mock transport and a tmp data dir: arXiv paper -> file at
+  `data_dir/pdfs/<sha256(paper_id)>.pdf`, row `ready`, `bytes`, `sha256`, `pages == 3`;
+  `2401.00005` -> `failed` "Not a PDF."; body > `pdf_max_bytes` (monkeypatched small cap) ->
+  `failed` "PDF is larger than 50 MB." and no file left; export host 404 -> falls back to
+  `arxiv.org/pdf`; direct PDF URL uses `papers.pdf_url` and skips the throttle (assert the
+  `Throttle` was not waited on); `.invalid` host -> `failed`; old id `math.GT/0107001` makes a
+  safe file name; `sweep_pending` turns `pending` into `failed` "Download interrupted. Try
+  again."; zero `paper_pages` rows after download. Then `pt/pdfstore.py` (`download`,
+  `sweep_pending`, `delete_file`; stream with cap, `%PDF-` check, temp file + `os.replace`,
+  connect 10 s / read 60 s, network outside the lock) and `pt/extract.py`
+  `page_count(pdf_bytes)`.
+- [ ] T050 [BE] [US5] PDF API wiring (FR-018, FR-019). Test first `tests/test_library_api.py`:
+  save -> background download done by TestClient -> `GET /api/library` shows `ready`, `pages
+  3`; `GET /api/library/pdf?paper_id=` -> 200 `application/pdf` inline, Range `bytes=0-99`
+  -> 206; failed paper -> 404 on pdf, `POST /api/library/retry` -> 202 then `ready`/`failed`;
+  retry on `ready` -> 409; unsave deletes the file from disk; after `create_app()`,
+  `mimetypes.guess_type("a.mjs")[0] == "text/javascript"`. Then `pt/app.py`: `BackgroundTasks` on new save and retry,
+  lifespan creates `data_dir` and calls `sweep_pending`, `mimetypes.add_type`, FileResponse
+  route with `Cache-Control: private, max-age=3600`.
+- [ ] T051 [BE] [US8] Annotations API (FR-025, FR-026; contracts "Annotations"). Test first
+  `tests/test_annotations_api.py`: create highlight (color default "yellow", rects fractions
+  0..1, quote 1..500) -> 201; color outside `yellow|mint|peach` -> 422; rect value 1.2 -> 422;
+  0 or 51 rects -> 422; page > `pdf.pages` -> 422; PDF not ready -> 409; page note with note
+  1..500 chars and `rects []` -> 201; note 501 chars -> 422; PATCH color/note; PATCH note ""
+  on a note -> 422; DELETE -> 204 then 404; list ordered page, top, id; unsaved paper -> 404;
+  `highlight_count` in `GET /api/library`; persists across app restart (new TestClient on same
+  DB). Files `pt/app.py`, `pt/models.py`, tests.
+
+### Wave F — FE lane (static or stubbed data only)
+
+- [ ] T052 [FE] Vendor pdf.js + static guard (constitution 2.0.0 I, R13). Test first
+  `tests/frontend/test_static_assets.py`: scan every file under `pt/static/` except
+  `pt/static/vendor/` for external URLs and forbidden APIs (`app.js` rule kept; `viewer.js`
+  may use static `import` only, no `import(`); assert `vendor/pdfjs/{pdf.min.mjs,
+  pdf.worker.min.mjs, LICENSE, VERSION}` exist, VERSION names `pdfjs-dist 6.3.289` (modern
+  `build/`), and both `.mjs` files contain the same version string. Then download those two
+  files + LICENSE once from the npm registry tarball (`pdfjs-dist-6.3.289.tgz`) and write
+  VERSION with source URL and sha256 of each file. Files `pt/static/vendor/pdfjs/**`,
+  `tests/frontend/test_static_assets.py`.
+- [ ] T053 [FE] [US5] Shell, nav and hash routes (brief L1, L2, sections 5-7). `pt/static/index.html`:
+  `nav.views` with `a[data-view="triage"]`, `a[data-view="library"]` + `.views__count`;
+  empty `#library` and `#preview` sections (hidden), per-view skip links; `app.js` router for
+  `#/`, `#/library?dir=&tags=&q=`, `#/library/paper/<encoded id>`: toggles `hidden`, keeps
+  triage state in memory, sets `document.title`, focuses the view heading, announces via
+  `#status`. `app.css` per brief. Test `tests/frontend/test_e2e_library.py` (`e2e`): Back/
+  Forward switch views without re-fetching triage results. Returning from Preview to Library
+  restores the hash filters and the list scroll position and focuses that paper's `Open
+  preview` (FR-024, brief L2).
+- [ ] T054 [FE] [US4] Save toggle on result rows (FR-015..FR-017; brief L3-L6 Rev 2).
+  `app.js` + `app.css`: `.paper__head` with `button.save[aria-pressed]` (not on failed rows);
+  states Save/Saving…/Saved/Removing…; renders `saved` from triage and papers responses;
+  click Save -> `POST /api/library {paper_id, topic}`; click Saved -> always the inline confirm
+  `[data-confirm="unsave"]` (copy per L6 with highlight count when known) -> `DELETE
+  /api/library?paper_id=`; errors per L5; nav count update; announcements. e2e with
+  `page.route` stubs shaped per contracts: save, saved-on-load, confirm/keep, confirm/remove,
+  error line.
+- [ ] T055 [FE] [US5] Viewer shell (FR-019, FR-024; brief L15-L17, L21). New ES module
+  `pt/static/viewer.js` (static import `./vendor/pdfjs/pdf.min.mjs`, worker
+  `/vendor/pdfjs/pdf.worker.min.mjs`): open `#/library/paper/<id>` -> `getDocument({url:
+  "/api/library/pdf?paper_id=<id>"})`; `section.pdf-page[data-page]` per page with canvas +
+  `.textLayer` rendered near the viewport only; toolbar back, title h1, `#pv-page-input`
+  ("page n of m", prev/next, clamp), `#pv-zoom` (fit width default, fit page, 50-200%),
+  "Open PDF in new tab"; viewer keyboard keys `+ - 0 n p`; states Opening / Downloading /
+  Unavailable / Render failed / Not saved per L21. e2e with `page.route` serving
+  `pt/fixtures/sample.pdf` and a stub library item: canvas count >= 1, text layer contains a
+  page-1 word, next page and zoom change page width, zero non-local requests.
+- [ ] T056 [FE] [US5] Find in paper (brief L24, R18). `viewer.js` find row: input, count
+  `<n> matches on <p> pages`, result buttons `Page N: …snippet…` from
+  `page.getTextContent()`, activate -> jump + outline; disabled until ready. e2e (stubbed PDF):
+  finding a page-1 word lists page 1; nonsense -> "No matches.".
+
+### Wave G — BE lane (paper chat, harness)
+
+- [ ] T057 [BE] [US9] Page extraction + MockClient page mode (R16). Test first
+  `tests/test_extract.py`: `extract_pages(sample.pdf)` -> 3 strings, page 2 contains
+  "Quartzite"; `tests/test_config_llm.py`: prompt with `<page n="1">..</page><page n="2">
+  ..Quartzite..</page>` and `<question>Where is quartzite discussed?</question>` ->
+  `"Mock answer from this paper [p.2]."`; "What is the capital of France?" -> starts with
+  `NOT_IN_STORED_PAPERS`; results-chat mock behaviour unchanged. Then `pt/extract.py`
+  `extract_pages`, `pt/llm.py` `MockClient.text` page mode (prompt contains `<page n=`).
+- [ ] T058 [BE] [US9] Paper chat agent + endpoint (FR-027, FR-028; contracts "POST
+  /api/paper-chat"). Test first `tests/test_paper_chat.py`: after save + list + pdf fetch +
+  annotation calls there are zero `paper_pages` rows and zero LLM calls (spy client); first
+  question with "Quartzite" -> `pages [2]`, rows now stored; "capital of France" -> refused;
+  model answer citing `[p.9]` -> `dropped_pages [9]`, refused when no valid page; PDF pending
+  or failed -> refused "Chat needs the PDF text. It is not ready yet." with no LLM call and no
+  extraction; all-empty pages -> "This PDF has no extractable text."; `history` > 6 turns ->
+  422; unsaved -> 404; LLM error -> 502; annotations never appear in the prompt (spy). Then
+  `pt/paper_chat.py` (context `<page n>` blocks, 300,000-char cap, history, `[p.N]`
+  validation), `pt/prompts/paper_chat.md`, `pt/models.py`, `pt/app.py`.
+- [ ] T059 [BE] Harness + v3 API smoke offline. `tests/e2e_harness.py`: LiveServer sets
+  `PAPER_TRIAGE_DATA_DIR` to a temp dir and cleans it up. `tests/test_e2e_mock.py` (socket
+  guard on): search -> save -> library `ready` -> pdf 200 -> highlight -> paper chat cites
+  `p.2` -> directory create/move/delete -> unsave leaves no file. `tests/test_e2e_harness.py`:
+  `/vendor/pdfjs/pdf.min.mjs` served as `text/javascript` once T052 landed (skip with reason if
+  the file is absent).
+
+### Wave G — FE lane (real API)
+
+- [ ] T060 [FE] [US5] [US6] Library view (FR-020, FR-022; brief L7, L10, L11, L12, L14).
+  `pt/static/library.js` + `index.html` + `app.css`: loads `GET /api/library`; rows
+  `li.lib-row[data-paper-id]` (title, authors, tags line, meta with `[data-pdf-status]`,
+  `Saved <d Mon>`, highlight count, links, rank `for "<topic>"`, critique disclosure, `Open
+  preview` -> preview route); filter `#lib-filter` (tags + title, L10a rules, debounce 150 ms,
+  `/` and Esc); tag bar `#lib-tags` (count desc then A-Z, AND, pressed first, two rows + Show
+  all, summary line, Clear filters); filter state in the hash; states loading/error/empty/no
+  match; poll every 3 s while any row is `pending`; `Try again` -> `POST
+  /api/library/retry`. Needs T047, T050. e2e (real harness): tag AND filter and title filter
+  give exact rows (SC-012); status reaches "PDF ready".
+- [ ] T061 [FE] [US7] Directories UI + row actions (FR-023; brief L8, L9, L10b, L13). Rail
+  `#dir-rail` (All saved, Unsorted, A-Z), `#dir-new` inline create, rename/delete in header
+  with inline confirm, validation copy from API `detail`, native select below 1024 px with
+  "Manage directories"; row `select[data-act="move"]` -> `POST /api/library/move`, row
+  collapse when filtered out; `Remove from Library` -> always-confirm group -> DELETE. Needs
+  T048. e2e: create, move, rename, delete (papers back in Unsorted, SC-015 no loss).
+- [ ] T062 [FE] [US8] Highlights, notes, list, export (FR-025, FR-026; brief L16 highlight
+  control, L18, L19, L23). `viewer.js`: selection popover (3 swatches yellow/mint/peach + Add
+  note), toolbar Highlight split control, rects as page-box fractions, `.hl[data-annotation-id]`
+  layer redrawn on zoom (multiply blend), cross-page selection clipped with status copy;
+  panel tab "Highlights n" `#pv-hl-list` (Go to, Edit note with 500 counter, Color select,
+  Delete + 8 s Undo, page notes); `Export notes` Markdown download. A page with no text layer
+  (scanned) shows a plain "No selectable text on this page" message for highlighting while
+  page notes still work. Needs T051. e2e: highlight persists after reload and keeps
+  proportional size after zoom; note saved; Go to jumps.
+- [ ] T063 [FE] [US9] Ask this paper panel + sheet (FR-027; brief L20 Rev 2, L22). New
+  `pt/static/paperchat.js` (+ `index.html`, `app.css`, `viewer.js` hook-up). Tab
+  "Ask this paper": idle copy, starters, `#pv-chat-question` + `#pv-chat-ask`; no request
+  before the first submit; `POST /api/paper-chat` with the last 6 turns as `history`;
+  `#pv-chat-log li.turn`, `[p.N]` -> `.cite[data-page]` buttons that jump; refusal
+  `.turn__a--refused`; error + Ask again; input disabled with the not-ready / unavailable copy
+  when `pdf.status` is not `ready`; transcript reset on reload and on closing the preview
+  (copy says so); < 1024 px panel as `<dialog>` sheet. Needs T058 (stub with `page.route`
+  until it lands).
+
+### Wave H — final
+
+- [ ] T064 [FE] Browser e2e v3 on the real harness `tests/frontend/test_e2e_library.py`
+  (`e2e`, port 8765 for FE runs): save from results -> Library row reaches "PDF ready" within
+  5 s -> preview renders page 1 within 2 s of opening (SC-011) ->
+  highlight + note survive server restart (SC-013) -> paper chat question with "Quartzite"
+  cites `p. 2` and jumps; "capital of France" refused; network-panel check: no paper-chat
+  request before the first question (SC-014) -> unsave from the card with confirm removes the
+  row (SC-015) -> card-to-PDF in 3 actions (SC-016); `2401.00005` shows "PDF unavailable" and a
+  disabled chat input; zero non-local requests in every case. Needs T059-T063.
+- [ ] T065 [BE] `README.md` + `SETUP_LOG.md` v3: Library, tags, directories, PDF preview,
+  annotations, paper chat; `PAPER_TRIAGE_DATA_DIR`; vendored pdf.js (version, license, source);
+  note that stored arXiv PDFs are for personal use only (do not deploy publicly). Needs T059.
+
 ## Lanes (parallel build)
 [BE] = backend-builder; [FE] = frontend-builder. Disjoint files: FE owns `src/paper_triage/static/**` + `tests/frontend/**`; BE owns the rest. T021 is split: BE commits the API test half first as "T021 (api): ...", FE then does the UI half and ticks the box as "T021 (ui): ...".
 Waves: A (parallel) BE T018 -> T019 -> T021(api) -> T022 || FE T017 -> T021(ui). B: FE T020 (needs T019 landed) -> T023. C: BE T024 (README) last. Tester runs after each wave on both lanes.
@@ -343,6 +557,21 @@ v2 waves (spawn both lanes in one message; tester after each wave; failures go b
   are reported as `NEEDS-BE:`.
 - Tester port 8766 (`E2E_PORT` default); FE manual and e2e runs use `E2E_PORT=8765`.
 
+v3 waves (spawn both lanes in one message; tester after each wave; failures go back tagged):
+
+| Wave | BE lane | FE lane | Cross-lane needs |
+|---|---|---|---|
+| F | T043 -> T044 -> T045 -> T046 -> T047 -> T048 -> T049 -> T050 -> T051 | T052 -> T053 -> T054 -> T055 -> T056 | none: FE stubs the API with `page.route` per contracts/api.md and serves `pt/fixtures/sample.pdf` |
+| G | T057 -> T058 -> T059 | T060 -> T061 -> T062 -> T063 | T060 needs T047+T050, T061 needs T048, T062 needs T051 (all Wave F); T063 stubs until T058 lands, verified in T064 |
+| H | T065 | T064 | T064 needs T059 + T060-T063; T065 needs T059 |
+
+- Shared files: none across lanes. BE never edits `pt/static/**` or `tests/frontend/**`;
+  FE reads (never writes) `pt/fixtures/sample.pdf`. The `.mjs` MIME registration is BE (T050);
+  FE's T052 guard and T055 e2e do not depend on it when stubbing (Playwright `route.fulfill`
+  sets the content type), but a real-server run of the viewer needs T050.
+- API handoff as in v2: contracts/api.md is the source of truth; BE records landed facts in
+  `.claude/state/agents/backend-builder.md` "API facts"; FE gaps go back as `NEEDS-BE:`.
+
 ## Dependencies
 
 T001 -> T002 -> {T003, T005, T006, T007, T008} ; T004 after T002+T003.
@@ -354,6 +583,11 @@ v2: T027 -> T028 -> T029 (T029 needs T028 fixture); T030 -> T031 (T031 tests nee
 words and T030 mock rule); T032 independent of T027-T031 but ordered after them in the BE lane;
 T033 needs T027-T031. FE: T034 -> T035 -> T036 -> T037; T038 needs T027+T036; T039 needs
 T029+T037+T038; T040 needs T031+T039; T041 needs T032+T037-T040; T042 needs T033.
+v3 BE: T043, T044 independent; T045 -> T046 -> T047 (needs T043) -> T048; T049 needs T044+T046;
+T050 needs T047+T049; T051 needs T046+T050; T057 needs T044; T058 needs T050+T057; T059 needs
+T050, T051, T058; T065 needs T059. v3 FE: T052 -> T053 -> T054 -> T055 (needs T052) -> T056;
+T060 needs T053+T047+T050; T061 needs T060+T048; T062 needs T055+T051; T063 needs T055 (+T058
+for real API); T064 needs T059-T063.
 
 ## Parallel Examples
 
@@ -368,3 +602,10 @@ v2 (16 tasks, T027-T042): US1 T027-T029, T035-T039; US2 T030, T031, T036, T040; 
 cross-cutting tests/tooling T032-T034, T041; docs T042. Increment order: Wave D gives links,
 paging and scoped chat at the API plus the redesigned UI with the indicator; Wave E wires the
 UI to the new API and proves it in a real browser.
+v3 (23 tasks, T043-T065; BE 13, FE 10): US4 T045, T047, T054; US5 T044, T046, T049, T050, T053,
+T055, T056, T060; US6 T043, T060; US7 T048, T061; US8 T046, T051, T062; US9 T057, T058, T063;
+cross-cutting T052, T059, T064, T065. Increment order: Wave F = storage + full Library API
+(save, directories, PDF, annotations) || UI shell, Save toggle, viewer, find on stubs (MVP
+check: save a paper and read its PDF in-page = US4 + US5); Wave G = paper chat API + harness
+|| Library, directories, highlights and chat UI on the real API; Wave H = full browser proof
+and docs.

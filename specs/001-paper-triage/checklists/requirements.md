@@ -41,8 +41,8 @@
   fixed). Added US4-US9, FR-008a,
   FR-015..FR-029, SC-009..SC-016, v3 entities, edge cases and assumptions. Zero
   [NEEDS CLARIFICATION] markers: router defaults recorded under Clarifications (v3). Numeric
-  limits (50 MB, 4 colors, 500-character notes, 60-character directory names) are user-visible
+  limits (50 MB, 3 colors, 500-character notes, 40-character directory names) are user-visible
   limits, not implementation detail. The viewer library, PDF storage form and extra viewer aids
-  are deliberately left to plan. Known blocker for plan, not for spec quality: scope now exceeds
-  constitution IV (9 stories, 31 FRs) and adds a per-paper chat scope beside principle III, so
-  speckit-constitution must amend before speckit-plan (analyze would flag CRITICAL otherwise).
+  are deliberately left to plan. Scope (9 stories, 31 FRs) and the per-paper chat scope are
+  covered by constitution 2.0.0 (amended 2026-10-03, user-approved). User decisions and brief
+  Rev 2 reconciliations recorded under Clarifications; items still pass.

@@ -120,3 +120,89 @@ Source notes: docs/research/paper-triage.md (arXiv, PDF, prompts, chat) + claude
   already makes the fetcher deterministic offline (`net.make_http(mock=True)`).
 - **Alternatives**: Selenium (heavier), JS test runner (adds Node toolchain), product-side
   latency env var (test concern leaking into product code).
+
+## v3 (2026-10-03): Library, PDF preview, paper chat
+
+Source research: `docs/research/v3-library-preview.md` (sections 1-7). Design: brief
+`docs/design/v3-library-brief.md` Rev 2. Decisions below override the research doc where they
+differ (user decisions relayed 2026-10-03).
+
+## R13 v3: PDF rendering
+
+- **Decision**: vendor `pdfjs-dist` 6.3.289 **modern** build (`build/pdf.min.mjs`,
+  `build/pdf.worker.min.mjs`, `LICENSE`, plus a `VERSION` file with source URLs and sha256)
+  under `src/paper_triage/static/vendor/pdfjs/`. Thin own viewer `static/viewer.js` (ES module,
+  static `import` of the vendored lib): one canvas + `TextLayer` per page, pages rendered lazily
+  near the viewport, worker same-origin (`/vendor/pdfjs/pdf.worker.min.mjs`; static files are
+  mounted at `/`). No `pdf_viewer.css` (about 25 lines of own `.textLayer` CSS instead), no
+  cmaps/standard_fonts/wasm in v3. The server registers `.mjs` as `text/javascript`.
+- **Rationale**: highlights need page JS access to the text layer; native `<embed>` cannot.
+  User targets current evergreen browsers, so the legacy build is not needed. Constitution
+  2.0.0 I allows vendored libraries (no CDN, no framework, no build step).
+- **Alternatives**: native iframe/embed (no highlight access); full pdf.js viewer app (heavy,
+  own toolbar clashes with DESIGN.md); pdf.js annotation editor (persists into PDF bytes only).
+
+## R14 v3: PDF storage, download and serving
+
+- **Decision**: files under `PAPER_TRIAGE_DATA_DIR` (default `./paper_triage_data`, git-ignored)
+  in `pdfs/<sha256(paper_id)>.pdf`; the path is read only from the DB row (no request path
+  traversal). Written to a temp file, then `os.replace`. Download starts on save as a FastAPI
+  `BackgroundTask` (in-process, no queue; TestClient runs it synchronously, which keeps tests
+  deterministic), streaming with a 50 MB cap, connect 10 s / read 60 s timeouts, `%PDF-` magic
+  check. arXiv: `https://export.arxiv.org/pdf/<id>` with fallback to `https://arxiv.org/pdf/<id>`
+  on 404/5xx, through the shared 3 s `Throttle`; direct PDF URLs: same path, no throttle.
+  Network happens outside the DB lock; status writes take the lock. On startup, rows still
+  `pending` become `failed` ("Download interrupted. Try again."). Retry only by user action.
+  Served by `FileResponse` (inline, `application/pdf`, Range supported by starlette 1.7.0).
+  Page count read with pypdf at download time (no text extraction).
+- **Rationale**: SQLite guidance prefers external files for blobs over 100 KB; BackgroundTasks
+  needs no new dependency; arXiv ToS allows personal storage, not redistribution.
+- **Alternatives**: BLOBs in SQLite (slower, bigger DB); thread pool or queue (constitution IV);
+  reuse triage bytes (would require keeping PDFs for unsaved papers; skipped).
+
+## R15 v3: annotations
+
+- **Decision**: geometry-first anchors: 1-based page + rects as fractions (0..1) of the rendered
+  page box + quote (<= 500 chars) + optional prefix/suffix (<= 64 chars). Stored in SQLite
+  `annotations`; redraw from fractions at any zoom. Three colors: yellow, mint, peach. Kinds:
+  `highlight` (rects + quote) and `note` (page note, no rects). Ordering by page, then `top`
+  (smallest rect y), then id.
+- **Rationale**: stored PDFs are immutable, so geometry is stable; fractions make zoom free.
+- **Alternatives**: Hypothesis-style fuzzy text anchoring (built for changing HTML).
+
+## R16 v3: per-paper chat
+
+- **Decision**: new runtime agent `paper_chat.py` + `prompts/paper_chat.md`. Lazy: on the first
+  question for a paper with no stored page text, extract per-page text with pypdf
+  (`extract.extract_pages`) into `paper_pages`; nothing happens on open. Context = whole paper
+  as `<page n="N">` blocks, capped at 300,000 characters (later pages dropped, prompt told).
+  The page sends the in-page transcript (last 6 turns) as `history`; the server stores no
+  turns. Citations `[p.N]` validated against the page count; invalid go to `dropped_pages`.
+  Sentinel `NOT_IN_STORED_PAPERS` or zero valid page citations -> refusal. PDF not ready or no
+  extractable text -> refusal without an LLM call. Highlights and notes are not context.
+  `MockClient.text` gains a page mode (prompt contains `<page n=`): content-word rule against
+  page text, cites the first matching page.
+- **Rationale**: a typical paper fits the context window; whole text avoids retrieval misses and
+  new deps. Page-only transcript per user decision. Same refusal machinery as results chat.
+- **Alternatives**: native citations API with document blocks (incompatible with mock path);
+  FTS5 page retrieval (only needed for huge papers); eager extraction on save (violates lazy
+  rule). Prompt caching deferred (optional live-mode cost tweak).
+
+## R17 v3: tags, library filtering, directories
+
+- **Decision**: `tags.py` `keywords(topic) -> list[str]`: lowercase, split on whitespace and
+  commas, strip surrounding punctuation (inner `-` kept), drop English stop words (fixed list in
+  the module) and 1-character tokens, dedupe keeping order. Item-only queries have topic `""`
+  -> no tags. Tags merge on save and when a topic search returns an already saved paper.
+  Filtering (tags AND, title substring, directory) runs client-side over `GET /api/library`
+  (tens to hundreds of papers). Directories: flat table, Unsorted = `NULL`, names 1-40 chars,
+  unique by `casefold()`, "Unsorted" and "All saved" reserved; delete sets members to `NULL`.
+- **Rationale**: one list request keeps the API small; client filtering is instant at this scale.
+- **Alternatives**: whole topic string as one tag (brief 10.1; router default chose tokens);
+  server-side filter endpoints (more API, no benefit at this scale).
+
+## R18 v3: find in paper and export notes
+
+- **Decision**: both client-only. Find uses `page.getTextContent()` per page (no server
+  endpoint; brief B8 dropped); export builds Markdown from the loaded annotation list.
+- **Rationale**: no new API; the viewer already loads the document.

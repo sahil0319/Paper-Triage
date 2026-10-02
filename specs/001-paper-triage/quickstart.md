@@ -39,6 +39,29 @@ Browser e2e (offline, after one-time `uv run playwright install chromium`):
 MOCK_LLM=1 uv run pytest -q -m e2e          # port 8766; override with E2E_PORT
 ```
 
+v3 Library (mock mode, offline; PDFs land in `PAPER_TRIAGE_DATA_DIR`, default
+`./paper_triage_data`):
+
+12. Search "diffusion models", activate Save on one card: the button reads "Saved"; the nav
+    shows "Library 1".
+13. Open Library: the row shows tags "diffusion" and "models", "Unsorted", and the PDF status
+    moves from "Downloading PDF…" to "PDF ready" without a reload.
+14. Search "video generation", Save another card. In Library select tags "diffusion" and
+    "models": only the first paper shows. Type part of its title: still shown; a random string:
+    "No saved papers match."
+15. Create directory "thesis", move the first paper into it, select "thesis": one row. Delete
+    "thesis" and confirm: the paper is back in Unsorted.
+16. Open preview: page 1 renders in the page (no new tab); next page, zoom in/out, fit width work.
+    Select text, pick Mint: the highlight shows, survives zoom and an app restart; add a note;
+    the Highlights list "Go to" jumps to the page.
+17. Ask this paper a question using a word from page 2 of the fixture: the answer cites "p. 2";
+    activating it jumps the viewer. Ask "What is the capital of France?": refusal. Reload: the
+    transcript is gone.
+18. Save `2401.00005` (fixture with a non-PDF body): status "PDF unavailable" with "Try again";
+    the chat input is disabled with its reason.
+19. Unsave from the card: a confirmation appears; confirm: the Library entry, its PDF file and
+    its highlights are gone.
+
 Live mode: copy `.env.example` to `.env`, set `ANTHROPIC_API_KEY` (optional
 `ANTHROPIC_MODEL`), run without `MOCK_LLM`. Expect ~3 s per arXiv request (rate limit).
 

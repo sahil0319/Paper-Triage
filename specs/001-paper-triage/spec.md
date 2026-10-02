@@ -96,22 +96,48 @@ Router defaults:
 
 Planner defaults:
 
-- Q: Does saving again refresh the snapshot, and where can a paper be unsaved? → A: No. The
-  first snapshot and save time are kept; only tags are merged. A saved card shows "Saved";
-  activating it again merges the current query's tags and changes nothing else. Unsave exists
-  only in the Library.
-- Q: Is the per-paper chat transcript kept? → A: Only in the page: each paper keeps its
-  transcript while the page stays open (switching papers keeps it) and loses it on reload. The
-  prepared per-page paper text is stored and reused; it is deleted on Unsave.
+- Q: Does saving again refresh the snapshot, and how do tags of later queries reach a saved
+  paper? → A: The first snapshot and save time are kept (user-confirmed). A repeated save
+  request only merges the current query's tags. Because the card's "Saved" control opens the
+  unsave confirmation (design brief v3 Rev 2, L4), tags also merge automatically whenever a
+  topic search returns an already saved paper.
 - Q: When does the mock paper chat answer instead of refusing? → A: Same rule as the results
   chat: only when the question shares a content word (4+ letters, not a stop word) with the
   paper's text; it then cites the first page containing that word. Otherwise it refuses.
-- Q: Which highlight colors, and must highlights survive zoom? → A: Four colors: yellow, green,
-  blue, pink (default yellow). Highlight positions are relative to the page, so they stay on the
-  same text at every zoom level.
 - Q: Does "Load 5 more" also clear the results chat transcript (FR-008a)? → A: Yes. Any change of
   the visible result set (new search, load-more, reload) clears the transcript and re-scopes the
-  chat, so earlier answers never appear to cover a set they did not see.
+  chat, so earlier answers never appear to cover a set they did not see. Shipped as F-006,
+  F-007 and F-008.
+
+User decisions (2026-10-03, relayed by the orchestrator):
+
+- Q: May the constitution grow to fit v3? → A: Yes; constitution 2.0.0 raises the scope cap,
+  adds the paper-chat scope to principle III and allows vendored front-end libraries.
+- Q: Is the paper chat transcript stored? → A: No. It lives in the page only and resets on
+  reload or when the preview closes. The prepared per-page paper text is stored and reused; it
+  is deleted on Unsave.
+- Q: What is the PDF size limit? → A: 50 MB per PDF.
+- Q: Can direct (non-arXiv) PDF URLs be saved? → A: Yes, through the same fetch path, without
+  the arXiv 3-second throttle, but with the same timeout, 50 MB cap and `%PDF-` check.
+- Q: Which browsers must work? → A: Current evergreen Chrome, Firefox and Safari; the modern
+  pdf.js build is used, not the legacy one.
+- Q: Do highlights and notes feed the paper chat? → A: No, not in v3.
+- Q: May a PDF library be vendored under the no-framework rule? → A: Yes (approved): pdf.js is
+  vendored as static files, no CDN, no framework, no build step.
+
+Design reconciliations (brief `docs/design/v3-library-brief.md` Rev 2; designer owns UI):
+
+- Q: How many highlight colors? → A: Three: yellow (default), mint, peach. Highlight positions
+  are relative to the page, so they stay on the same text at every zoom level.
+- Q: How long may a directory name be? → A: 1-40 characters after trimming.
+- Q: Is a tag one keyword or the whole topic string? → A: One normalized keyword token each
+  (router default), not the whole topic string.
+- Q: What does the paper chat do when the PDF is not ready? → A: The chat input is disabled with
+  a plain reason; no abstract fallback. The API also refuses without a model call.
+- Q: When must Unsave be confirmed? → A: Always, from the result card and from the Library;
+  the confirmation says it deletes the saved PDF and any highlights and notes.
+- Q: Is find-in-paper served by the API? → A: No. The page searches the PDF text it already
+  loads (brief B8 dropped).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -205,13 +231,13 @@ had on the card, tagged with the first query's keywords.
    abstract, summary, critique, score and reason, source links, source query, tags and save time.
 2. **Given** a saved paper, **When** the user runs another search or the paper is re-triaged with
    a different score, **Then** the Library entry still shows the values captured at save time.
-3. **Given** a paper already saved from "diffusion distillation", **When** it shows in a search
-   for "consistency models" and the user saves it again, **Then** the Library still holds one
+3. **Given** a paper already saved from "diffusion distillation", **When** a search for
+   "consistency models" returns it, **Then** its card shows "Saved", the Library still holds one
    entry, the original snapshot and save time are kept, and the tags now include the keywords of
-   both queries.
+   both queries (a repeated save request has the same effect).
 4. **Given** a search made of arXiv IDs or PDF URLs, **When** the user saves a result, **Then**
    it is saved with no keyword tags.
-5. **Given** a saved paper, **When** the user chooses Unsave in the Library and confirms, **Then**
+5. **Given** a saved paper, **When** the user chooses Unsave (card or Library) and confirms, **Then**
    the entry, its stored PDF, its highlights, notes and prepared paper text are removed; **When**
    the user cancels, **Then** nothing changes.
 
@@ -293,7 +319,7 @@ uses a list of all annotations to jump back to any of them later.
 
 **Why this priority**: Turns the preview into a reading tool; depends on Story 5.
 
-**Independent Test**: Open a saved paper, highlight a line in green, add a note to it, restart
+**Independent Test**: Open a saved paper, highlight a line in mint, add a note to it, restart
 the app, reopen the paper; the highlight and note are there, and the annotation list jumps to
 the right page.
 
@@ -331,8 +357,9 @@ ask an in-paper question (answer cites valid page numbers) and an outside questi
 3. **Given** an open paper, **When** the user asks something the paper does not cover (another
    paper, general knowledge), **Then** the reply is a visibly intentional refusal, in mock and
    live mode alike.
-4. **Given** a paper whose PDF is not ready or has no extractable text, **When** the user asks a
-   question, **Then** the chat refuses with a plain reason and no model call is made.
+4. **Given** a paper whose PDF is not ready or has no extractable text, **When** the user opens
+   the chat, **Then** its input is disabled with a plain reason; a question sent anyway (direct
+   API call) is refused with no model call.
 
 ### Edge Cases
 
@@ -357,15 +384,16 @@ ask an in-paper question (answer cites valid page numbers) and an outside questi
   saved.
 - (v3) PDF download fails (unreachable host, not a PDF, larger than 50 MB): status failed with a
   plain reason; the snapshot is kept; Retry is offered.
-- (v3) App restarts while a PDF is pending: on start, pending downloads are retried once or
-  marked failed; never left pending forever.
+- (v3) App restarts while a PDF is pending: on start, pending downloads are marked failed
+  ("Download interrupted. Try again.") so the user can retry; never left pending forever.
 - (v3) PDF with no text layer (scanned): it still displays; text highlights and paper chat are
   unavailable with a plain message; page notes still work.
 - (v3) Unsave or directory delete while the viewer shows an affected paper: the viewer closes
   (unsave) or keeps the paper open under "Unsorted" (directory delete).
 - (v3) Query made only of stop words or punctuation: the paper is saved with no tags.
 - (v3) Tag search text matches no tag: a plain "no tags match" line; paper list unchanged.
-- (v3) Paper chat question while the PDF is still pending: refusal with "PDF not ready yet".
+- (v3) PDF still pending or failed: the paper chat input is disabled with the reason; a direct
+  API call refuses without a model call.
 
 ## Requirements *(mandatory)*
 
@@ -423,14 +451,17 @@ ask an in-paper question (answer cites valid page numbers) and an outside questi
   basis), score and reason, abstract-page and PDF links, source query, tags, and save time.
   Snapshots persist across restarts and are not changed by later searches or re-triage.
 - **FR-016**: Saving an already saved paper MUST NOT create a second entry; it keeps the original
-  snapshot and save time and merges the new query's tags. Cards of saved papers show "Saved" in
-  any search and after reload; activating it again only merges tags.
-- **FR-017**: Unsave (Library only, after explicit confirmation) MUST delete the saved entry, its
-  stored PDF, its annotations and its prepared paper text; triage results for searches are kept.
+  snapshot and save time and merges the new query's tags; a topic search that returns an
+  already saved paper also merges its tags. Cards of saved papers show "Saved" in any search
+  and after reload.
+- **FR-017**: Unsave (from the result card or the Library, always after explicit confirmation)
+  MUST delete the saved entry, its stored PDF, its annotations and its prepared paper text;
+  triage results for searches are kept.
 - **FR-018**: On save, the system MUST download the paper's PDF in the background without
   delaying the save, store it locally, and expose status pending, ready or failed (with
-  reason); failed downloads offer Retry. Limit 50 MB; non-PDF content fails. Pending downloads
-  left by a restart are resumed or failed on start. Mock/offline mode uses a fixture PDF and no
+  reason); failed downloads offer Retry. Limit 50 MB; content not starting with `%PDF-` fails. arXiv
+  and direct PDF URLs use the same path; only arXiv downloads are throttled. Pending downloads
+  left by a restart are marked failed on start (user retries). Mock/offline mode uses a fixture PDF and no
   network.
 - **FR-019**: Stored PDFs MUST be served by the app itself and shown in an in-page viewer; viewing
   loads no external hosts or assets.
@@ -443,16 +474,16 @@ ask an in-paper question (answer cites valid page numbers) and an outside questi
   narrows the tag list, multi-select (papers must carry all selected tags), clear-all, and a
   case-insensitive title filter; tag, title and directory filters combine (AND), with a
   "no match" state.
-- **FR-023**: Users MUST be able to create, rename and delete flat directories (name 1-60
+- **FR-023**: Users MUST be able to create, rename and delete flat directories (name 1-40
   characters after trimming, unique case-insensitive). A built-in "Unsorted" directory cannot be
   renamed or deleted. Each saved paper is in exactly one directory (default "Unsorted") and can
   be moved. Deleting a directory (after confirmation) moves its papers to "Unsorted". An "All"
   view lists every saved paper.
 - **FR-024**: The viewer MUST offer previous/next page, go to page, "page n of m", zoom in/out,
-  fit width, and a link to open the original PDF in a new tab; closing it keeps the Library
+  fit width, and a link to open the stored PDF in a new tab; closing it keeps the Library
   filters and scroll position.
-- **FR-025**: Users MUST be able to highlight selected PDF text in one of 4 colors (yellow
-  default, green, blue, pink; positions stay on the same text at every zoom level), add a short
+- **FR-025**: Users MUST be able to highlight selected PDF text in one of 3 colors (yellow
+  default, mint, peach; positions stay on the same text at every zoom level), add a short
   note (max 500 characters) to a highlight or to a page, edit, recolor and delete them; all
   annotations persist locally across restarts.
 - **FR-026**: The viewer MUST show a per-paper annotation list ordered by page, each entry with
@@ -462,12 +493,15 @@ ask an in-paper question (answer cites valid page numbers) and an outside questi
   model call before the first question for that paper. It refuses explicitly when the paper
   cannot answer (mock and live alike; mock answers only when the question shares a content word
   with the paper's text and cites the first page containing it) and refuses without a model call
-  when the PDF is not ready or has no extractable text. The transcript lives in the page only.
+  when the PDF is not ready or has no extractable text (the page disables the chat input with
+  the reason). The transcript lives in the page only and resets on reload or when the preview
+  closes. Highlights and notes are not chat context.
 - **FR-028**: The system MUST verify every cited page number exists in that paper and remove or
   flag any that does not; paper chat never cites other papers.
 - **FR-029**: Library, viewer, annotations and paper chat MUST follow DESIGN.md, the v3 design
   brief (`docs/design/v3-library-brief.md`) and PRODUCT.md, stay on the one page, and be
-  keyboard operable; destructive actions need confirmation.
+  keyboard operable. Unsave and directory delete need explicit confirmation; deleting a
+  highlight or note offers Undo for 8 seconds instead.
 
 ### Key Entities
 
@@ -544,12 +578,13 @@ ask an in-paper question (answer cites valid page numbers) and an outside questi
   claim real per-paper progress, so no progress endpoint is needed.
 - The current result set lives in the page, not the server; a reload rebuilds it from the
   last topic's stored results.
-- (v3) Scope grows past constitution IV (max 3 stories / 15 FRs) and adds a second chat scope
-  (one paper's text) next to principle III's result-set scope; PDFs are now kept for saved
-  papers (supersedes the v1 "PDFs are not kept" answer for saved papers only). A constitution
-  amendment (and a PRODUCT.md note by the orchestrator) is required before plan.
+- (v3) Constitution 2.0.0 covers v3: scope cap 9 stories / 32 FRs (this spec: 9 / 31), a
+  second chat scope (one paper's text) in principle III, vendored front-end libraries, and PDFs
+  kept for saved papers (supersedes the v1 "PDFs are not kept" answer for saved papers only).
+  The PRODUCT.md Library section is drafted separately by the designer for user review.
 - (v3) The Library, viewer and paper chat are views of the same single page, not new pages.
-- (v3) The PDF download runs inside the app process (no job queue); one retry on restart.
+- (v3) The PDF download runs inside the app process (no job queue); a download cut off by a
+  restart is marked failed and retried only by the user.
 - (v3) The PDF viewer library is vendored into the app's static assets; which library, how the
   PDF is stored (disk file vs database), and any extra small viewer aids (for example find in
   document, remember last page) are decided at plan time from `docs/research/v3-library-preview.md`.

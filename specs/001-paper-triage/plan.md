@@ -41,7 +41,8 @@ T025: `LLM_PROVIDER=openai` swaps in `OpenAIClient` (`OPENAI_API_KEY`, `OPENAI_M
 
 ## Constitution Check
 
-*Pre-research and post-design: PASS. Re-checked for v2 against constitution 1.1.0: PASS.*
+*Pre-research and post-design: PASS. Re-checked for v2 against constitution 1.1.0: PASS.
+Re-checked for v3 against constitution 2.0.0: PASS (see "v3 Constitution Check" below).*
 
 | Principle | Check | Status |
 |---|---|---|
@@ -154,6 +155,102 @@ row, `#load-more` (button; absent from the DOM or `hidden` when not offered), `#
 `#ask` (chat submit), `#chat-log` with `li.turn`, refusal `.turn__a--refused`, citations
 `a.cite`.
 
+## v3 Amendment (2026-10-03)
+
+Sources: spec.md US4-US9, FR-015..FR-029, SC-009..SC-016, Clarifications "2026-10-03 (v3)";
+research R13-R18 (summarising `docs/research/v3-library-preview.md`); brief
+`docs/design/v3-library-brief.md` **Rev 2** (FE items L1-L24; backend needs B1-B7, B8 dropped);
+[contracts/api.md](contracts/api.md) "v3 Library endpoints" (authoritative shapes);
+[data-model.md](data-model.md) "v3 tables". FR-008a is already shipped (F-006/F-007/F-008);
+no v3 task.
+
+**Technical context deltas**: no new Python dependency. New vendored front-end files
+(pdfjs-dist 6.3.289 modern build, Apache-2.0) under `static/vendor/pdfjs/`. New env
+`PAPER_TRIAGE_DATA_DIR` (default `./paper_triage_data`, git-ignored). Browsers: current
+evergreen Chrome, Firefox, Safari. Scale: tens to hundreds of saved papers, PDFs <= 50 MB.
+
+### v3 Constitution Check (2.0.0)
+
+| Principle | Check | Status |
+|---|---|---|
+| I Small | No new Python dep; new modules `tags.py`, `pdfstore.py`, `paper_chat.py` (+ `prompts/paper_chat.md`, one prompt for the new LLM agent); pdf.js vendored with LICENSE + VERSION, no CDN/framework/build step | PASS |
+| II Offline | PDF downloads via the injected `make_http` client; mock transport serves `sample.pdf` (3 pages after T044) and failure cases; paper chat via `MockClient` page mode; e2e uses a temp data dir on the local harness server | PASS |
+| III Grounded | Results chat unchanged. Paper chat: own text only, `[p.N]` validated against page count, sentinel refusal, no LLM call without ready PDF/text, lazy extraction, no annotations in context | PASS |
+| IV Scope | 9 stories / 31 FRs (cap 9 / 32); one page with hash-routed views; BackgroundTasks (in-process) for downloads with persisted status, no queue; PDFs only for saved papers, local only | PASS |
+| V Honest critique | Snapshot keeps `basis`; Library rows keep the abstract-only flag | PASS |
+
+### Modules and files (v3 touch map)
+
+[BE]:
+
+- `tags.py` (new): `keywords(topic) -> list[str]` (R17).
+- `config.py`: `data_dir` (`PAPER_TRIAGE_DATA_DIR`), `pdf_max_bytes = 50 * 1024 * 1024`,
+  `paper_chat_cap = 300_000`, `paper_chat_history = 6`.
+- `db.py`: v3 tables + CRUD (saved papers, tags, directories, files, pages, annotations).
+- `pdfstore.py` (new): `download(paper_id, conn, http, lock, settings)`: URL choice, stream with
+  cap, `%PDF-` check, atomic write, page count, status rows (R14); `sweep_pending(conn)`;
+  `delete_file(path)`.
+- `extract.py`: `extract_pages(pdf_bytes) -> list[str]`, `page_count(pdf_bytes) -> int`.
+- `llm.py`: `MockClient.text` page mode (R16).
+- `paper_chat.py` (new runtime agent) + `prompts/paper_chat.md`.
+- `models.py`: `LibraryItem`, `Directory`, `Annotation*`, `PaperChatIn/Answer`, `PaperOut.saved`.
+- `pipeline.py`: `saved` flag on results; tag merge for saved papers on topic searches.
+- `app.py`: v3 routes; `mimetypes.add_type("text/javascript", ".mjs")`; lifespan creates the
+  data dir and runs `sweep_pending`.
+- `net.py`: mock handler serves `sample.pdf` for `export.arxiv.org/pdf/...` (already, host
+  check) and keeps `2401.00005` invalid; `.invalid` hosts 404.
+- `fixtures/sample.pdf`: 3 pages with known marker words (page 1 text kept as today).
+- `tests/` (not `tests/frontend/`): `test_tags.py`, `test_db.py`, `test_library_api.py`,
+  `test_pdfstore.py`, `test_annotations_api.py`, `test_paper_chat.py`, `test_extract.py`,
+  `test_config_llm.py`, `test_e2e_mock.py`, `e2e_harness.py` (temp `PAPER_TRIAGE_DATA_DIR`).
+- `.gitignore` (`paper_triage_data/`), `.env.example`, `README.md`, `SETUP_LOG.md`.
+
+[FE]:
+
+- `static/vendor/pdfjs/{pdf.min.mjs, pdf.worker.min.mjs, LICENSE, VERSION}`.
+- `static/index.html`: nav views (L1), `#library` and `#preview` sections, skip links, scripts.
+- `static/app.js`: router (L2), Save toggle (L3-L6) in result rows, view switching.
+- `static/library.js` (new, classic script or module): Library view (L7-L14).
+- `static/viewer.js` (new ES module): pdf.js viewer (L15-L17, L21), highlights (L18-L19),
+  find (L24), export (L23).
+- `static/paperchat.js` (new): Ask this paper (L20), sheet (L22) shared with the panel.
+- `static/app.css`: v3 styles per brief.
+- `tests/frontend/test_static_assets.py` (scan all non-vendor static files; vendor files,
+  LICENSE, VERSION present), `tests/frontend/test_e2e_browser.py` / new
+  `tests/frontend/test_e2e_library.py`.
+
+### Key design notes (v3)
+
+- Save sends `{paper_id, topic}`; the server builds the snapshot from stored data (never trusts
+  card text). Already-saved is a 200 with merged tags.
+- PDF download: `BackgroundTasks` after the save response; network outside `app.state.lock`;
+  status writes under the lock. TestClient runs background tasks before returning, so API tests
+  see `ready`/`failed` immediately; the browser polls `GET /api/library` every 3 s while any row
+  is `pending` (brief L12).
+- Paper ids go in bodies/query strings (old arXiv ids contain `/`).
+- Paper chat is lazy: the only code path that extracts page text is `POST /api/paper-chat`
+  with a ready PDF and no `paper_pages` rows. Tests assert zero `paper_pages` rows and zero
+  LLM calls after save, list, PDF fetch and annotation calls.
+- Viewer: pdf.js `getDocument({url: "/api/library/pdf?paper_id=..."})`, worker
+  `/vendor/pdfjs/pdf.worker.min.mjs`. Highlights drawn from fractions per page wrapper; three
+  colors; multiply blend.
+- Hash routes: `#/`, `#/library?dir=&tags=&q=`, `#/library/paper/<encodeURIComponent(id)>`.
+- FE wave-1 work (shell, Save toggle, viewer shell, find) may stub API calls in Playwright with
+  `page.route` using contract-shaped JSON and `src/paper_triage/fixtures/sample.pdf`; wave-2
+  and the final e2e run against the real harness.
+
+### UI test hooks (v3; e2e specs use only these)
+
+`nav a[data-view="triage"]`, `nav a[data-view="library"]`, `.views__count`; result row
+`button.save[aria-pressed]`; confirm group `[data-confirm="unsave"]` with `button[data-act="remove"]`
+and `button[data-act="keep"]`; `#library`, `#lib-filter`, `#lib-tags button.tag[aria-pressed]`,
+`#lib-list li.lib-row[data-paper-id]`, `.lib-row [data-pdf-status]` (value = API status),
+`.lib-row button[data-act="open"]`, `.lib-row select[data-act="move"]`, `#dir-rail`,
+`#dir-new`; `#preview`, `#pv-pages section.pdf-page[data-page]`, `canvas`, `.textLayer`,
+`.hl[data-annotation-id]`, `#pv-page-input`, `#pv-zoom`, `#pv-hl-list li[data-annotation-id]`,
+`#pv-chat-question`, `#pv-chat-ask`, `#pv-chat-log li.turn`, `.cite[data-page]`,
+`.turn__a--refused`.
+
 ## Complexity Tracking
 
-None. No constitution violations.
+None. No constitution violations (v3 scope covered by constitution 2.0.0).
