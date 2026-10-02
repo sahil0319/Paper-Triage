@@ -90,3 +90,33 @@ None. Await user.
 
 ### Next
 When planner phase 2 reports → spawn backend-builder + frontend-builder in parallel on v3 wave 1 per tasks.md Lanes → tester → sentinel.
+
+## Checkpoint: v3 Build in Progress (2026-10-03)
+
+**Task**: Update checkpoint after BE lane complete and FE Wave F running
+**Status**: DONE
+**Findings**: Backend lane v3 complete (T043-T051, T057-T059, T065), verified GREEN. FE Wave F in progress (T052-T055 done, T056 pending). BE: pytest 344, live 88/88, ruff clean.
+
+### Actions taken
+- Updated checkpoint.md: phase="v3 build", BE complete, FE Wave F progress, Wave G/H pending, exact next step
+- Updated progress.json: T043-T065 statuses (done/pending), phase="v3 build", DONE=false
+- Appended sentinel.md (this file)
+
+### Verified
+- BE lane: 65381fc (T065) matches commit list T043-T051, T057-T059
+- FE Wave F: be3cbf1 (T052), 9b6ea8a (T053), c72e508 (T054), eb16174 (T055) done; T056 pending
+- QA verified BE: docs/qa/v3-wave-FG-be.md (pytest 344, live probe 88/88)
+- Tasks.md ticks: T043-T055 ✓, T056 ☐, T060-T064 ☐, T065 ✓
+
+### Items persisted
+- analysis.md committed ba039be (speckit-analyze output from planner)
+- PRODUCT.md Library section committed 374ee23 (user request)
+- Highlight colors corrected yellow/mint/peach (commit 0bd9170)
+
+### Pending
+1. T056 (find in paper) and FE Wave F tester green
+2. 7 .claude/agents/*.md uncommitted (report-format block added by router); defer restart to post-Wave-F
+3. T060-T063 (Wave G real API), T064 (Wave H e2e)
+
+### Next
+When FE Wave F done → tester FE Wave F (verify T052-T055, smoke T056) → FE Wave G builders (T060-T063) → tester → restart Claude Code → FE T064 → final tester pass.
