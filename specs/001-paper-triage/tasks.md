@@ -438,7 +438,7 @@ hooks. Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest 
   Forward switch views without re-fetching triage results. Returning from Preview to Library
   restores the hash filters and the list scroll position and focuses that paper's `Open
   preview` (FR-024, brief L2).
-- [ ] T054 [FE] [US4] Save toggle on result rows (FR-015..FR-017; brief L3-L6 Rev 2).
+- [x] T054 [FE] [US4] Save toggle on result rows (FR-015..FR-017; brief L3-L6 Rev 2).
   `app.js` + `app.css`: `.paper__head` with `button.save[aria-pressed]` (not on failed rows);
   states Save/Saving…/Saved/Removing…; renders `saved` from triage and papers responses;
   click Save -> `POST /api/library {paper_id, topic}`; click Saved -> always the inline confirm

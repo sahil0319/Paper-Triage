@@ -4,6 +4,7 @@ Static files are the real app; `/api/library*` is stubbed per contracts/api.md (
 Every case runs through `offline_page`: any non-local request fails the test.
 """
 
+import json
 from urllib.parse import quote
 
 import pytest
@@ -197,3 +198,198 @@ def test_deep_link_to_preview_loads_the_library_first(app):
     expect(page.locator("#preview")).to_be_visible()
     expect(page.locator("#preview-heading")).to_have_text("Old style id paper")
     expect(page).to_have_title("Old style id paper · Paper Triage")
+
+
+# ---- T054: save toggle on result rows ----
+
+
+def triage_item(n, **kw):
+    item = {
+        "paper_id": f"2401.{n:05d}",
+        "title": f"Result paper {n}",
+        "authors": ["A. Author"],
+        "source": "arxiv",
+        "basis": "fulltext",
+        "rank": 10 - n,
+        "rank_reason": "Stub reason.",
+        "summary": None,
+        "critique": None,
+        "status": "ok",
+        "error": None,
+        "abs_url": f"https://arxiv.org/abs/2401.{n:05d}",
+        "pdf_url": f"https://arxiv.org/pdf/2401.{n:05d}",
+        "saved": False,
+    }
+    item.update(kw)
+    return item
+
+
+def stub_triage(page, results, topic="diffusion models"):
+    body = {
+        "topic": topic,
+        "results": results,
+        "errors": [],
+        "offset": 0,
+        "next_offset": None,
+        "has_more": False,
+    }
+    page.route(
+        lambda url: url.endswith("/api/triage"),
+        lambda route: route.fulfill(
+            status=200, content_type="application/json", body=json.dumps(body)
+        ),
+    )
+
+
+def run_search(page, rows):
+    page.fill("#query", "diffusion models")
+    page.click("#submit")
+    expect(page.locator("#paper-list li.paper")).to_have_count(rows, timeout=15_000)
+    expect(page.locator("#submit")).to_be_enabled()
+
+
+def save_btn(page, n):
+    return page.locator(f'[id="paper-2401.{n:05d}"] button.save')
+
+
+def test_save_button_states_and_failed_rows(app):
+    page = app
+    LibraryStub(page, [lib_item(2)])
+    stub_triage(
+        page,
+        [
+            triage_item(1),
+            triage_item(2, saved=True),
+            triage_item(3, status="failed", rank=0, error="Could not fetch."),
+        ],
+    )
+    page.goto("/")
+    run_search(page, 3)
+    expect(save_btn(page, 1)).to_have_text("Save")
+    expect(save_btn(page, 1)).to_have_attribute("aria-pressed", "false")
+    expect(save_btn(page, 2)).to_have_text("Saved")
+    expect(save_btn(page, 2)).to_have_attribute("aria-pressed", "true")
+    expect(page.locator('[id="paper-2401.00003"] button.save')).to_have_count(0)
+    # Button accessible description is the row title.
+    title_id = page.locator('[id="paper-2401.00001"] .paper__title').get_attribute("id")
+    assert save_btn(page, 1).get_attribute("aria-describedby") == title_id
+
+
+def test_save_posts_topic_updates_count_and_announces(app):
+    page = app
+    stub = LibraryStub(page, [lib_item(9)])
+    stub_triage(page, [triage_item(1), triage_item(2)])
+    page.goto("/")
+    expect(page.locator(".views__count")).to_have_text("1")
+    run_search(page, 2)
+    hold = []
+    page.route(
+        lambda url: url.endswith("/api/library"),
+        lambda route: hold.append(route) if route.request.method == "POST" else route.fallback(),
+    )
+    save_btn(page, 1).click()
+    expect(save_btn(page, 1)).to_have_text("Saving…")
+    expect(save_btn(page, 1)).to_have_attribute("aria-disabled", "true")
+    expect(save_btn(page, 1)).to_have_attribute("aria-busy", "true")
+    hold[0].fallback()
+    expect(save_btn(page, 1)).to_have_text("Saved")
+    expect(save_btn(page, 1)).to_have_attribute("aria-pressed", "true")
+    expect(page.locator(".views__count")).to_have_text("2")
+    expect(page.locator("#status")).to_have_text("Saved to Library.")
+    posts = stub.calls_to("POST", "/api/library")
+    assert [c[3] for c in posts] == [{"paper_id": "2401.00001", "topic": "diffusion models"}]
+
+
+def test_unsave_always_confirms_keep_and_escape(app):
+    page = app
+    stub = LibraryStub(page, [lib_item(1, highlight_count=3)])
+    stub_triage(page, [triage_item(1, saved=True)])
+    page.goto("/")
+    run_search(page, 1)
+    save_btn(page, 1).click()
+    group = page.locator('[data-confirm="unsave"]')
+    expect(group).to_be_visible()
+    expect(group).to_have_attribute("role", "group")
+    expect(group).to_have_attribute("aria-label", "Confirm removal")
+    expect(group).to_contain_text(
+        "Remove from Library? This deletes the saved PDF and 3 highlights with their notes."
+    )
+    expect(group.get_by_role("button", name="Keep")).to_be_focused()
+    page.keyboard.press("Escape")
+    expect(group).to_have_count(0)
+    expect(save_btn(page, 1)).to_be_focused()
+    expect(save_btn(page, 1)).to_have_text("Saved")
+    save_btn(page, 1).click()
+    page.get_by_role("button", name="Keep").click()
+    expect(group).to_have_count(0)
+    assert stub.calls_to("DELETE", "/api/library") == []
+
+
+def test_unsave_remove_deletes_and_updates(app):
+    page = app
+    stub = LibraryStub(page, [lib_item(1), lib_item(8)])
+    stub_triage(page, [triage_item(1, saved=True)])
+    page.goto("/")
+    run_search(page, 1)
+    expect(page.locator(".views__count")).to_have_text("2")
+    save_btn(page, 1).click()
+    expect(page.locator('[data-confirm="unsave"]')).to_contain_text(
+        "Remove from Library? This deletes the saved PDF."
+    )
+    expect(page.locator('[data-confirm="unsave"]')).not_to_contain_text("highlight")
+    page.get_by_role("button", name="Remove", exact=True).click()
+    expect(save_btn(page, 1)).to_have_text("Save")
+    expect(save_btn(page, 1)).to_have_attribute("aria-pressed", "false")
+    expect(save_btn(page, 1)).to_be_focused()
+    expect(page.locator(".views__count")).to_have_text("1")
+    expect(page.locator("#status")).to_have_text("Removed from Library.")
+    deletes = stub.calls_to("DELETE", "/api/library")
+    assert [c[2] for c in deletes] == [{"paper_id": "2401.00001"}]
+
+
+def test_save_error_shows_row_alert_and_keeps_state(app):
+    page = app
+    stub = LibraryStub(page, [])
+    stub_triage(page, [triage_item(1)])
+    page.goto("/")
+    run_search(page, 1)
+    stub.fail[("POST", "/api/library")] = (500, "disk full")
+    save_btn(page, 1).click()
+    err = page.locator('[id="paper-2401.00001"] .row-error')
+    expect(err).to_have_text("Could not save. disk full")
+    expect(err).to_have_attribute("role", "alert")
+    expect(save_btn(page, 1)).to_have_text("Save")
+    # Next attempt clears the line.
+    save_btn(page, 1).click()
+    expect(save_btn(page, 1)).to_have_text("Saved")
+    expect(err).to_have_count(0)
+
+
+def test_unsave_error_keeps_saved_state(app):
+    page = app
+    stub = LibraryStub(page, [lib_item(1)])
+    stub_triage(page, [triage_item(1, saved=True)])
+    page.goto("/")
+    run_search(page, 1)
+    stub.fail[("DELETE", "/api/library")] = (500, "locked")
+    save_btn(page, 1).click()
+    page.get_by_role("button", name="Remove", exact=True).click()
+    expect(page.locator('[id="paper-2401.00001"] .row-error')).to_have_text(
+        "Could not remove from Library. locked"
+    )
+    expect(save_btn(page, 1)).to_have_text("Saved")
+    expect(save_btn(page, 1)).to_have_attribute("aria-pressed", "true")
+
+
+def test_saved_state_follows_library_after_view_switch(app):
+    page = app
+    stub = LibraryStub(page, [lib_item(1)])
+    stub_triage(page, [triage_item(1, saved=True)])
+    page.goto("/")
+    run_search(page, 1)
+    page.click('nav.views a[data-view="library"]')
+    expect(page.locator("#library")).to_be_visible()
+    stub.items.clear()  # removed elsewhere (e.g. the Library view)
+    page.evaluate("PT.libraryRemove('2401.00001')")
+    page.click('nav.views a[data-view="triage"]')
+    expect(save_btn(page, 1)).to_have_text("Save")

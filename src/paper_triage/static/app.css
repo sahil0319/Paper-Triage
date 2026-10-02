@@ -543,6 +543,22 @@ a.btn--secondary { color: var(--color-ink); }
 .paper__head .paper__title { flex: 1; min-width: 0; }
 .paper__head .btn { flex: none; }
 
+
+/* ---- save toggle and unsave confirm (L4-L6) ---- */
+
+.save { display: inline-flex; align-items: center; gap: var(--space-xs); min-width: 7.75rem; justify-content: center; }
+.save__glyph { flex: none; }
+.save.is-saved { background: var(--color-surface-strong); border-color: transparent; color: var(--color-ink); }
+.save.is-busy { opacity: 0.7; cursor: progress; }
+.row-error { font: var(--type-body-md); line-height: var(--leading-prose); color: var(--color-coral);
+  margin-top: var(--space-sm); overflow-wrap: anywhere; }
+.confirm {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-sm);
+  margin-top: var(--space-sm); max-width: var(--measure);
+}
+.confirm__text { font: var(--type-body-md); line-height: var(--leading-prose); color: var(--color-ink); flex-basis: 100%; }
+.btn--remove { color: var(--color-coral); border-color: var(--color-coral); }
+
 /* ---- Library view (L7, L14) ---- */
 
 .library { padding-block: var(--space-xl) var(--space-xxl); }
@@ -615,6 +631,7 @@ a.btn--secondary { color: var(--color-ink); }
   .working__glyph, .turn__glyph, .btn__glyph { color: CanvasText; }
   .rank__meter span { background: CanvasText; }
   .btn--primary { border: 1px solid ButtonText; }
+  .save.is-saved { border: 1px solid CanvasText; }
   :focus-visible { outline: 2px solid Highlight; }
 }
 

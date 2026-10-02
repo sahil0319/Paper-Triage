@@ -259,12 +259,160 @@
     var reason = failed
       ? h("p", { class: "paper__reason paper__reason--failed" }, r.error || "This paper could not be processed.")
       : h("p", { class: "paper__reason" }, r.rank_reason || "");
+    var titleId = "paper-title-" + r.paper_id;
     return h("li", { class: "paper", id: "paper-" + r.paper_id, tabindex: "-1" },
       rankBlock(r, failed),
       h("div", { class: "paper__body" },
-        h("h3", { class: "paper__title" }, r.title),
+        h("div", { class: "paper__head" },
+          h("h3", { class: "paper__title", id: titleId }, r.title),
+          failed ? null : saveControl(r, titleId)),
         authorsLine(r.authors) ? h("p", { class: "paper__authors" }, authorsLine(r.authors)) : null,
         reason, meta, details(r)));
+  }
+
+  // ---- save toggle (v3 L3-L6): POST/DELETE /api/library; confirm before every unsave ----
+
+  var SAVE_LABEL = { idle: "Save", busy: "Saving…", done: "Saved", removing: "Removing…" };
+
+  function bookmark(filled) {
+    return svg("svg", { class: "save__glyph", width: "16", height: "16", viewBox: "0 0 16 16",
+      "aria-hidden": "true", focusable: "false" },
+      svg("path", { d: "M4 2.5h8v11L8 10.5 4 13.5z", fill: filled ? "currentColor" : "none",
+        stroke: "currentColor", "stroke-width": "1.5", "stroke-linejoin": "round" }));
+  }
+
+  function setSaveButton(btn, mode) {
+    var saved = mode === "done" || mode === "removing";
+    var busy = mode === "busy" || mode === "removing";
+    clear(btn);
+    btn.appendChild(bookmark(saved));
+    btn.appendChild(document.createTextNode(SAVE_LABEL[mode]));
+    btn.setAttribute("aria-pressed", saved ? "true" : "false");
+    btn.classList.toggle("is-saved", saved);
+    btn.classList.toggle("is-busy", busy);
+    if (busy) {
+      btn.setAttribute("aria-disabled", "true");
+      btn.setAttribute("aria-busy", "true");
+    } else {
+      btn.removeAttribute("aria-disabled");
+      btn.removeAttribute("aria-busy");
+    }
+  }
+
+  function rowError(li, text) {
+    var old = li.querySelector(".row-error");
+    if (old) old.parentNode.removeChild(old);
+    if (!text) return;
+    var meta = li.querySelector(".paper__meta");
+    var el = h("p", { class: "row-error", role: "alert" }, text);
+    meta.parentNode.insertBefore(el, meta.nextSibling);
+  }
+
+  function highlightCount(id) {
+    var it = libItem(id);
+    return it && typeof it.highlight_count === "number" ? it.highlight_count : 0;
+  }
+
+  function confirmCopy(n) {
+    return n > 0
+      ? "Remove from Library? This deletes the saved PDF and " + n + (n === 1 ? " highlight" : " highlights") +
+        " with " + (n === 1 ? "its note" : "their notes") + "."
+      : "Remove from Library? This deletes the saved PDF.";
+  }
+
+  function saveControl(r, titleId) {
+    var btn = h("button", { type: "button", class: "btn btn--secondary btn--small save",
+      "aria-describedby": titleId, "data-save": r.paper_id });
+    setSaveButton(btn, r.saved ? "done" : "idle");
+
+    function li() { return btn.closest("li"); }
+
+    function save() {
+      rowError(li(), "");
+      setSaveButton(btn, "busy");
+      postJSON("/api/library", { paper_id: r.paper_id, topic: state.topic })
+        .then(function (data) {
+          r.saved = true;
+          libraryAdd(data && data.paper);
+          setSaveButton(btn, "done");
+          announce("Saved to Library.");
+        })
+        .catch(function (err) {
+          setSaveButton(btn, "idle");
+          rowError(li(), "Could not save. " + failMessage(err));
+        });
+    }
+
+    function unsave() {
+      rowError(li(), "");
+      closeConfirm(false);
+      setSaveButton(btn, "removing");
+      btn.focus();
+      fetch("/api/library?paper_id=" + encodeURIComponent(r.paper_id), { method: "DELETE" })
+        .then(function (res) {
+          return res.json().catch(function () { return null; }).then(function (body) {
+            if (!res.ok) throw new Error(errorText(res, body));
+          });
+        })
+        .then(function () {
+          r.saved = false;
+          libraryRemove(r.paper_id);
+          setSaveButton(btn, "idle");
+          announce("Removed from Library.");
+        })
+        .catch(function (err) {
+          setSaveButton(btn, "done");
+          rowError(li(), "Could not remove from Library. " + failMessage(err));
+        });
+    }
+
+    var group = null;
+    function closeConfirm(refocus) {
+      if (!group) return;
+      group.parentNode.removeChild(group);
+      group = null;
+      btn.hidden = false;
+      if (refocus) btn.focus();
+    }
+
+    function confirm() {
+      rowError(li(), "");
+      var keep = h("button", { type: "button", class: "btn btn--secondary btn--small" }, "Keep");
+      var remove = h("button", { type: "button", class: "btn btn--secondary btn--small btn--remove",
+        "data-confirm-remove": "" }, "Remove");
+      keep.addEventListener("click", function () { closeConfirm(true); });
+      remove.addEventListener("click", unsave);
+      group = h("div", { class: "confirm", role: "group", "aria-label": "Confirm removal",
+        "data-confirm": "unsave" },
+        h("p", { class: "confirm__text" }, confirmCopy(highlightCount(r.paper_id))), remove, keep);
+      group.addEventListener("keydown", function (ev) {
+        if (ev.key === "Escape") { ev.stopPropagation(); closeConfirm(true); }
+      });
+      var head = btn.parentNode;
+      head.parentNode.insertBefore(group, head.nextSibling);
+      btn.hidden = true;
+      keep.focus();
+    }
+
+    btn.addEventListener("click", function () {
+      if (btn.getAttribute("aria-disabled") === "true") return;
+      if (btn.getAttribute("aria-pressed") === "true") confirm(); else save();
+    });
+    // Keep the saved state in step with the Library (an unsave done in the Library view).
+    btn.syncSaved = function () {
+      if (!lib.loaded || btn.getAttribute("aria-disabled") === "true" || group) return;
+      var now = !!libItem(r.paper_id);
+      if (now === !!r.saved) return;
+      r.saved = now;
+      setSaveButton(btn, now ? "done" : "idle");
+    };
+    return btn;
+  }
+
+  function syncSaveButtons() {
+    Array.prototype.forEach.call(listEl.querySelectorAll("button.save"), function (b) {
+      if (b.syncSaved) b.syncSaved();
+    });
   }
 
   function paperRow(id) {
@@ -894,7 +1042,7 @@
   if (window.history && "scrollRestoration" in history) history.scrollRestoration = "manual";
 
   var lib = { papers: [], directories: [], unsorted: 0, total: 0, loaded: false, error: null,
-    pending: null, sig: "" };
+    pending: null, sig: "", dirty: false };
 
   function parseParams(qs) {
     var out = { dir: "", tags: [], q: "" };
@@ -985,22 +1133,25 @@
       return true;
     }).then(function (changed) {
       lib.pending = null;
+      if (lib.dirty) { lib.dirty = false; return loadLibrary(); }
       return changed;
     });
     return lib.pending;
   }
 
   // After a save or unsave elsewhere on the page: keep the cached list and nav count current.
+  // Before the first load the list is unknown, so reload instead of guessing a total.
   function libraryAdd(item) {
+    if (!lib.loaded) { lib.dirty = true; if (!lib.pending) loadLibrary(); return; }
     if (!item || libItem(item.paper_id)) return;
     lib.papers.unshift(item);
     lib.total = lib.papers.length;
-    lib.loaded = true;
     lib.sig = "";
     updateNavCount();
   }
 
   function libraryRemove(id) {
+    if (!lib.loaded) { lib.dirty = true; if (!lib.pending) loadLibrary(); return; }
     lib.papers = lib.papers.filter(function (p) { return p.paper_id !== id; });
     lib.total = lib.papers.length;
     lib.sig = "";
@@ -1173,6 +1324,7 @@
     setView(r.view);
     if (r.view === "triage") {
       document.title = BASE_TITLE;
+      syncSaveButtons();
       jump(first ? 0 : triageScroll);
     } else if (r.view === "library") {
       document.title = "Library · " + BASE_TITLE;
