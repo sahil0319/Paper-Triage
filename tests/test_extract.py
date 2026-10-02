@@ -6,6 +6,7 @@ from paper_triage.extract import (
     ExtractError,
     extract_pages,
     extract_text,
+    page_count,
     pdf_title,
     prepare_for_llm,
 )
@@ -108,3 +109,9 @@ def test_pdf_title():
     assert pdf_title(SAMPLE.read_bytes()) == "Sample Paper on Diffusion Distillation"
     assert pdf_title(SAMPLE.read_bytes().replace(b" /Info 6 0 R", b"")) is None
     assert pdf_title(b"junk") is None
+
+
+def test_page_count():
+    assert page_count(SAMPLE.read_bytes()) == 3
+    with pytest.raises(ExtractError):
+        page_count(b"nope")

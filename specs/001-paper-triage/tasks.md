@@ -389,7 +389,7 @@ hooks. Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest 
   members; delete -> `moved` n and members `directory_id null`; move to unknown dir -> 404;
   `GET /api/library` `directories` A-Z with counts, `unsorted_count`, `total`. Files
   `pt/app.py`, `pt/models.py`, `tests/test_library_api.py`.
-- [ ] T049 [BE] [US5] PDF store module (R14, contracts "PDF download rules"). Test first
+- [x] T049 [BE] [US5] PDF store module (R14, contracts "PDF download rules"). Test first
   `tests/test_pdfstore.py` with the mock transport and a tmp data dir: arXiv paper -> file at
   `data_dir/pdfs/<sha256(paper_id)>.pdf`, row `ready`, `bytes`, `sha256`, `pages == 3`;
   `2401.00005` -> `failed` "Not a PDF."; body > `pdf_max_bytes` (monkeypatched small cap) ->
