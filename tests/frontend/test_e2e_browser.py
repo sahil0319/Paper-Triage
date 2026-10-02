@@ -157,3 +157,58 @@ def test_chat_answer_cites_only_shown_papers(home):
     cited = set(turn.locator("a.cite").all_inner_texts())
     assert cited == {"2401.00003"}
     assert outside_id not in turn.inner_text()
+
+
+def _chat_scope_ids(page, question):
+    """Ask in the chat and return the paper_ids the page sent with the request."""
+    with page.expect_request(lambda r: r.url.endswith("/api/chat")) as info:
+        ask(page, question)
+    return info.value.post_data_json["paper_ids"]
+
+
+def test_load_more_clears_chat_and_widens_scope(home):
+    page = home
+    search(page, TOPIC, 10)
+    assert len(_chat_scope_ids(page, "What is the capital of France?")) == 10
+    expect(page.locator("#chat-log li.turn")).to_have_count(1)
+
+    page.click("#load-more")
+    expect(page.locator("#paper-list li.paper")).to_have_count(15)
+    # (a) transcript cleared, (c) visible and announced scope line
+    expect(page.locator("#chat-log li.turn")).to_have_count(0)
+    expect(page.locator("#chat-note")).to_be_visible()
+    expect(page.locator("#chat-note")).to_contain_text("Chat now covers 15 papers")
+    expect(page.locator("#status")).to_contain_text("Chat now covers 15 papers")
+    expect(page.locator("#chat-scope")).to_contain_text("15 papers")
+    # (b) next chat request carries all 15 visible ids, in display order
+    assert _chat_scope_ids(page, "What is the capital of France?") == _ids(page)
+    assert len(_ids(page)) == 15
+    expect(page.locator("#chat-note")).to_be_hidden()
+
+
+def test_load_more_error_keeps_chat_and_scope(home):
+    page = home
+    search(page, TOPIC, 10)
+    ask(page, "What is the capital of France?")
+    expect(page.locator("#chat-log li.turn")).to_have_count(1)
+
+    page.route("**/api/triage", lambda route: route.fulfill(
+        status=502, content_type="application/json", body='{"detail": "boom"}'))
+    page.click("#load-more")
+    expect(page.locator(".load-more__error")).to_be_visible(timeout=10_000)
+    page.unroute("**/api/triage")
+    expect(page.locator("#chat-log li.turn")).to_have_count(1)
+    expect(page.locator("#chat-note")).to_be_hidden()
+    expect(page.locator("#paper-list li.paper")).to_have_count(10)
+    assert len(_chat_scope_ids(page, "What is the capital of France?")) == 10
+
+
+def test_new_search_clears_chat_transcript(home):
+    page = home
+    search(page, TOPIC, 10)
+    ask(page, "What is the capital of France?")
+    expect(page.locator("#chat-log li.turn")).to_have_count(1)
+    search(page, "2401.00001", 1)
+    expect(page.locator("#chat-log li.turn")).to_have_count(0)
+    expect(page.locator("#chat-note")).to_contain_text("Chat now covers 1 paper.")
+    assert _chat_scope_ids(page, "What is the capital of France?") == ["2401.00001"]

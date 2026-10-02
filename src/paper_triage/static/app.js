@@ -332,6 +332,7 @@
 
   function render(data, stored) {
     var rs = data.results || [];
+    var hadRows = state.rows.length > 0;
     state.rows = rs.slice();
     state.topic = data.topic || "";
     state.stored = !!stored;
@@ -359,7 +360,8 @@
       showEmpty("none", data.topic);
       statusEl.textContent = "No papers found.";
     }
-    refreshChat();
+    // A new result set replaces the chat scope; a transcript about the old set no longer applies.
+    resetChat(hadRows && rs.length > 0 && !stored);
     refreshLoadMore();
   }
 
@@ -612,7 +614,13 @@
           added[0].focus();
           added[0].scrollIntoView({ block: "start" });
         }
-        refreshChat();
+        if (added.length) {
+          // The result set grew: chat scope = every row now shown, transcript starts over.
+          var covered = resetChat(true);
+          statusEl.textContent += " " + covered;
+        } else {
+          refreshChat();
+        }
       })
       .catch(function (err) {
         if (gen !== state.generation) return;
@@ -657,11 +665,30 @@
   chatEl.insertBefore(suggestEl, logEl);
 
   var chatBusy = false;
+  var chatGen = 0; // bumped on every reset; answers for an older scope are dropped
   var scopeEl = document.getElementById("chat-scope");
+  var noteEl = document.getElementById("chat-note");
+
+  function okCount() {
+    return state.rows.filter(function (r) { return r.status !== "failed"; }).length;
+  }
+
+  // Result set changed: clear the transcript, rescope the chat (askInto sends the current rows),
+  // and say so. The visible line sits in the chat; #status announces it (polite live region).
+  // Returns the scope sentence.
+  function resetChat(announce) {
+    chatGen++;
+    clear(logEl);
+    var line = "Chat now covers " + plural(okCount(), "paper") + ". Earlier questions were cleared.";
+    noteEl.textContent = announce ? line : "";
+    noteEl.hidden = !announce;
+    refreshChat();
+    return line;
+  }
 
   // The chat is scoped to the papers shown (first page + load-more pages), sent as paper_ids.
   function refreshChat() {
-    var n = state.rows.filter(function (r) { return r.status !== "failed"; }).length;
+    var n = okCount();
     var empty = !state.rows.length;
     clear(scopeEl);
     if (empty) {
@@ -746,6 +773,7 @@
     var turn = h("li", { class: "turn" },
       h("p", { class: "turn__q" }, h("span", { class: "sr-only" }, "You asked: "), q));
     logEl.appendChild(turn);
+    noteEl.hidden = true;
     suggestEl.hidden = true;
     turn.scrollIntoView({ block: "nearest" });
     return turn;
@@ -776,12 +804,15 @@
     chatBusy = true;
     askBtn.disabled = true;
     var ids = state.rows.map(function (r) { return r.paper_id; }).slice(0, 50);
+    var gen = chatGen;
     postJSON("/api/chat", { question: q, paper_ids: ids })
       .then(function (data) {
+        if (gen !== chatGen) return; // result set changed meanwhile; the turn is gone
         turn.removeChild(pending);
         turn.appendChild(answerEl(data));
       })
       .catch(function (err) {
+        if (gen !== chatGen) return;
         turn.removeChild(pending);
         var again = h("button", { type: "button", class: "btn btn--secondary btn--small" }, "Ask again");
         again.addEventListener("click", function () {
@@ -796,6 +827,7 @@
       .then(function () {
         chatBusy = false;
         askBtn.disabled = !state.rows.length;
+        if (gen !== chatGen) return;
         turn.scrollIntoView({ block: "nearest" });
         question.focus();
       });

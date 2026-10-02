@@ -332,6 +332,8 @@ input:disabled { opacity: 0.55; cursor: default; }
   color: var(--color-muted); margin-top: var(--space-xs); }
 .chat__scope + .chat__scope { margin-top: var(--space-xxs); }
 .chat__scope strong { font-weight: 500; color: var(--color-ink); }
+.chat__note { color: var(--color-ink); font-weight: 500; }
+.chat__note[hidden] { display: none; }
 .chat__log { flex: 1; overflow-y: auto; max-height: 60vh; margin-top: var(--space-md); min-height: 0; }
 .chat__log:empty { display: none; }
 .chat__form { display: flex; gap: var(--space-xs); margin-top: var(--space-md); }
