@@ -2,7 +2,13 @@ from pathlib import Path
 
 import pytest
 
-from paper_triage.extract import ExtractError, extract_text, pdf_title, prepare_for_llm
+from paper_triage.extract import (
+    ExtractError,
+    extract_pages,
+    extract_text,
+    pdf_title,
+    prepare_for_llm,
+)
 
 SAMPLE = Path(__file__).parent.parent / "src/paper_triage/fixtures/sample.pdf"
 
@@ -11,6 +17,38 @@ def test_extract_sample_pdf():
     text = extract_text(SAMPLE.read_bytes())
     assert len(text) > 500
     assert "distillation" in text.lower()
+
+
+def test_sample_pdf_has_three_pages_with_markers():
+    pages = extract_pages(SAMPLE.read_bytes())
+    assert len(pages) == 3
+    assert "distillation" in pages[0].lower()
+    assert "Quartzite" in pages[1] and "Quartzite" not in pages[0] + pages[2]
+    assert "Obsidian" in pages[2] and "Obsidian" not in pages[0] + pages[1]
+    assert SAMPLE.stat().st_size < 50_000
+    xml = (SAMPLE.parent / "arxiv_search.xml").read_text()
+    assert "Quartzite" not in xml
+
+
+def test_sample_pdf_page_one_text_unchanged():
+    page1 = extract_pages(SAMPLE.read_bytes())[0]
+    assert page1.splitlines()[0] == "Sample Paper on Diffusion Distillation"
+    assert page1.splitlines()[-1] == "[1] Ho et al. Denoising diffusion probabilistic models."
+    assert len(page1.splitlines()) == 18
+
+
+def test_sample_pdf_matches_generator():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("make_sample_pdf", SAMPLE.with_name("make_sample_pdf.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert mod.build() == SAMPLE.read_bytes()
+
+
+def test_extract_pages_invalid_bytes():
+    with pytest.raises(ExtractError):
+        extract_pages(b"not a pdf")
 
 
 def test_extract_invalid_bytes():

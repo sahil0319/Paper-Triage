@@ -344,7 +344,7 @@ hooks. Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest 
   (`"self-supervised"`); 1-character tokens and stop words dropped; duplicates removed keeping
   first order; `""` and `"the of and"` -> `[]`. Then `pt/tags.py` `keywords(topic: str) ->
   list[str]` with a fixed English stop-word frozenset in the module.
-- [ ] T044 [BE] [US5] Multi-page fixture + mock PDF cases (R14, R16). Regenerate
+- [x] T044 [BE] [US5] Multi-page fixture + mock PDF cases (R14, R16). Regenerate
   `pt/fixtures/sample.pdf` as 3 pages (< 50 KB, pypdf-readable): page 1 text identical to the
   current single page; page 2 contains the marker word "Quartzite"; page 3 contains
   "Obsidian"; neither marker appears on other pages or in `arxiv_search.xml`. Keep the

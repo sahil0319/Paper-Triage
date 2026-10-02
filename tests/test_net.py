@@ -1,3 +1,4 @@
+import io
 import re
 
 import httpx
@@ -133,3 +134,13 @@ def test_mock_feed_markers_unique_and_refusal_words_absent():
         others = " ".join(x.lower() for j, x in enumerate(entries) if j != i)
         words = {w.lower() for w in re.findall(r"[A-Za-z]{6,}", titles[i])}
         assert any(w not in others for w in words), titles[i]
+
+
+def test_mock_export_host_serves_pdf_like_arxiv_host():
+    client, _ = make_http(True)
+    ok = client.get("https://export.arxiv.org/pdf/2401.00001")
+    assert ok.status_code == 200 and ok.content.startswith(b"%PDF")
+    assert len(PdfReader(io.BytesIO(ok.content)).pages) == 3
+    bad = client.get("https://export.arxiv.org/pdf/2401.00005v2")
+    assert bad.status_code == 200 and not bad.content.startswith(b"%PDF")
+    assert client.get("https://export.arxiv.org/pdf/math.GT/0107001").content.startswith(b"%PDF")

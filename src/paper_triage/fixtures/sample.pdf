@@ -3,7 +3,7 @@
 << /Type /Catalog /Pages 2 0 R >>
 endobj
 2 0 obj
-<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+<< /Type /Pages /Kids [3 0 R 7 0 R 9 0 R] /Count 3 >>
 endobj
 3 0 obj
 << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
@@ -39,17 +39,52 @@ endobj
 6 0 obj
 << /Title (Sample Paper on Diffusion Distillation) >>
 endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 8 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+8 0 obj
+<< /Length 392 >>
+stream
+BT /F1 11 Tf 14 TL 50 740 Td
+(5 Analysis) Tj T*
+(We inspect the sampled latents layer by layer to see where the student departs.) Tj T*
+(Quartzite filters remove the high frequency residue left by the one step student.) Tj T*
+(The filter is applied once per stage and adds no trainable parameters.) Tj T*
+(Table 2 lists the measured error for each stage of the progressive schedule.) Tj T*
+ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 10 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+10 0 obj
+<< /Length 410 >>
+stream
+BT /F1 11 Tf 14 TL 50 740 Td
+(6 Limitations) Tj T*
+(The approach was tested on one dataset and one teacher architecture only.) Tj T*
+(Obsidian checkpoints from the final stage are released for later comparison.) Tj T*
+(We did not study text conditioned models or video generation in this work.) Tj T*
+(7 Acknowledgements) Tj T*
+(The authors thank the reviewers for their careful reading of the draft.) Tj T*
+ET
+endstream
+endobj
 xref
-0 7
+0 11
 0000000000 65535 f 
 0000000009 00000 n 
 0000000058 00000 n 
-0000000115 00000 n 
-0000000241 00000 n 
-0000001510 00000 n 
-0000001580 00000 n 
+0000000127 00000 n 
+0000000253 00000 n 
+0000001522 00000 n 
+0000001592 00000 n 
+0000001661 00000 n 
+0000001787 00000 n 
+0000002230 00000 n 
+0000002357 00000 n 
 trailer
-<< /Size 7 /Root 1 0 R /Info 6 0 R >>
+<< /Size 11 /Root 1 0 R /Info 6 0 R >>
 startxref
-1649
+2819
 %%EOF

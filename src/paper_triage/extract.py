@@ -24,6 +24,15 @@ def extract_text(pdf_bytes: bytes) -> str:
     return text
 
 
+def extract_pages(pdf_bytes: bytes) -> list[str]:
+    """Text of each page in order (1 entry per page; empty string when a page has no text)."""
+    try:
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        return [page.extract_text() or "" for page in reader.pages]
+    except Exception as e:
+        raise ExtractError(f"cannot read PDF: {e}") from e
+
+
 def prepare_for_llm(text: str, cap: int) -> str:
     """Drop a trailing References section (heading in the second half), then cap length."""
     for m in _REFERENCES.finditer(text):
