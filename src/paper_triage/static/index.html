@@ -97,11 +97,32 @@
 
   <main id="library" class="container library" data-route="library" aria-labelledby="library-heading" hidden>
     <div class="lib-layout">
+      <nav id="dir-rail" class="rail" aria-label="Directories">
+        <h2 class="rail__label">Directories</h2>
+        <ul id="dir-list" class="rail__list"></ul>
+        <div id="dir-new-slot" class="rail__new"></div>
+      </nav>
       <div class="lib-main">
         <div class="lib-head">
           <h1 id="library-heading" class="library__h" tabindex="-1">Library</h1>
+          <div id="dir-rename-slot" class="lib-head__rename" hidden></div>
+          <div id="dir-actions" class="lib-head__actions" hidden></div>
         </div>
+        <div id="dir-confirm" class="lib-head__confirm" hidden></div>
         <p id="library-count" class="results__count" hidden></p>
+        <div id="dir-mobile" class="dir-mobile">
+          <div class="dir-mobile__row">
+            <div class="lib-filter">
+              <label class="lib-filter__label" for="dir-select">Directory</label>
+              <select id="dir-select" class="select"></select>
+            </div>
+            <button id="dir-manage" type="button" class="btn btn--secondary btn--small" aria-expanded="false" aria-controls="dir-manage-panel">Manage directories</button>
+          </div>
+          <div id="dir-manage-panel" class="dir-manage" hidden>
+            <ul id="dir-manage-list" class="dir-manage__list"></ul>
+            <div id="dir-new-slot-m" class="dir-manage__new"></div>
+          </div>
+        </div>
         <p id="library-loading" class="results__count" hidden>Loading your library…</p>
         <div id="library-alert" class="alert" role="alert" hidden></div>
         <div id="lib-content" class="lib-content" hidden>

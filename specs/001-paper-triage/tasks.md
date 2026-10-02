@@ -499,7 +499,7 @@ hooks. Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest 
   match; poll every 3 s while any row is `pending`; `Try again` -> `POST
   /api/library/retry`. Needs T047, T050. e2e (real harness): tag AND filter and title filter
   give exact rows (SC-012); status reaches "PDF ready".
-- [ ] T061 [FE] [US7] Directories UI + row actions (FR-023; brief L8, L9, L10b, L13). Rail
+- [x] T061 [FE] [US7] Directories UI + row actions (FR-023; brief L8, L9, L10b, L13). Rail
   `#dir-rail` (All saved, Unsorted, A-Z), `#dir-new` inline create, rename/delete in header
   with inline confirm, validation copy from API `detail`, native select below 1024 px with
   "Manage directories"; row `select[data-act="move"]` -> `POST /api/library/move`, row

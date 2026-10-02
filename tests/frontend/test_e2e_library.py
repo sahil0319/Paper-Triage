@@ -1050,6 +1050,8 @@ def real_library(app, live_server):
         data = api.get(f"{live_server.url}/api/library").json()
         for p in data["papers"]:
             api.delete(f"{live_server.url}/api/library?paper_id={p['paper_id']}")
+        for d in data["directories"]:
+            api.delete(f"{live_server.url}/api/directories/{d['id']}")
 
     wipe()
     yield live_server.url
@@ -1120,3 +1122,253 @@ def test_real_unavailable_pdf_offers_retry(app, real_library):
     expect(st).to_contain_text("PDF unavailable", timeout=5_000)
     rows(page).first.get_by_role("button", name="Try again").click()
     expect(st).to_contain_text("PDF unavailable", timeout=5_000)
+
+
+# ---- T061: directories and row actions (real harness) ----
+
+
+def dir_item(page, name):
+    return page.locator(f'#dir-list button.rail__item[data-dir="{name}"]')
+
+
+def two_saved(page, base):
+    topic = _triage(page, base, "diffusion distillation")
+    _save(page, base, topic, "2401.00001")
+    _save(page, base, topic, "2401.00002")
+
+
+def make_dir(page, name):
+    page.click("#dir-new")
+    page.fill("#dir-new-slot input", name)
+    page.press("#dir-new-slot input", "Enter")
+    expect(dir_item(page, name)).to_have_attribute("aria-current", "true")
+
+
+def test_rail_lists_all_unsorted_and_counts(app, real_library):
+    page, base = app, real_library
+    two_saved(page, base)
+    page.goto("/#/library")
+    expect(rows(page)).to_have_count(2)
+    expect(page.locator("#dir-rail")).to_be_visible()
+    items = page.locator("#dir-list button.rail__item")
+    assert [i.get_attribute("data-dir") for i in items.all()] == ["", "Unsorted"]
+    expect(items.nth(0)).to_contain_text("All saved")
+    expect(items.nth(0)).to_contain_text("2")
+    expect(items.nth(0)).to_have_attribute("aria-current", "true")
+    expect(items.nth(1)).to_contain_text("Unsorted")
+    expect(page.locator("#dir-new")).to_have_text("New directory")
+    expect(page.locator("#dir-rail h2.rail__label")).to_have_text("Directories")
+    items.nth(1).click()
+    expect(items.nth(1)).to_have_attribute("aria-current", "true")
+    assert page.evaluate("location.hash") == "#/library?dir=Unsorted"
+    expect(page.locator("#library-count")).to_have_text("2 of 2 saved papers · Unsorted")
+
+
+def test_create_directory_validation_and_select(app, real_library):
+    page, base = app, real_library
+    two_saved(page, base)
+    page.goto("/#/library")
+    expect(rows(page)).to_have_count(2)
+    page.click("#dir-new")
+    inp = page.locator("#dir-new-slot input")
+    expect(inp).to_be_focused()
+    expect(inp).to_have_attribute("placeholder", "e.g. final year thesis")
+    expect(inp).to_have_attribute("maxlength", "40")
+    inp.press("Enter")
+    err = page.locator("#dir-new-slot .field-error")
+    expect(err).to_have_text("Enter a name.")
+    expect(inp).to_have_attribute("aria-invalid", "true")
+    inp.fill("Unsorted")
+    inp.press("Enter")
+    expect(err).to_have_text('"Unsorted" already exists.')
+    inp.fill("network")
+    inp.press("Enter")
+    expect(dir_item(page, "network")).to_have_attribute("aria-current", "true")
+    expect(page.locator("#library-heading")).to_have_text("network")
+    expect(page.locator("#status")).to_have_text('Directory "network" created.')
+    assert page.evaluate("location.hash") == "#/library?dir=network"
+    expect(page.locator("#library-empty .empty__title")).to_have_text("No papers in network.")
+    expect(page.locator("#library-empty .empty__body")).to_have_text(
+        "Move a saved paper here with its Directory menu."
+    )
+    # Duplicate, case-insensitive (server rule).
+    page.click("#dir-new")
+    inp = page.locator("#dir-new-slot input")
+    inp.fill("NETWORK")
+    inp.press("Enter")
+    expect(page.locator("#dir-new-slot .field-error")).to_have_text('"NETWORK" already exists.')
+    # Escape cancels and returns focus.
+    inp.press("Escape")
+    expect(page.locator("#dir-new")).to_be_focused()
+    expect(page.locator("#dir-new-slot form")).to_have_count(0)
+
+
+def test_move_paper_between_directories_with_collapse(app, real_library):
+    page, base = app, real_library
+    two_saved(page, base)
+    page.goto("/#/library")
+    expect(rows(page)).to_have_count(2)
+    make_dir(page, "network")
+    page.click('#dir-list button[data-dir=""]')
+    expect(rows(page)).to_have_count(2)
+    sel = rows(page).first.locator('select[data-act="move"]')
+    first_id = row_ids(page)[0]
+    sel.select_option(label="network")
+    expect(page.locator("#status")).to_have_text("Moved to network.")
+    expect(rows(page)).to_have_count(2)  # still in All saved
+    expect(dir_item(page, "network")).to_contain_text("1")
+    expect(dir_item(page, "Unsorted")).to_contain_text("1")
+    # In network: moving back to Unsorted collapses the row out.
+    dir_item(page, "network").click()
+    expect(rows(page)).to_have_count(1)
+    assert row_ids(page) == [first_id]
+    rows(page).first.locator('select[data-act="move"]').select_option(label="Unsorted")
+    expect(rows(page)).to_have_count(0)
+    expect(page.locator("#status")).to_have_text("Moved to Unsorted.")
+    expect(page.locator("#library-empty .empty__title")).to_have_text("No papers in network.")
+    expect(page.locator("#library-heading")).to_be_focused()
+    data = page.request.get(f"{base}/api/library").json()
+    assert all(p["directory_id"] is None for p in data["papers"])
+
+
+def test_move_error_reverts_select(app):
+    page = app
+    stub = lib_page(page, [lib_item(1)])
+    stub.directories = [{"id": 1, "name": "network", "count": 0}]
+    page.reload()
+    sel = rows(page).first.locator('select[data-act="move"]')
+    stub.fail[("POST", "/api/library/move")] = (404, "unknown directory")
+    sel.select_option(label="network")
+    expect(rows(page).first.locator(".row-error")).to_have_text("Could not move. unknown directory")
+    expect(sel).to_have_value("")
+    expect(sel).to_be_enabled()
+
+
+def test_rename_directory(app, real_library):
+    page, base = app, real_library
+    two_saved(page, base)
+    page.goto("/#/library")
+    make_dir(page, "network")
+    make_dir(page, "vision")
+    expect(page.locator("#dir-actions")).to_be_visible()
+    page.click('#dir-actions [data-act="rename"]')
+    inp = page.locator("#dir-rename-slot input")
+    expect(inp).to_be_focused()
+    expect(inp).to_have_value("vision")
+    expect(page.locator("#library-heading")).to_be_hidden()
+    inp.fill("network")
+    inp.press("Enter")
+    expect(page.locator("#dir-rename-slot .field-error")).to_have_text('"network" already exists.')
+    inp.fill("computer vision")
+    page.click("#dir-rename-slot button[type=submit]")
+    expect(page.locator("#library-heading")).to_have_text("computer vision")
+    assert page.evaluate("location.hash") == "#/library?dir=computer%20vision"
+    expect(dir_item(page, "computer vision")).to_have_attribute("aria-current", "true")
+    expect(dir_item(page, "vision")).to_have_count(0)
+    # Escape cancels.
+    page.click('#dir-actions [data-act="rename"]')
+    page.locator("#dir-rename-slot input").press("Escape")
+    expect(page.locator("#library-heading")).to_be_visible()
+    expect(page.locator('#dir-actions [data-act="rename"]')).to_be_focused()
+
+
+def test_all_saved_and_unsorted_have_no_rename_or_delete(app, real_library):
+    page, base = app, real_library
+    two_saved(page, base)
+    page.goto("/#/library")
+    expect(rows(page)).to_have_count(2)
+    expect(page.locator("#dir-actions")).to_be_hidden()
+    dir_item(page, "Unsorted").click()
+    expect(page.locator("#dir-actions")).to_be_hidden()
+
+
+def test_delete_directory_moves_papers_to_unsorted(app, real_library):
+    page, base = app, real_library
+    two_saved(page, base)
+    page.goto("/#/library")
+    make_dir(page, "network")
+    page.click('#dir-list button[data-dir=""]')
+    for i in range(2):
+        rows(page).nth(i).locator('select[data-act="move"]').select_option(label="network")
+        expect(page.locator("#status")).to_have_text("Moved to network.")
+        page.evaluate("document.getElementById('status').textContent = ''")
+    dir_item(page, "network").click()
+    expect(rows(page)).to_have_count(2)
+    page.click('#dir-actions [data-act="delete"]')
+    group = page.locator("#dir-confirm [role=group]")
+    expect(group).to_contain_text('Delete "network"? Its 2 papers move to Unsorted.')
+    expect(group.get_by_role("button", name="Keep")).to_be_focused()
+    page.keyboard.press("Escape")
+    expect(group).to_have_count(0)
+    expect(page.locator('#dir-actions [data-act="delete"]')).to_be_focused()
+    page.click('#dir-actions [data-act="delete"]')
+    group.get_by_role("button", name="Delete", exact=True).click()
+    expect(dir_item(page, "Unsorted")).to_have_attribute("aria-current", "true")
+    expect(page.locator("#status")).to_have_text("Directory deleted. 2 papers moved to Unsorted.")
+    expect(rows(page)).to_have_count(2)
+    expect(dir_item(page, "network")).to_have_count(0)
+    data = page.request.get(f"{base}/api/library").json()
+    assert data["total"] == 2 and data["directories"] == [] and data["unsorted_count"] == 2
+
+
+def test_remove_from_library_always_confirms(app, real_library):
+    page, base = app, real_library
+    two_saved(page, base)
+    page.goto("/#/library")
+    expect(rows(page)).to_have_count(2)
+    expect(page.locator(".views__count")).to_have_text("2")
+    gone = row_ids(page)[0]
+    keep_id = row_ids(page)[1]
+    rows(page).first.get_by_role("button", name="Remove from Library").click()
+    group = rows(page).first.locator("[data-confirm=unsave]")
+    expect(group).to_contain_text("Remove from Library? This deletes the saved PDF.")
+    expect(group.get_by_role("button", name="Keep")).to_be_focused()
+    page.keyboard.press("Escape")
+    expect(group).to_have_count(0)
+    expect(rows(page).first.get_by_role("button", name="Remove from Library")).to_be_focused()
+    assert [c for c in page.request.get(f"{base}/api/library").json()["papers"]]
+    rows(page).first.get_by_role("button", name="Remove from Library").click()
+    rows(page).first.get_by_role("button", name="Remove", exact=True).click()
+    expect(rows(page)).to_have_count(1)
+    assert row_ids(page) == [keep_id]
+    expect(page.locator("#status")).to_have_text("Removed from Library.")
+    expect(page.locator(".views__count")).to_have_text("1")
+    expect(rows(page).first.locator(".open-preview")).to_be_focused()
+    ids = [p["paper_id"] for p in page.request.get(f"{base}/api/library").json()["papers"]]
+    assert gone not in ids
+
+
+def test_small_screen_uses_select_and_manage_panel(app, real_library):
+    page, base = app, real_library
+    two_saved(page, base)
+    page.set_viewport_size({"width": 800, "height": 900})
+    page.goto("/#/library")
+    expect(rows(page)).to_have_count(2)
+    expect(page.locator("#dir-rail")).to_be_hidden()
+    sel = page.locator("#dir-select")
+    expect(sel).to_be_visible()
+    expect(page.locator("label[for=dir-select]")).to_have_text("Directory")
+    assert [o.inner_text() for o in sel.locator("option").all()] == [
+        "All saved (2)",
+        "Unsorted (2)",
+    ]
+    manage = page.locator("#dir-manage")
+    expect(manage).to_have_attribute("aria-expanded", "false")
+    manage.click()
+    expect(manage).to_have_attribute("aria-expanded", "true")
+    expect(page.locator("#dir-manage-panel")).to_be_visible()
+    page.click("#dir-manage-panel .dir-new")
+    inp = page.locator("#dir-new-slot-m input")
+    inp.fill("network")
+    inp.press("Enter")
+    expect(page.locator("#library-heading")).to_have_text("network")
+    expect(sel).to_have_value("network")
+    # Per-item rename and delete live in the panel.
+    expect(page.locator("#dir-manage-list .dir-manage__item")).to_have_count(1)
+    page.get_by_role("button", name="Delete directory network").click()
+    expect(page.locator("#dir-manage-list [role=group]")).to_contain_text('Delete "network"?')
+    page.locator("#dir-manage-list").get_by_role("button", name="Delete", exact=True).click()
+    expect(page.locator("#status")).to_contain_text("Directory deleted.")
+    expect(sel).to_have_value("Unsorted")
+    sel.select_option("")
+    expect(rows(page)).to_have_count(2)
