@@ -3,6 +3,7 @@
    Shares helpers with app.js through window.PT. Text is set with textContent only. */
 import * as pdfjsLib from "./vendor/pdfjs/pdf.min.mjs";
 import { initAnnotations } from "./annotations.js";
+import { initPaperChat } from "./paperchat.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/vendor/pdfjs/pdf.worker.min.mjs";
 
@@ -30,6 +31,12 @@ const el = {
   findResults: $("pv-find-results"),
   panel: $("pv-panel"),
   layout: $("pv-layout"),
+  panelBody: $("pv-panel-body"),
+  sheet: $("pv-sheet"),
+  sheetBody: $("pv-sheet-body"),
+  sheetOpen: $("pv-sheet-open"),
+  sheetClose: $("pv-sheet-close"),
+  tablist: $("pv-tabs"),
 };
 
 // Tiny event hub for the modules that hang off the viewer (annotations, paper chat).
@@ -87,7 +94,9 @@ function stale(t) {
 function close() {
   token++;
   emit("close");
+  closeSheet();
   el.panel.hidden = true;
+  el.sheetOpen.hidden = true;
   el.layout.classList.remove("has-panel");
   if (cur) {
     window.clearInterval(cur.pollT);
@@ -121,6 +130,7 @@ function open(item, force) {
   const status = (item.pdf && item.pdf.status) || "none";
   cur = { id: item.paper_id, item, key: statusKey(item), token, mode: keepZoom || "fit-width", pages: [], status };
   el.panel.hidden = false;
+  el.sheetOpen.hidden = false;
   el.layout.classList.add("has-panel");
   emit("open", cur);
   if (status === "ready") showPdf();
@@ -705,11 +715,80 @@ const hub = {
     el.pageInput.value = String(n);
     setPageUi();
   },
-  showPanel() {
+  showPanel(name) {
     el.panel.hidden = false;
+    if (name) selectTab(name);
+    if (!wide.matches) openSheet();
   },
+  closeSheet,
 };
+
+// ---- panel tabs and the < 1024px sheet (brief L19, L22) ----
+
+const wide = window.matchMedia("(min-width: 1024px)");
+const TABS = [
+  { name: "highlights", tab: $("pv-tab-hl"), panel: $("pv-tabpanel-hl") },
+  { name: "chat", tab: $("pv-tab-chat"), panel: $("pv-tabpanel-chat") },
+];
+
+function selectTab(name, focus) {
+  TABS.forEach((t) => {
+    const on = t.name === name;
+    t.tab.setAttribute("aria-selected", on ? "true" : "false");
+    t.tab.tabIndex = on ? 0 : -1;
+    t.panel.hidden = !on;
+    if (on && focus) t.tab.focus();
+  });
+}
+
+el.tablist.addEventListener("click", (ev) => {
+  const t = TABS.find((x) => x.tab === ev.target.closest("[role=tab]"));
+  if (t) selectTab(t.name);
+});
+el.tablist.addEventListener("keydown", (ev) => {
+  const i = TABS.findIndex((x) => x.tab === document.activeElement);
+  if (i < 0) return;
+  let next = -1;
+  if (ev.key === "ArrowRight") next = (i + 1) % TABS.length;
+  else if (ev.key === "ArrowLeft") next = (i + TABS.length - 1) % TABS.length;
+  else if (ev.key === "Home") next = 0;
+  else if (ev.key === "End") next = TABS.length - 1;
+  if (next < 0) return;
+  ev.preventDefault();
+  selectTab(TABS[next].name, true);
+});
+
+let sheetReturnFocus = true;
+
+function openSheet() {
+  if (el.sheet.open) return;
+  el.sheetBody.appendChild(el.panelBody);
+  el.sheet.showModal();
+}
+
+function closeSheet(returnFocus) {
+  if (!el.sheet.open) return;
+  sheetReturnFocus = returnFocus === true;
+  el.sheet.close();
+}
+
+el.sheet.addEventListener("close", () => {
+  el.panel.appendChild(el.panelBody);
+  if (sheetReturnFocus && !el.sheetOpen.hidden) el.sheetOpen.focus();
+  sheetReturnFocus = true;
+});
+el.sheetOpen.addEventListener("click", () => openSheet());
+el.sheetClose.addEventListener("click", () => closeSheet(true));
+wide.addEventListener("change", () => {
+  if (wide.matches) closeSheet(false);
+});
+// Backdrop clicks close the sheet too.
+el.sheet.addEventListener("click", (ev) => {
+  if (ev.target === el.sheet) closeSheet(true);
+});
+
 initAnnotations(hub);
+initPaperChat(hub);
 
 window.PTViewer = {
   hub,

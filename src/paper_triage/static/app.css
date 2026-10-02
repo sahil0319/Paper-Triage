@@ -653,7 +653,7 @@ a.btn--secondary { color: var(--color-ink); }
 .lib-dir__select { height: 36px; }
 .lib-confirm { flex-basis: 100%; margin-top: 0; }
 .lib-row.is-collapsing { opacity: 0; padding-block: 0; border-top-width: 0;
-  transition: height var(--dur-base) var(--ease-out), opacity var(--dur-base) var(--ease-out), padding var(--dur-base) var(--ease-out); }
+  transition: height var(--dur-base) var(--ease-out), opacity var(--dur-base) var(--ease-out); }
 
 @media (min-width: 768px) {
   .lib-dir__label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -832,6 +832,35 @@ a.btn--secondary { color: var(--color-ink); }
   .swatch, .pv-popover { border: 1px solid CanvasText; }
 }
 
+
+/* ---- Ask this paper (L20) and the < 1024px sheet (L22) ---- */
+
+.pv-chat__nopdf { font: var(--type-body-md); line-height: var(--leading-prose); color: var(--color-ink);
+  background: var(--color-cream); border-radius: var(--radius-md); padding: var(--space-sm) var(--space-md); margin-top: var(--space-sm); }
+.pv-chat__idle { margin-top: var(--space-md); }
+.pv-chat__starters { display: grid; gap: var(--space-xs); margin-top: var(--space-sm); }
+.pv-chat__log { max-height: none; overflow: visible; margin-top: var(--space-md); }
+.pv-chat__log:focus-visible { outline-offset: 2px; }
+.pv-chat__form { margin-top: var(--space-md); position: sticky; bottom: 0; background: var(--color-surface-soft);
+  padding-block: var(--space-sm); }
+.pv-chat .row-error { margin-top: var(--space-sm); }
+button.cite { border: 0; cursor: pointer; font-family: var(--font-mono); }
+button.cite:active { background: var(--color-hairline); }
+.pv-chat__pages { line-height: 1.9; }
+
+.pv-sheet-open { display: none; flex: none; }
+.pv-sheet { width: 100%; max-width: none; height: 85dvh; max-height: 85dvh; margin: auto 0 0; padding: 0; border: 0;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0; background: var(--color-surface-soft);
+  box-shadow: var(--shadow-button); overflow: hidden; }
+.pv-sheet[open] { display: flex; flex-direction: column; animation: sheet-up var(--dur-base) var(--ease-out); }
+.pv-sheet::backdrop { background: rgba(24, 29, 38, 0.4); }
+.pv-sheet__head { flex: none; display: flex; justify-content: flex-end; padding: var(--space-xs) var(--space-md) 0; }
+.pv-sheet__body { flex: 1; min-height: 0; overflow: auto; }
+.pv-sheet .pv-panel__body { padding-top: 0; }
+@keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+@media (max-width: 1023px) { .pv-sheet-open:not([hidden]) { display: inline-flex; } }
+@media (forced-colors: active) { .pv-sheet { border: 1px solid CanvasText; } }
+
 /* Text layer: transparent, selectable text positioned over the canvas by pdf.js. */
 .textLayer {
   position: absolute; inset: 0; overflow: clip; line-height: 1; text-align: initial; text-size-adjust: none;
@@ -906,5 +935,6 @@ a.btn--secondary { color: var(--color-ink); }
   .working__verb.is-out { transition: none; }
   .paper--cited { animation: none; outline: 2px solid var(--color-info-border); }
   .pdf-page.is-flash, .hl.is-flash { animation: none; }
+  .pv-sheet[open] { animation: none; }
   .paper--new { animation: none; background-color: var(--color-cream); padding-inline: var(--space-sm); margin-inline: calc(-1 * var(--space-sm)); }
 }

@@ -1006,7 +1006,7 @@
     if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (t && t.isContentEditable)) return;
     // `/` focuses the main input of the current view.
     var target = route.view === "library" ? document.getElementById("lib-filter")
-      : route.view === "preview" ? document.getElementById("pv-chat-input") : input;
+      : route.view === "preview" ? document.getElementById("pv-chat-question") : input;
     if (!target) return;
     ev.preventDefault();
     target.focus();

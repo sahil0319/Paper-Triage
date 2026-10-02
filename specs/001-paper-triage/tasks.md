@@ -514,7 +514,7 @@ hooks. Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest 
   (scanned) shows a plain "No selectable text on this page" message for highlighting while
   page notes still work. Needs T051. e2e: highlight persists after reload and keeps
   proportional size after zoom; note saved; Go to jumps.
-- [ ] T063 [FE] [US9] Ask this paper panel + sheet (FR-027; brief L20 Rev 2, L22). New
+- [x] T063 [FE] [US9] Ask this paper panel + sheet (FR-027; brief L20 Rev 2, L22). New
   `pt/static/paperchat.js` (+ `index.html`, `app.css`, `viewer.js` hook-up). Tab
   "Ask this paper": idle copy, starters, `#pv-chat-question` + `#pv-chat-ask`; no request
   before the first submit; `POST /api/paper-chat` with the last 6 turns as `history`;

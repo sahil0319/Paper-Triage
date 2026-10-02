@@ -1459,7 +1459,7 @@ def test_highlight_via_toolbar_draws_lists_and_saves_fractions(app):
     stub = hl_preview(page)
     btn = page.locator("#pv-hl-btn")
     expect(btn).to_have_attribute("aria-disabled", "true")
-    expect(page.locator("#pv-panel .pv-empty__title")).to_have_text("No highlights yet.")
+    expect(page.locator("#pv-hl-empty .pv-empty__title")).to_have_text("No highlights yet.")
     line(page, "Abstract").select_text()
     expect(btn).not_to_have_attribute("aria-disabled", "true")
     btn.click()
@@ -1600,7 +1600,7 @@ def test_delete_with_undo_and_expiry(app):
     items(page).first.get_by_role("button", name="Delete").click()
     expect(tomb).to_have_count(1)
     expect(tomb).to_have_count(0, timeout=5_000)
-    expect(page.locator("#pv-panel .pv-empty__title")).to_be_visible()
+    expect(page.locator("#pv-hl-empty .pv-empty__title")).to_be_visible()
 
 
 def test_page_note_add_edit_and_delete(app):
@@ -1829,3 +1829,443 @@ def test_real_go_to_jumps_to_the_page(app, real_library):
     page.locator("#pv-pages").evaluate("w => { w.scrollTop = 0 }")
     items(page).first.get_by_role("button", name=re.compile("Go to highlight on page 2")).click()
     expect(page.locator("#pv-page-input")).to_have_value("2")
+
+
+# ---- T063: Ask this paper panel and sheet ----
+
+
+def chat_requests(page):
+    reqs = []
+    page.on(
+        "request",
+        lambda r: reqs.append(r.post_data_json) if r.url.endswith("/api/paper-chat") else None,
+    )
+    return reqs
+
+
+def stub_chat(page, responder):
+    """Stub POST /api/paper-chat; `responder(body)` returns (status, json)."""
+
+    def handle(route):
+        status, data = responder(route.request.post_data_json)
+        route.fulfill(status=status, content_type="application/json", body=json.dumps(data))
+
+    page.route(lambda url: url.endswith("/api/paper-chat"), handle)
+
+
+def ask_tab(page):
+    page.click("#pv-tab-chat")
+    expect(page.locator("#pv-tabpanel-chat")).to_be_visible()
+
+
+def ask(page, q):
+    page.fill("#pv-chat-question", q)
+    page.click("#pv-chat-ask")
+
+
+def chat_turns(page):
+    return page.locator("#pv-chat-log li.turn")
+
+
+def test_chat_is_lazy_no_request_until_first_question(app):
+    page = app
+    reqs = chat_requests(page)
+    hl_preview(page)
+    ask_tab(page)
+    expect(page.locator("#pv-chat-idle")).to_be_visible()
+    expect(page.locator("#pv-chat-idle .pv-empty__title")).to_have_text(
+        "Chat is off until you ask."
+    )
+    expect(page.locator("#pv-chat-idle .pv-empty__body")).to_have_text(
+        "Your first question reads this paper, so it takes longer than the rest."
+    )
+    starters = page.locator("#pv-chat-starters button")
+    assert starters.all_inner_texts() == [
+        "What is the main claim?",
+        "What baselines are compared?",
+        "What are the stated limitations?",
+    ]
+    expect(page.locator("#pv-chat-scope")).to_have_text(
+        "Answers use only this paper. Citations point to pages. Not saved: closing or reloading clears this chat."
+    )
+    expect(page.locator("label[for=pv-chat-question]")).to_have_text("Question about this paper")
+    expect(page.locator("#pv-chat-question")).to_have_attribute(
+        "placeholder", "Ask about this paper"
+    )
+    expect(page.locator("#pv-chat-ask")).to_have_class(re.compile("btn--primary"))
+    expect(page.locator("#pv-chat-log")).to_have_attribute("role", "log")
+    expect(page.locator("#pv-chat-log")).to_have_attribute(
+        "aria-label", "Conversation about this paper"
+    )
+    page.click("#pv-tab-hl")
+    page.click("#pv-tab-chat")
+    page.wait_for_timeout(300)
+    assert reqs == [], "chat must not call the server before the first question"
+
+
+def test_chat_starter_sends_first_question(app):
+    page = app
+    reqs = chat_requests(page)
+    stub_chat(
+        page,
+        lambda b: (
+            200,
+            {"answer": "Fine [p.1].", "pages": [1], "refused": False, "dropped_pages": []},
+        ),
+    )
+    hl_preview(page)
+    ask_tab(page)
+    page.get_by_role("button", name="What baselines are compared?").click()
+    expect(chat_turns(page)).to_have_count(1)
+    expect(chat_turns(page).first.locator(".turn__q")).to_contain_text(
+        "What baselines are compared?"
+    )
+    expect(chat_turns(page).first.locator(".cite")).to_have_count(2)  # inline marker and Pages line
+    assert reqs == [
+        {"paper_id": "2401.00001", "question": "What baselines are compared?", "history": []}
+    ]
+    expect(page.locator("#pv-chat-idle")).to_be_hidden()
+    expect(page.locator("#pv-chat-reset")).to_have_text(
+        "This chat clears when you close the preview or reload."
+    )
+
+
+def test_chat_pending_copy_first_slow_and_later(app):
+    page = app
+    page.add_init_script("window.__PT_CHAT_SLOW_MS = 400")
+    held = []
+    page.route(
+        lambda url: url.endswith("/api/paper-chat"),
+        lambda route: held.append(route),
+    )
+    hl_preview(page)
+    ask_tab(page)
+    ask(page, "first question")
+    pending = page.locator("#pv-chat-log .turn__pending")
+    expect(pending).to_have_text("Reading this paper. The first answer takes longer.")
+    expect(page.locator("#pv-chat-ask")).to_be_disabled()
+    expect(page.locator("#pv-chat-question")).to_be_enabled()
+    expect(pending).to_have_text("Still reading. Long papers take up to a minute.")
+    held[0].fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps(
+            {"answer": "ok [p.1]", "pages": [1], "refused": False, "dropped_pages": []}
+        ),
+    )
+    expect(page.locator("#pv-chat-ask")).to_be_enabled()
+    ask(page, "second question")
+    expect(page.locator("#pv-chat-log .turn__pending")).to_have_text("Reading this paper…")
+    held[1].abort()
+
+
+def test_chat_history_is_last_six_turns(app):
+    page = app
+    reqs = chat_requests(page)
+    stub_chat(
+        page,
+        lambda b: (
+            200,
+            {
+                "answer": f"A for {b['question']} [p.1]",
+                "pages": [1],
+                "refused": False,
+                "dropped_pages": [],
+            },
+        ),
+    )
+    hl_preview(page)
+    ask_tab(page)
+    for i in range(8):
+        ask(page, f"q{i}")
+        expect(chat_turns(page)).to_have_count(i + 1)
+        expect(page.locator("#pv-chat-ask")).to_be_enabled()
+    assert reqs[0]["history"] == []
+    assert reqs[1]["history"] == [{"question": "q0", "answer": "A for q0 [p.1]"}]
+    assert len(reqs[7]["history"]) == 6
+    assert reqs[7]["history"][0]["question"] == "q1" and reqs[7]["history"][-1]["question"] == "q6"
+
+
+def test_chat_cite_chip_jumps_to_page_and_flashes(app):
+    page = app
+    stub_chat(
+        page,
+        lambda b: (
+            200,
+            {
+                "answer": "See [p.3] and [p.99].",
+                "pages": [3],
+                "refused": False,
+                "dropped_pages": [99],
+            },
+        ),
+    )
+    hl_preview(page)
+    ask_tab(page)
+    ask(page, "where?")
+    cite = chat_turns(page).first.locator('.turn__a button.cite[data-page="3"]').first
+    expect(cite).to_have_text("p. 3")
+    expect(cite).to_have_attribute("aria-label", "Go to page 3")
+    expect(chat_turns(page).first.locator(".turn__a")).not_to_contain_text("99")
+    expect(chat_turns(page).first.locator(".sources")).to_contain_text("Pages: p. 3")
+    cite.click()
+    expect(page.locator("#pv-page-input")).to_have_value("3")
+    expect(page.locator('.pdf-page[data-page="3"]')).to_have_class(re.compile("is-flash"))
+    expect(page.locator("#pv-pages")).to_be_focused()
+
+
+def test_chat_arxiv_tokens_are_plain_chips(app):
+    page = app
+    stub_chat(
+        page,
+        lambda b: (
+            200,
+            {
+                "answer": "Per [arXiv:2401.00001] [p.1].",
+                "pages": [1],
+                "refused": False,
+                "dropped_pages": [],
+            },
+        ),
+    )
+    hl_preview(page)
+    ask_tab(page)
+    ask(page, "x")
+    chip = chat_turns(page).first.locator("span.cite")
+    expect(chip).to_have_text("arXiv:2401.00001")
+    expect(chip).not_to_have_attribute("role", "button")
+
+
+def test_chat_refusal_component(app):
+    page = app
+    stub_chat(
+        page,
+        lambda b: (
+            200,
+            {"answer": "That is not covered.", "pages": [], "refused": True, "dropped_pages": []},
+        ),
+    )
+    hl_preview(page)
+    ask_tab(page)
+    ask(page, "capital of France?")
+    r = chat_turns(page).first.locator(".turn__a--refused")
+    expect(r.locator(".turn__refused-title")).to_have_text("Not in this paper")
+    expect(r.locator(".turn__refused-body")).to_have_text("That is not covered.")
+    expect(r.locator(".turn__refused-hint")).to_have_text("Ask about something this paper covers.")
+    expect(chat_turns(page).first.locator("button.cite")).to_have_count(0)
+
+
+def test_chat_first_question_error_returns_to_idle_and_restores_input(app):
+    page = app
+    stub_chat(page, lambda b: (502, {"detail": "model call failed: boom"}))
+    hl_preview(page)
+    ask_tab(page)
+    ask(page, "my first question")
+    err = page.locator("#pv-chat-error")
+    expect(err).to_have_text("Could not answer. model call failed: boom")
+    expect(err).to_have_attribute("role", "alert")
+    expect(page.locator("#pv-chat-idle")).to_be_visible()
+    expect(chat_turns(page)).to_have_count(0)
+    expect(page.locator("#pv-chat-question")).to_have_value("my first question")
+
+
+def test_chat_later_error_offers_ask_again(app):
+    page = app
+    calls = []
+
+    def responder(b):
+        calls.append(b["question"])
+        if len(calls) == 2:
+            return 502, {"detail": "model call failed: boom"}
+        return 200, {"answer": "ok [p.1]", "pages": [1], "refused": False, "dropped_pages": []}
+
+    stub_chat(page, responder)
+    hl_preview(page)
+    ask_tab(page)
+    ask(page, "one")
+    expect(chat_turns(page)).to_have_count(1)
+    ask(page, "two")
+    err = chat_turns(page).nth(1).locator(".turn__err")
+    expect(err).to_contain_text("Could not answer. model call failed: boom")
+    err.get_by_role("button", name="Ask again").click()
+    expect(chat_turns(page).nth(1).locator(".turn__a")).to_be_visible()
+    assert calls == ["one", "two", "two"]
+
+
+def test_chat_disabled_without_ready_pdf(app):
+    page = app
+    reqs = chat_requests(page)
+    stub = preview(page, [lib_item(1, pdf={"status": "pending", "error": None, "pages": None})])
+    ask_tab(page)
+    expect(page.locator("#pv-chat-nopdf")).to_have_text(
+        "Chat needs the PDF text. It is not ready yet."
+    )
+    expect(page.locator("#pv-chat-question")).to_be_disabled()
+    expect(page.locator("#pv-chat-ask")).to_be_disabled()
+    expect(page.locator("#pv-chat-idle")).to_be_hidden()
+    stub.items[0]["pdf"] = {"status": "ready", "error": None, "pages": 3}
+    expect(page.locator("#pv-chat-question")).to_be_enabled(timeout=10_000)
+    expect(page.locator("#pv-chat-nopdf")).to_be_hidden()
+    assert reqs == []
+
+
+def test_chat_unavailable_pdf_copy(app):
+    page = app
+    preview(page, [lib_item(1, pdf={"status": "failed", "error": "Not a PDF.", "pages": None})])
+    ask_tab(page)
+    expect(page.locator("#pv-chat-nopdf")).to_have_text(
+        "Chat needs the PDF text, and this PDF is unavailable."
+    )
+    expect(page.locator("#pv-chat-question")).to_be_disabled()
+
+
+def test_chat_transcript_clears_on_close_and_reload(app):
+    page = app
+    stub_chat(
+        page,
+        lambda b: (
+            200,
+            {"answer": "ok [p.1]", "pages": [1], "refused": False, "dropped_pages": []},
+        ),
+    )
+    page.add_init_script("window.__PT_UNDO_MS = 800")
+    preview(page, [lib_item(1)], hash_="#/library")
+    page.locator(".open-preview").first.click()
+    expect(page.locator(".pdf-page")).to_have_count(3)
+    ask_tab(page)
+    ask(page, "hello")
+    expect(chat_turns(page)).to_have_count(1)
+    page.click("#pv-back")
+    page.locator(".open-preview").first.click()
+    expect(page.locator(".pdf-page")).to_have_count(3)
+    ask_tab(page)
+    expect(chat_turns(page)).to_have_count(0)
+    expect(page.locator("#pv-chat-idle")).to_be_visible()
+    ask(page, "again")
+    expect(chat_turns(page)).to_have_count(1)
+    page.reload()
+    expect(page.locator(".pdf-page")).to_have_count(3)
+    ask_tab(page)
+    expect(chat_turns(page)).to_have_count(0)
+
+
+def test_tabs_keyboard_roving_arrows_home_end(app):
+    page = app
+    hl_preview(page)
+    tabs = page.locator("#pv-tabs [role=tab]")
+    assert [t.inner_text().strip() for t in tabs.all()][1] == "Ask this paper"
+    expect(page.locator("#pv-tabs")).to_have_attribute("role", "tablist")
+    hl, chat = page.locator("#pv-tab-hl"), page.locator("#pv-tab-chat")
+    expect(hl).to_have_attribute("aria-controls", "pv-tabpanel-hl")
+    expect(chat).to_have_attribute("aria-controls", "pv-tabpanel-chat")
+    hl.focus()
+    page.keyboard.press("ArrowRight")
+    expect(chat).to_be_focused()
+    expect(chat).to_have_attribute("aria-selected", "true")
+    expect(hl).to_have_attribute("aria-selected", "false")
+    expect(page.locator("#pv-tabpanel-chat")).to_be_visible()
+    expect(page.locator("#pv-tabpanel-hl")).to_be_hidden()
+    page.keyboard.press("Home")
+    expect(hl).to_be_focused()
+    page.keyboard.press("End")
+    expect(chat).to_be_focused()
+    page.keyboard.press("ArrowRight")
+    expect(hl).to_be_focused()
+
+
+def test_slash_focuses_chat_input_in_preview(app):
+    page = app
+    hl_preview(page)
+    ask_tab(page)
+    page.locator("#pv-pages").focus()
+    page.keyboard.press("/")
+    expect(page.locator("#pv-chat-question")).to_be_focused()
+
+
+def test_sheet_below_1024_opens_modal_with_tabs_and_returns_focus(app):
+    page = app
+    page.set_viewport_size({"width": 800, "height": 900})
+    stub_chat(
+        page,
+        lambda b: (
+            200,
+            {"answer": "ok [p.2]", "pages": [2], "refused": False, "dropped_pages": []},
+        ),
+    )
+    page.add_init_script("window.__PT_UNDO_MS = 800")
+    preview(page, [lib_item(1)])
+    page.set_viewport_size({"width": 800, "height": 900})
+    expect(page.locator(".pdf-page")).to_have_count(3)
+    expect(page.locator("#pv-panel")).to_be_hidden()
+    btn = page.locator("#pv-sheet-open")
+    expect(btn).to_have_text("Highlights and chat")
+    expect(page.locator("#pv-sheet")).not_to_have_attribute("open", "")
+    btn.click()
+    sheet = page.locator("#pv-sheet")
+    expect(sheet).to_be_visible()
+    assert sheet.evaluate("e => e.open && e.matches(':modal')")
+    expect(sheet.locator("#pv-tabs")).to_be_visible()
+    sheet.locator("#pv-tab-chat").click()
+    ask(page, "where")
+    expect(sheet.locator("#pv-chat-log li.turn")).to_have_count(1)
+    # Esc closes and returns focus to the toolbar button.
+    page.keyboard.press("Escape")
+    expect(sheet).not_to_have_attribute("open", "")
+    expect(btn).to_be_focused()
+    # Close button does the same.
+    btn.click()
+    sheet.locator("#pv-sheet-close").click()
+    expect(btn).to_be_focused()
+    # A cite chip closes the sheet first, then jumps.
+    btn.click()
+    sheet.locator("#pv-tab-chat").click()
+    sheet.locator("button.cite").first.click()
+    expect(sheet).not_to_have_attribute("open", "")
+    expect(page.locator("#pv-page-input")).to_have_value("2")
+    expect(page.locator("#pv-pages")).to_be_focused()
+
+
+def test_sheet_opens_for_note_from_popover_and_closes_when_wide(app):
+    page = app
+    page.set_viewport_size({"width": 800, "height": 900})
+    stub = preview(page, [lib_item(1)])
+    page.set_viewport_size({"width": 800, "height": 900})
+    expect(page.locator('.pdf-page[data-page="1"].has-text')).to_have_count(1, timeout=10_000)
+    drag_select(page, "Abstract")
+    page.locator("#pv-popover").get_by_role("button", name="Add note").click()
+    expect(page.locator("#pv-sheet")).to_be_visible()
+    expect(page.locator("#pv-sheet textarea")).to_be_focused()
+    page.locator("#pv-sheet textarea").fill("from the sheet")
+    page.locator("#pv-sheet textarea").press("Control+Enter")
+    assert stub.annotations[0]["note"] == "from the sheet"
+    page.set_viewport_size({"width": 1280, "height": 900})
+    expect(page.locator("#pv-sheet")).not_to_have_attribute("open", "")
+    expect(page.locator("#pv-panel")).to_be_visible()
+    expect(items(page)).to_have_count(1)
+
+
+# Real harness (BE T057-T058): grounded answer with a page cite, refusal, no early request.
+
+
+def test_real_paper_chat_cites_page_2_and_jumps(app, real_library):
+    page = _real_preview(app, real_library)
+    reqs = chat_requests(page)
+    ask_tab(page)
+    page.wait_for_timeout(300)
+    assert reqs == []
+    ask(page, "Where is Quartzite discussed?")
+    expect(chat_turns(page)).to_have_count(1)
+    cite = chat_turns(page).first.locator('button.cite[data-page="2"]').first
+    expect(cite).to_have_text("p. 2", timeout=20_000)
+    assert reqs[0]["paper_id"] == "2401.00001" and reqs[0]["history"] == []
+    cite.click()
+    expect(page.locator("#pv-page-input")).to_have_value("2")
+
+
+def test_real_paper_chat_refuses_outside_the_paper(app, real_library):
+    page = _real_preview(app, real_library)
+    ask_tab(page)
+    ask(page, "What is the capital of France?")
+    expect(chat_turns(page).first.locator(".turn__a--refused")).to_be_visible(timeout=20_000)
+    expect(chat_turns(page).first.locator("button.cite")).to_have_count(0)
+    expect(chat_turns(page).first.locator(".turn__refused-title")).to_have_text("Not in this paper")
