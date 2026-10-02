@@ -68,3 +68,25 @@ When FE wave E reports → spawn tester (T038-T041 full suite) → sentinel → 
 ### Next
 None. Await user.
 
+
+## Checkpoint: v3 Amendment Planning (2026-10-03)
+
+**Task**: v3 amendment phase checkpoint (research + design + spec phase 1 complete, planner phase 2 queued)
+**Status**: DONE
+**Findings**: v2 complete (all 42 tasks, fixes F-006/F-007/F-008 shipped GREEN). v3 research/design/spec amendment phase 1 done. Planner ready for phase 2 (constitution 2.0.0, plan, data-model, contracts, tasks, analyze).
+
+### Actions taken
+- Collected v2 tail state: F-006 c205d59, F-007/F-008 c911fa1 (236 pytest, 15 e2e x3, ruff clean)
+- Collected v3 state: research docs/research/v3-library-preview.md, design docs/design/v3-library-brief.md (Rev 2), spec amendment 753d0a5
+- Updated checkpoint.md: phase="v3 planning", summary of v2 fixes, v3 research/design/spec, user decisions, planner phase 2 next
+- Updated progress.json: phase="v3 planning", DONE=false, T001-T042 all done
+- Appended sentinel.md (this file)
+
+### Verified
+- v2 tester final: 236 pytest, 15 e2e x3, ruff clean (docs/qa/F-006.md, failures.md)
+- v3 research: docs/research/v3-library-preview.md complete (pdfjs, pypdf, Range, throttle facts)
+- v3 design: docs/design/v3-library-brief.md (Rev 2) complete (L1-L24 FE, B1-B8 BE)
+- v3 spec amendment: 753d0a5 (US4-US9, FR-008a, FR-015..029, SC-009..016, 7 entities, 9 edge cases)
+
+### Next
+When planner phase 2 reports → spawn backend-builder + frontend-builder in parallel on v3 wave 1 per tasks.md Lanes → tester → sentinel.

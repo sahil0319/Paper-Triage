@@ -1,5 +1,5 @@
 {
-  "phase": "done (v2)",
+  "phase": "v3 planning",
   "tasks": {
     "T001": "done",
     "T002": "done",
@@ -45,9 +45,9 @@
     "T042": "done"
   },
   "last_checkpoint_ts": 1728050400,
-  "context_pct": 49.7,
+  "context_pct": 29.3,
   "last_warn_level": 0,
   "last_warn_ts": 1790850814.690676,
-  "DONE": true,
+  "DONE": false,
   "last_precompact_ts": 1790846263.5785239
 }

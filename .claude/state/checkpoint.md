@@ -1,76 +1,74 @@
-# Checkpoint: v2 Complete
+# Checkpoint: v3 Amendment in Progress
 
-**Phase**: done (v2 amendment: redesign, searching indicator, paper links, chat scope, load-more, e2e browser tests)
+**Phase**: v3 planning (v2 complete, v3 research + design + spec phase 1 done; planner phase 2 queued)
 
-**Status**: ALL TASKS DONE. Tester final pass GREEN.
+**Status**: Fixes F-006/F-007/F-008 shipped and verified GREEN. v3 user request research, design brief, and spec amendment committed. Planner ready for phase 2.
 
 ## Summary
 
-All 42 tasks complete. v2 amendment (16 tasks, T027-T042) delivered.
+v2 project (T001-T042) complete and tested (236 pytest pass, 15 e2e stable, ruff clean).
 
-- Pytest: 230 pass (MOCK_LLM=1 offline)
-- E2E: 9 pass (x3 stable, Playwright chromium, zero external requests)
+v3 user request live: save papers to local library; in-app PDF preview (pdfjs-dist vendored, Range-served); keyword tags with AND multi-select; user directories; PDF annotations (highlights 4 colors, notes); per-paper chat (transcript page-only); chat disabled when no PDF.
+
+Research + design + spec amendment (phase 1) complete:
+- docs/research/v3-library-preview.md: pdfjs-dist 6.3.289 vendor option, pypdf per-page text, FileResponse Range support, arXiv throttle.
+- docs/design/v3-library-brief.md (Rev 2): L1-L24 FE items (Library sidebar, save/unsave, tags, directories, PDF viewer, chat), B1-B8 BE needs (save paper, PDF serve, tags CRUD, etc).
+- PRODUCT.md Library draft: docs/design/product-md-library-draft.md (user to paste when ready).
+- specs/001-paper-triage/spec.md commit 753d0a5: US4-US9 (save/unsave/tagging stories), FR-008a (F-006 chat clear/rescope), FR-015..029 (Library features), SC-009..016 (PDF viewer, annotations, per-paper chat scenarios), 7 new entities, 9 edge cases, assumptions.
+
+## Fixes shipped (v2 tail)
+
+**F-006** (c205d59): load-more and new search clear chat transcript and rescope to new paper set.
+- Root: transcript never cleared.
+- Fix: resetChat() appends scope sentence to #status (once per result-set change).
+- Verify: docs/qa/F-006.md (tester e2e 12 x3 stable, pytest 233 pass).
+
+**F-007/F-008** (c911fa1): chat reset announced once in #status; #ask re-enabled after stale reply settles.
+- Root: reset announced per row; Ask disabled during in-flight reply.
+- Fix: resetChat appends scope once via observer pattern; stale replies dropped via chatGen.
+- Verify: tester e2e 15 x3 stable, pytest 236 pass; docs/qa/failures.md + F-006.md.
+
+## v2 test results (final)
+
+- Pytest: 236 pass (MOCK_LLM=1 offline)
+- E2E: 15 pass (x3 stable, Playwright chromium, E2E_PORT 8766)
 - Ruff: clean
-- Impeccable: 2 known false positives (A1)
+- Repo: .db/.env ignored, no secrets, uv.lock tracked
 
-## Wave D (T027-T042)
+## User decisions (v3 all approved)
 
-Commit 63fc73e (T033 last) through 0311833 (T042 latest).
+- Constitution 2.0.0 scope bump (added Library stories/features).
+- Paper chat page-only (not full-text).
+- PDF cap 50 MB.
+- Re-save keeps first snapshot; tags merge.
+- Direct PDF URLs savable (pdf:<sha12> ids).
+- Evergreen browsers, modern pdf.js.
+- Notes don't feed chat.
+- Vendored pdf.js approved.
+- 4 highlight colors: yellow, green, blue, pink.
+- Chat disabled when no PDF.
+- Unsave confirms and deletes PDF + annotations.
 
-**BE T027-T033, T042**:
-- T027: abs_url/pdf_url source links
-- T028: 15-entry mock feed, start/totalResults
-- T029: offset paging for topic searches
-- T030: MockClient scope (content word matching)
-- T031: chat scoped to paper_ids (max 50)
-- T032: Playwright harness (E2E_PORT 8766)
-- T033: API-level v2 smoke (links, paging, scope)
-- T042: README v2 (features, e2e setup, E2E_PORT)
+## In progress
 
-**FE T034-T037**:
-- T034: static asset guard (no external URLs, hooks)
-- T035: redesign shell (tokens, nav, query, results, chat, empty, alert)
-- T036: redesigned rendering (rows, rank, disclosure, turns, citations, refusal, states)
-- T037: searching indicator (cream card, verb rotate, timer, aria-live, reduced motion)
+**Planner phase 2**: Constitution 2.0.0 → specify/clarify/plan/tasks/analyze for v3 features.
+- Input: v3 user request + research + design.
+- Output: constitution.md 2.0.0, amended spec.md, data-model.md, contracts (api.md v3), tasks T043+ with Lanes/waves, analysis.md.
+- Blocker resolved: phase 1 complete (spec.md amended); ready to start.
 
-## Wave E (T038-T041)
+## Open items
 
-Commits ad4980c (T038) through 0abd7b4 (T041).
+1. **analysis.md**: planner phase 2 will write specs/001-paper-triage/analysis.md (speckit-analyze output).
+2. **PRODUCT.md**: user to paste Library section from docs/design/product-md-library-draft.md (orchestrator action).
+3. **Checklist**: specs/001-paper-triage/checklists/v2-requirements.md 11/28 ticked; v3 checklists TBD after phase 2.
+4. **No-mistakes gate**: deferred (needs .local/bare.git).
 
-**FE T038-T041**:
-- T038 ad4980c: paper links (arXiv page, PDF, a11y labels)
-- T039 98066a2: load 5 more (offset paging, dedupe, focus, error retry)
-- T040 51587b9: chat scope wiring (paper_ids from rows, disabled when empty)
-- T041 0abd7b4: browser e2e specs (indicator, links, load-more, chat scope/refusal)
-
-**Fixes (verified GREEN on HEAD 568d480)**:
-- F-002 6cd65e0: re-run refreshes last-run marker
-- F-003 a04adfc: reduced-motion new-row cue as background tint
-- F-004 568d480: direct-PDF row, self-contained cites-only, refusal positive control
-- F-005 bbbe244: e2e harness fails fast when port in use
-
-## Verification
-
-- Tasks: T001-T042 all ticked in tasks.md, all have matching `T00X` commits
-- Tester: final pass GREEN (docs/qa/final.md)
-- Repo: .db/.env ignored, no secrets tracked, fresh clone feasible (uv.lock tracked)
-
-## Open items for user
-
-1. **analysis.md**: specs/001-paper-triage/analysis.md not persisted (harness blocks planner writes). User to: (a) write themselves, (b) ask router to write, or (c) skip.
-2. **.venv shebangs**: local .venv stale shebangs. Fix: `rm -rf .venv && uv sync`
-3. **no-mistakes gate**: deferred. Needs `.local/bare.git` init + remote config.
-4. **load-more e2e gaps**: error state, 50-cap, empty-set chat disabled not covered in T041 (manually verified in docs/qa/final.md).
-5. **checklist**: specs/001-paper-triage/checklists/v2-requirements.md 11/28 ticked; rest are spec gaps/decisions for review.
-6. **advisories**: A1 impeccable detect false positives (optional fix); A3 mock chat first-word-match citation (per contract).
-
-## Files touched (this checkpoint)
+## Files touched
 
 - `.claude/state/checkpoint.md` (this file)
-- `.claude/state/progress.json` (DONE=true, phase="done (v2)", all tasks done)
+- `.claude/state/progress.json` (phase, tasks, DONE=false, context_pct)
 - `.claude/state/agents/sentinel.md` (appended)
 
 ## Next
 
-None. Project complete. User may initialize no-mistakes gate, fix .venv, persist analysis.md, review checklist, or request optional enhancements.
-
+When planner reports phase 2 done → spawn backend-builder + frontend-builder in parallel on v3 wave 1 per Lanes section in tasks.md → tester → sentinel.
