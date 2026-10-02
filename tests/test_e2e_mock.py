@@ -10,8 +10,9 @@ from paper_triage.app import create_app
 
 
 @pytest.fixture
-def client(tmp_db, monkeypatch):
+def client(tmp_db, tmp_path, monkeypatch):
     monkeypatch.setenv("MOCK_LLM", "1")
+    monkeypatch.setenv("PAPER_TRIAGE_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.setenv("PAPER_TRIAGE_DB", tmp_db)
 
@@ -129,3 +130,48 @@ def test_v2_pdf_url_item_links(client):
     (item,) = r["results"]
     assert item["abs_url"] is None and item["pdf_url"] == "https://example.org/a.pdf"
     assert r["has_more"] is False and r["next_offset"] is None
+
+
+def test_v3_library_flow_offline(client, tmp_path):
+    """search -> save -> ready -> pdf -> highlight -> paper chat -> directories -> unsave."""
+    topic = "diffusion distillation"
+    results = client.post("/api/triage", json={"query": topic, "max_results": 5}).json()["results"]
+    pid = "2401.00001"
+    assert pid in {r["paper_id"] for r in results}
+
+    saved = client.post("/api/library", json={"paper_id": pid, "topic": topic})
+    assert saved.status_code == 201 and saved.json()["paper"]["tags"] == ["diffusion", "distillation"]
+    item = client.get("/api/library").json()["papers"][0]
+    assert item["pdf"] == {"status": "ready", "error": None, "pages": 3}
+
+    pdf = client.get("/api/library/pdf", params={"paper_id": pid})
+    assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF-")
+    files = list((tmp_path / "data" / "pdfs").glob("*.pdf"))
+    assert len(files) == 1
+
+    hl = client.post("/api/annotations", json={
+        "paper_id": pid, "page": 2, "kind": "highlight", "rects": [[0.1, 0.2, 0.3, 0.02]],
+        "quote": "Quartzite filters",
+    })
+    assert hl.status_code == 201
+    assert client.get("/api/library").json()["papers"][0]["highlight_count"] == 1
+
+    chat = client.post("/api/paper-chat", json={"paper_id": pid, "question": "Where is Quartzite?"})
+    assert chat.status_code == 200
+    body = chat.json()
+    assert body["refused"] is False and body["pages"] == [2] and "[p.2]" in body["answer"]
+
+    d = client.post("/api/directories", json={"name": "Filters"}).json()
+    moved = client.post("/api/library/move", json={"paper_id": pid, "directory_id": d["id"]})
+    assert moved.status_code == 200
+    lib = client.get("/api/library").json()
+    assert lib["directories"] == [{"id": d["id"], "name": "Filters", "count": 1}]
+    assert client.delete(f"/api/directories/{d['id']}").json() == {"deleted": True, "moved": 1}
+    assert client.get("/api/library").json()["unsorted_count"] == 1
+
+    gone = client.delete("/api/library", params={"paper_id": pid})
+    assert gone.json() == {"deleted": True, "annotations": 1}
+    assert list((tmp_path / "data" / "pdfs").glob("*")) == []
+    assert client.get("/api/library/pdf", params={"paper_id": pid}).status_code == 404
+    assert client.get("/api/library").json()["total"] == 0
+    assert _stored_ids(client)  # papers and results survive an unsave

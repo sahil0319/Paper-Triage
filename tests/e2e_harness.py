@@ -4,7 +4,9 @@ searching indicator can be observed."""
 
 import asyncio
 import os
+import shutil
 import socket
+import tempfile
 import threading
 import time
 
@@ -33,7 +35,7 @@ class _TriageDelay:
 class LiveServer:
     def __init__(self, db_path: str, port: int | None = None):
         self.db_path = db_path
-        self.data_dir = os.path.join(os.path.dirname(db_path) or ".", "data")  # saved PDFs
+        self.data_dir: str | None = None  # temp dir for saved PDFs, made by start(), removed by stop()
         self.port = port or int(os.environ.get("E2E_PORT", "8766"))
         self.triage_delay = 0.0
         self._server: uvicorn.Server | None = None
@@ -60,6 +62,7 @@ class LiveServer:
 
     def start(self) -> None:
         self._check_port_free()
+        self.data_dir = tempfile.mkdtemp(prefix="paper-triage-data-")
         for key, value in (
             ("MOCK_LLM", "1"), ("PAPER_TRIAGE_DB", self.db_path),
             ("PAPER_TRIAGE_DATA_DIR", self.data_dir),
@@ -100,3 +103,6 @@ class LiveServer:
             else:
                 os.environ[key] = old
         self._saved_env.clear()
+        if self.data_dir is not None:
+            shutil.rmtree(self.data_dir, ignore_errors=True)
+            self.data_dir = None

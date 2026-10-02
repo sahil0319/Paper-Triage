@@ -480,7 +480,7 @@ hooks. Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest 
   422; unsaved -> 404; LLM error -> 502; annotations never appear in the prompt (spy). Then
   `pt/paper_chat.py` (context `<page n>` blocks, 300,000-char cap, history, `[p.N]`
   validation), `pt/prompts/paper_chat.md`, `pt/models.py`, `pt/app.py`.
-- [ ] T059 [BE] Harness + v3 API smoke offline. `tests/e2e_harness.py`: LiveServer sets
+- [x] T059 [BE] Harness + v3 API smoke offline. `tests/e2e_harness.py`: LiveServer sets
   `PAPER_TRIAGE_DATA_DIR` to a temp dir and cleans it up. `tests/test_e2e_mock.py` (socket
   guard on): search -> save -> library `ready` -> pdf 200 -> highlight -> paper chat cites
   `p.2` -> directory create/move/delete -> unsave leaves no file. `tests/test_e2e_harness.py`:
