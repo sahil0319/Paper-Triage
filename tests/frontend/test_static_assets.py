@@ -20,6 +20,12 @@ REQUIRED_IDS = [
     "alert",
     "working",
     "load-more",
+    "library",
+    "library-heading",
+    "library-list",
+    "preview",
+    "preview-heading",
+    "pv-back",
 ]
 
 
@@ -83,7 +89,6 @@ def test_status_is_polite_live_region():
 
 def test_alert_has_role_alert():
     assert _html().ids["alert"].get("role") == "alert"
-
 
 
 def test_working_indicator_contract():
@@ -162,3 +167,14 @@ def test_vendored_pdfjs_version_pinned():
 
 def test_vendored_pdfjs_license_is_apache():
     assert "Apache License" in (PDFJS / "LICENSE").read_text(encoding="utf-8")
+
+
+def test_nav_has_view_links_and_per_view_regions():
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert '<nav class="views"' in html
+    assert 'data-view="triage"' in html and 'data-view="library"' in html
+    assert "views__count" in html
+    for view in ("triage", "library", "preview"):
+        assert f'data-route="{view}"' in html
+        assert f'data-skip="{view}"' in html
+    assert 'type="module" src="viewer.js"' in html

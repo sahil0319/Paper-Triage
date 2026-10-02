@@ -7,14 +7,22 @@
   <meta name="description" content="Rank a pile of papers by relevance, with an honest critique of each.">
   <link rel="stylesheet" href="app.css">
   <script src="app.js" defer></script>
+  <script type="module" src="viewer.js"></script>
 </head>
 <body>
-  <a class="skip" href="#results-heading">Skip to results</a>
-  <a class="skip" href="#chat-heading">Skip to chat</a>
+  <a class="skip" data-skip="triage" href="#results-heading">Skip to results</a>
+  <a class="skip" data-skip="triage" href="#chat-heading">Skip to chat</a>
+  <a class="skip" data-skip="library" href="#library-list" hidden>Skip to saved papers</a>
+  <a class="skip" data-skip="preview" href="#pv-pages" hidden>Skip to PDF</a>
+  <a class="skip" data-skip="preview" href="#pv-panel" hidden>Skip to highlights and chat</a>
 
   <header class="global-nav">
     <div class="container global-nav__inner">
       <span class="brand">Paper Triage</span>
+      <nav class="views" aria-label="Views">
+        <a href="#/" data-view="triage" aria-current="page">Triage</a>
+        <a href="#/library" data-view="library">Library<span class="views__count" hidden></span></a>
+      </nav>
       <div class="global-nav__meta">
         <p id="model" class="model" hidden></p>
         <p id="mock-label" class="mock-label" hidden><span class="badge">Mock mode</span><span class="mock-label__more">Canned responses, no model calls.</span></p>
@@ -22,10 +30,12 @@
     </div>
   </header>
 
-  <section class="intro" aria-labelledby="intro-heading">
+  <p id="status" class="sr-only" role="status" aria-live="polite"></p>
+
+  <section id="triage-intro" class="intro" data-route="triage" aria-labelledby="intro-heading">
     <div class="container">
       <div class="intro__inner">
-        <h1 id="intro-heading">Find the papers worth reading.</h1>
+        <h1 id="intro-heading" tabindex="-1">Find the papers worth reading.</h1>
         <p class="lead">Rank a pile of papers by relevance, with a skeptical critique of each.</p>
         <form id="triage-form" class="triage-form" role="search" novalidate>
           <label class="sr-only" for="query">Topic, arXiv IDs, or PDF URLs</label>
@@ -39,11 +49,10 @@
     </div>
   </section>
 
-  <main id="main" class="container workspace">
+  <main id="main" class="container workspace" data-route="triage">
     <section class="results" aria-labelledby="results-heading" aria-busy="false">
       <h2 id="results-heading">Ranked papers</h2>
       <p id="results-count" class="results__count" hidden></p>
-      <p id="status" class="sr-only" role="status" aria-live="polite"></p>
       <div id="working" class="working" role="group" aria-label="Triage in progress" hidden></div>
       <div id="alert" class="alert" role="alert" hidden></div>
       <div id="notes" class="notes" hidden></div>
@@ -83,6 +92,23 @@
         <button id="ask" class="btn btn--primary btn--ask" type="submit">Ask</button>
       </form>
     </aside>
+  </main>
+
+  <main id="library" class="container library" data-route="library" aria-labelledby="library-heading" hidden>
+    <h1 id="library-heading" class="library__h" tabindex="-1">Library</h1>
+    <p id="library-count" class="results__count" hidden></p>
+    <p id="library-loading" class="results__count" hidden>Loading your library…</p>
+    <div id="library-alert" class="alert" role="alert" hidden></div>
+    <div id="library-empty" class="empty" hidden></div>
+    <ol id="library-list" class="papers" tabindex="-1"></ol>
+  </main>
+
+  <main id="preview" class="preview" data-route="preview" aria-labelledby="preview-heading" hidden>
+    <div class="pv-bar">
+      <button id="pv-back" type="button" class="btn btn--secondary btn--small pv-back">Library</button>
+      <h1 id="preview-heading" class="pv-title" tabindex="-1">Preview</h1>
+    </div>
+    <div id="pv-stage" class="pv-stage"></div>
   </main>
 </body>
 </html>

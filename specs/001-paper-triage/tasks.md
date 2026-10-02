@@ -429,7 +429,7 @@ hooks. Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest 
   files + LICENSE once from the npm registry tarball (`pdfjs-dist-6.3.289.tgz`) and write
   VERSION with source URL and sha256 of each file. Files `pt/static/vendor/pdfjs/**`,
   `tests/frontend/test_static_assets.py`.
-- [ ] T053 [FE] [US5] Shell, nav and hash routes (brief L1, L2, sections 5-7). `pt/static/index.html`:
+- [x] T053 [FE] [US5] Shell, nav and hash routes (brief L1, L2, sections 5-7). `pt/static/index.html`:
   `nav.views` with `a[data-view="triage"]`, `a[data-view="library"]` + `.views__count`;
   empty `#library` and `#preview` sections (hidden), per-view skip links; `app.js` router for
   `#/`, `#/library?dir=&tags=&q=`, `#/library/paper/<encoded id>`: toggles `hidden`, keeps

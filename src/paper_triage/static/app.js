@@ -126,8 +126,10 @@
 
   function getJSON(url) {
     return fetch(url).then(function (res) {
-      if (!res.ok) throw new Error(String(res.status));
-      return res.json();
+      return res.json().catch(function () { return null; }).then(function (body) {
+        if (!res.ok) throw new Error(errorText(res, body));
+        return body;
+      });
     });
   }
 
@@ -853,13 +855,369 @@
     var t = ev.target;
     var tag = t && t.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (t && t.isContentEditable)) return;
+    // `/` focuses the main input of the current view.
+    var target = route.view === "library" ? document.getElementById("lib-filter")
+      : route.view === "preview" ? document.getElementById("pv-chat-input") : input;
+    if (!target) return;
     ev.preventDefault();
-    input.focus();
+    target.focus();
   });
 
   input.addEventListener("keydown", function (ev) {
     if (ev.key === "Escape" && !state.running) input.value = "";
   });
+
+
+  // ---- views, hash routes, Library data (v3: L1, L2, L14) ----
+  // Triage state stays in memory: switching views only toggles `hidden` (FR-024).
+
+  var libraryEl = document.getElementById("library");
+  var libHeading = document.getElementById("library-heading");
+  var libCountEl = document.getElementById("library-count");
+  var libLoadingEl = document.getElementById("library-loading");
+  var libAlertEl = document.getElementById("library-alert");
+  var libEmptyEl = document.getElementById("library-empty");
+  var libListEl = document.getElementById("library-list");
+  var navCountEl = document.querySelector(".views__count");
+  var previewHeading = document.getElementById("preview-heading");
+  var pvStage = document.getElementById("pv-stage");
+  var pvBack = document.getElementById("pv-back");
+
+  var BASE_TITLE = "Paper Triage";
+  var HEADINGS = { triage: "intro-heading", library: "library-heading", preview: "preview-heading" };
+
+  var route = { view: null, id: null, params: null, hash: "" };
+  var libReturn = null;     // where the Library was left for a Preview: hash, scroll, paper id
+  var triageScroll = 0;
+  var cameFromLibrary = false;
+  var viewer = null;        // set by viewer.js through PT.registerViewer
+  if (window.history && "scrollRestoration" in history) history.scrollRestoration = "manual";
+
+  var lib = { papers: [], directories: [], unsorted: 0, total: 0, loaded: false, error: null,
+    pending: null, sig: "" };
+
+  function parseParams(qs) {
+    var out = { dir: "", tags: [], q: "" };
+    String(qs || "").split("&").forEach(function (pair) {
+      if (!pair) return;
+      var i = pair.indexOf("=");
+      var k = i < 0 ? pair : pair.slice(0, i);
+      var v = i < 0 ? "" : pair.slice(i + 1);
+      try {
+        if (k === "dir") out.dir = decodeURIComponent(v);
+        else if (k === "q") out.q = decodeURIComponent(v);
+        else if (k === "tags") {
+          out.tags = v.split(",").filter(Boolean).map(function (t) { return decodeURIComponent(t); });
+        }
+      } catch (e) { /* malformed escape: ignore this parameter */ }
+    });
+    return out;
+  }
+
+  function libraryHash(p) {
+    var parts = [];
+    if (p && p.dir) parts.push("dir=" + encodeURIComponent(p.dir));
+    if (p && p.tags && p.tags.length) parts.push("tags=" + p.tags.map(encodeURIComponent).join(","));
+    if (p && p.q) parts.push("q=" + encodeURIComponent(p.q));
+    return "#/library" + (parts.length ? "?" + parts.join("&") : "");
+  }
+
+  function previewHash(id) {
+    return "#/library/paper/" + encodeURIComponent(id);
+  }
+
+  // null = a plain in-page fragment (#paper-<id>, skip links): not a route change.
+  function parseRoute(hash) {
+    if (!hash || hash === "#" || hash === "#/") return { view: "triage" };
+    if (hash.indexOf("#/") !== 0) return null;
+    var rest = hash.slice(2);
+    var q = rest.indexOf("?");
+    var parts = (q < 0 ? rest : rest.slice(0, q)).split("/");
+    var qs = q < 0 ? "" : rest.slice(q + 1);
+    if (parts[0] !== "library") return { view: "triage" };
+    if (parts.length === 1 || (parts.length === 2 && parts[1] === "")) {
+      return { view: "library", params: parseParams(qs) };
+    }
+    if (parts[1] === "paper" && parts.length >= 3) {
+      try {
+        return { view: "preview", id: decodeURIComponent(parts.slice(2).join("/")) };
+      } catch (e) { return { view: "triage" }; }
+    }
+    return { view: "library", params: parseParams(qs) };
+  }
+
+  function jump(top) {
+    window.scrollTo({ top: top, left: 0, behavior: "instant" });
+  }
+
+  function libItem(id) {
+    for (var i = 0; i < lib.papers.length; i++) if (lib.papers[i].paper_id === id) return lib.papers[i];
+    return null;
+  }
+
+  function updateNavCount() {
+    var n = lib.loaded ? lib.total : 0;
+    navCountEl.textContent = String(n);
+    navCountEl.hidden = !n;
+  }
+
+  function setLibrary(data) {
+    lib.papers = data.papers || [];
+    lib.directories = data.directories || [];
+    lib.unsorted = data.unsorted_count || 0;
+    lib.total = typeof data.total === "number" ? data.total : lib.papers.length;
+    lib.loaded = true;
+    lib.error = null;
+    updateNavCount();
+  }
+
+  // Fetches GET /api/library once at a time. Resolves true when the data changed.
+  function loadLibrary() {
+    if (lib.pending) return lib.pending;
+    lib.pending = getJSON("/api/library").then(function (data) {
+      var sig = JSON.stringify(data);
+      var changed = sig !== lib.sig;
+      lib.sig = sig;
+      if (changed || !lib.loaded) setLibrary(data);
+      return changed;
+    }).catch(function (err) {
+      lib.error = err.message === "Failed to fetch" ? NETWORK_MSG : failMessage(err);
+      return true;
+    }).then(function (changed) {
+      lib.pending = null;
+      return changed;
+    });
+    return lib.pending;
+  }
+
+  // After a save or unsave elsewhere on the page: keep the cached list and nav count current.
+  function libraryAdd(item) {
+    if (!item || libItem(item.paper_id)) return;
+    lib.papers.unshift(item);
+    lib.total = lib.papers.length;
+    lib.loaded = true;
+    lib.sig = "";
+    updateNavCount();
+  }
+
+  function libraryRemove(id) {
+    lib.papers = lib.papers.filter(function (p) { return p.paper_id !== id; });
+    lib.total = lib.papers.length;
+    lib.sig = "";
+    updateNavCount();
+  }
+
+  // ---- Library view (placeholder list until T060 adds filters, directories and tags) ----
+
+  var loadingTimer = null;
+
+  function libRow(it) {
+    var titleId = "lib-title-" + it.paper_id;
+    var open = h("button", { type: "button", class: "btn btn--secondary btn--small open-preview",
+      "data-open-preview": it.paper_id, "aria-describedby": titleId }, "Open preview");
+    open.addEventListener("click", function () { location.hash = previewHash(it.paper_id); });
+    var meta = h("div", { class: "paper__meta" },
+      h("span", { class: "paper__id" }, it.paper_id), paperLinks(it));
+    return h("li", { class: "paper", "data-paper-id": it.paper_id },
+      rankBlock(it, false),
+      h("div", { class: "paper__body" },
+        h("div", { class: "paper__head" },
+          h("h3", { class: "paper__title", id: titleId }, it.title), open),
+        authorsLine(it.authors) ? h("p", { class: "paper__authors" }, authorsLine(it.authors)) : null,
+        it.rank_reason ? h("p", { class: "paper__reason" }, it.rank_reason) : null,
+        meta, details(it)));
+  }
+
+  function restoreLibraryReturn() {
+    if (!libReturn || libReturn.hash !== route.hash) return;
+    var ret = libReturn;
+    libReturn = null;
+    var btn = null;
+    var btns = libListEl.querySelectorAll("[data-open-preview]");
+    for (var i = 0; i < btns.length; i++) {
+      if (btns[i].getAttribute("data-open-preview") === ret.id) btn = btns[i];
+    }
+    jump(ret.y);
+    if (btn) btn.focus({ preventScroll: true });
+  }
+
+  function renderLibrary(restore) {
+    window.clearTimeout(loadingTimer);
+    var waiting = !lib.loaded && !lib.error;
+    libLoadingEl.hidden = true;
+    if (waiting) {
+      loadingTimer = window.setTimeout(function () {
+        if (!lib.loaded && !lib.error && route.view === "library") libLoadingEl.hidden = false;
+      }, SHOW_DELAY_MS);
+    }
+    clear(libAlertEl);
+    libAlertEl.hidden = true;
+    libEmptyEl.hidden = true;
+    clear(libListEl);
+    libCountEl.hidden = true;
+    if (lib.error && !lib.loaded) {
+      var retry = h("button", { type: "button", class: "btn btn--on-dark" }, "Try again");
+      retry.addEventListener("click", function () { enterLibrary(true); });
+      libAlertEl.appendChild(h("p", { class: "alert__title" }, "Could not load your library."));
+      libAlertEl.appendChild(h("p", { class: "alert__detail" }, lib.error));
+      libAlertEl.appendChild(retry);
+      libAlertEl.hidden = false;
+      return;
+    }
+    if (!lib.loaded) return;
+    if (!lib.papers.length) {
+      clear(libEmptyEl);
+      libEmptyEl.appendChild(h("p", { class: "empty__title" }, "Nothing saved yet."));
+      libEmptyEl.appendChild(h("p", { class: "empty__body" },
+        "Save papers from your ranked results. Each saved paper keeps its rank, critique, tags and a local PDF."));
+      libEmptyEl.appendChild(h("p", { class: "empty__actions" },
+        h("a", { class: "btn btn--secondary", href: "#/" }, "Go to Triage")));
+      libEmptyEl.hidden = false;
+      return;
+    }
+    libCountEl.textContent = lib.papers.length + " of " + lib.total + " saved paper" +
+      (lib.total === 1 ? "" : "s");
+    libCountEl.hidden = false;
+    lib.papers.forEach(function (it) { libListEl.appendChild(libRow(it)); });
+    if (restore) restoreLibraryReturn();
+  }
+
+  // Entering the Library from elsewhere shows the cached list at once and refreshes it in the
+  // background; the list is rebuilt only when the server data changed.
+  function enterLibrary(force) {
+    renderLibrary(true);
+    if (lib.loaded && !force) return;
+    if (force) { lib.error = null; renderLibrary(false); }
+    loadLibrary().then(function (changed) {
+      if (route.view === "library" && changed) renderLibrary(true);
+    });
+  }
+
+  // ---- Preview view (shell; viewer.js renders the PDF, T055) ----
+
+  function previewState(title, body, action) {
+    clear(pvStage);
+    pvStage.appendChild(h("div", { class: "empty" },
+      h("p", { class: "empty__title" }, title),
+      body ? h("p", { class: "empty__body" }, body) : null,
+      action || null));
+  }
+
+  function renderPreview() {
+    var id = route.id;
+    if (!lib.loaded && !lib.error) {
+      previewHeading.textContent = "Opening…";
+      loadLibrary().then(function () { if (route.view === "preview" && route.id === id) renderPreview(); });
+      return;
+    }
+    if (lib.error && !lib.loaded) {
+      var again = h("button", { type: "button", class: "btn btn--secondary" }, "Try again");
+      again.addEventListener("click", function () {
+        lib.error = null;
+        renderPreview();
+      });
+      previewHeading.textContent = "Preview";
+      previewState("Could not load your library.", lib.error, h("p", { class: "empty__actions" }, again));
+      return;
+    }
+    var it = libItem(id);
+    var title = it ? it.title : "Preview";
+    previewHeading.textContent = title;
+    previewHeading.setAttribute("title", title);
+    document.title = (it ? title : "Preview") + " · " + BASE_TITLE;
+    if (!it) {
+      if (viewer) viewer.close();
+      previewState("This paper is not in your Library.", null,
+        h("p", { class: "empty__actions" }, h("a", { class: "btn btn--secondary", href: "#/library" }, "Go to Library")));
+      return;
+    }
+    clear(pvStage);
+    if (viewer) viewer.open(it);
+  }
+
+  pvBack.addEventListener("click", function () {
+    if (cameFromLibrary) history.back();
+    else location.hash = libReturn ? libReturn.hash : "#/library";
+  });
+
+  // ---- router ----
+
+  function announce(text) {
+    statusEl.textContent = text;
+  }
+
+  function setView(view) {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-route]"), function (el) {
+      el.hidden = el.getAttribute("data-route") !== view;
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-skip]"), function (el) {
+      el.hidden = el.getAttribute("data-skip") !== view;
+    });
+    Array.prototype.forEach.call(document.querySelectorAll(".views a"), function (a) {
+      var on = a.getAttribute("data-view") === (view === "preview" ? "library" : view);
+      if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    });
+  }
+
+  function applyRoute(first) {
+    var r = parseRoute(location.hash);
+    if (!r) return; // in-page fragment: stay where we are
+    var prev = route;
+    if (prev.view === "triage") triageScroll = window.scrollY;
+    if (prev.view === "library" && r.view === "preview") {
+      libReturn = { hash: prev.hash, y: window.scrollY, id: r.id };
+    }
+    cameFromLibrary = prev.view === "library" && r.view === "preview";
+    if (prev.view === "preview" && r.view !== "preview" && viewer) viewer.close();
+    route = { view: r.view, id: r.id || null, params: r.params || null, hash: location.hash };
+    setView(r.view);
+    if (r.view === "triage") {
+      document.title = BASE_TITLE;
+      jump(first ? 0 : triageScroll);
+    } else if (r.view === "library") {
+      document.title = "Library · " + BASE_TITLE;
+      jump(0);
+      enterLibrary(false);
+    } else {
+      document.title = "Preview · " + BASE_TITLE;
+      jump(0);
+      renderPreview();
+    }
+    if (first) return;
+    var focusTarget = document.getElementById(HEADINGS[r.view]);
+    var restored = r.view === "library" && !libReturn && document.activeElement &&
+      document.activeElement.hasAttribute && document.activeElement.hasAttribute("data-open-preview");
+    if (focusTarget && !restored) focusTarget.focus({ preventScroll: true });
+    announce(r.view === "triage" ? "Triage."
+      : r.view === "library" ? "Library."
+      : "Preview: " + (libItem(r.id) ? libItem(r.id).title : "opening") + ".");
+  }
+
+  window.addEventListener("hashchange", function () { applyRoute(false); });
+
+  // Skip links move focus without touching the hash (a hash change would be a route change).
+  Array.prototype.forEach.call(document.querySelectorAll("a.skip"), function (a) {
+    a.addEventListener("click", function (ev) {
+      var target = document.getElementById((a.getAttribute("href") || "").slice(1));
+      if (!target) return;
+      ev.preventDefault();
+      if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+      target.focus();
+    });
+  });
+
+  // Shared with viewer.js (a separate ES module); see T055.
+  window.PT = {
+    h: h, svg: svg, clear: clear, plural: plural, announce: announce, getJSON: getJSON,
+    postJSON: postJSON, failMessage: failMessage, reducedMotion: reducedMotion,
+    route: function () { return route; }, libItem: libItem, loadLibrary: loadLibrary,
+    libraryAdd: libraryAdd, libraryRemove: libraryRemove, libraryHash: libraryHash,
+    previewHash: previewHash, rankBlock: rankBlock, details: details, paperLinks: paperLinks,
+    registerViewer: function (v) {
+      viewer = v;
+      if (route.view === "preview" && lib.loaded) renderPreview();
+    }
+  };
 
   // ---- on load: backend status and stored results (no refetching from arXiv) ----
 
@@ -888,4 +1246,6 @@
   refreshChat();
   loadStatus();
   loadStored();
+  applyRoute(true);
+  if (route.view === "triage") loadLibrary(); // fills the nav count; Library and Preview load it themselves
 })();
