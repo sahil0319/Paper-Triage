@@ -470,7 +470,7 @@ hooks. Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest 
   `"Mock answer from this paper [p.2]."`; "What is the capital of France?" -> starts with
   `NOT_IN_STORED_PAPERS`; results-chat mock behaviour unchanged. Then `pt/extract.py`
   `extract_pages`, `pt/llm.py` `MockClient.text` page mode (prompt contains `<page n=`).
-- [ ] T058 [BE] [US9] Paper chat agent + endpoint (FR-027, FR-028; contracts "POST
+- [x] T058 [BE] [US9] Paper chat agent + endpoint (FR-027, FR-028; contracts "POST
   /api/paper-chat"). Test first `tests/test_paper_chat.py`: after save + list + pdf fetch +
   annotation calls there are zero `paper_pages` rows and zero LLM calls (spy client); first
   question with "Quartzite" -> `pages [2]`, rows now stored; "capital of France" -> refused;

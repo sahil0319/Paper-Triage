@@ -97,3 +97,10 @@ class LibraryItem(BaseModel):
     saved_at: str
     pdf: PdfState
     highlight_count: int = 0
+
+
+class PaperChatAnswer(BaseModel):
+    answer: str
+    pages: list[int] = Field(default_factory=list)
+    refused: bool
+    dropped_pages: list[int] = Field(default_factory=list)

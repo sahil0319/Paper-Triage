@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from . import db, pdfstore
+from . import db, paper_chat, pdfstore
 from .chat import answer as chat_answer
 from .config import get_settings
 from .llm import LLMError, get_client
@@ -107,6 +107,25 @@ class AnnotationPatch(BaseModel):
 
 def _annotation_out(a: dict) -> dict:
     return {k: v for k, v in a.items() if k != "top"}
+
+
+class Turn(BaseModel):
+    question: str
+    answer: str
+
+
+class PaperChatIn(BaseModel):
+    paper_id: str
+    question: str
+    history: list[Turn] = Field(default_factory=list)
+
+    @field_validator("question")
+    @classmethod
+    def _non_empty(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("question must not be empty")
+        return v
 
 
 class RetryIn(BaseModel):
@@ -316,6 +335,23 @@ def create_app() -> FastAPI:
         if moved is None:
             raise HTTPException(404, "unknown directory")
         return {"deleted": True, "moved": moved}
+
+    @app.post("/api/paper-chat")
+    def post_paper_chat(body: PaperChatIn, request: Request):
+        s = get_settings()
+        if len(body.history) > s.paper_chat_history:
+            raise HTTPException(422, f"history: at most {s.paper_chat_history} turns")
+        st = request.app.state
+        try:
+            out = paper_chat.answer(
+                body.paper_id, body.question, [t.model_dump() for t in body.history], st.conn,
+                st.llm, st.lock, s,
+            )
+        except paper_chat.NotSaved:
+            raise HTTPException(404, "not in the library") from None
+        except LLMError as e:
+            raise HTTPException(502, f"model call failed: {e}") from e
+        return out.model_dump()
 
     @app.get("/api/annotations")
     def get_annotations(paper_id: str, request: Request):
