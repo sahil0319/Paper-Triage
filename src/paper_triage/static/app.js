@@ -1039,6 +1039,7 @@
   var triageScroll = 0;
   var cameFromLibrary = false;
   var viewer = null;        // set by viewer.js through PT.registerViewer
+  var viewerFailed = false; // viewer.js did not load (checked on window load)
   if (window.history && "scrollRestoration" in history) history.scrollRestoration = "manual";
 
   var lib = { papers: [], directories: [], unsorted: 0, total: 0, loaded: false, error: null,
@@ -1248,6 +1249,7 @@
 
   function previewState(title, body, action) {
     clear(pvStage);
+    pvStage.hidden = false;
     pvStage.appendChild(h("div", { class: "empty" },
       h("p", { class: "empty__title" }, title),
       body ? h("p", { class: "empty__body" }, body) : null,
@@ -1282,8 +1284,8 @@
         h("p", { class: "empty__actions" }, h("a", { class: "btn btn--secondary", href: "#/library" }, "Go to Library")));
       return;
     }
-    clear(pvStage);
     if (viewer) viewer.open(it);
+    else if (viewerFailed) previewState("This PDF could not be displayed.", "The viewer did not load. Reload the page.");
   }
 
   pvBack.addEventListener("click", function () {
@@ -1297,13 +1299,21 @@
     statusEl.textContent = text;
   }
 
+  // Per-view skip links; one that needs a target (the panel) shows only while that target does.
+  function refreshSkipLinks(view) {
+    view = view || route.view;
+    Array.prototype.forEach.call(document.querySelectorAll("[data-skip]"), function (el) {
+      var need = el.getAttribute("data-skip-needs");
+      var t = need ? document.getElementById(need) : null;
+      el.hidden = el.getAttribute("data-skip") !== view || (!!need && (!t || t.hidden));
+    });
+  }
+
   function setView(view) {
     Array.prototype.forEach.call(document.querySelectorAll("[data-route]"), function (el) {
       el.hidden = el.getAttribute("data-route") !== view;
     });
-    Array.prototype.forEach.call(document.querySelectorAll("[data-skip]"), function (el) {
-      el.hidden = el.getAttribute("data-skip") !== view;
-    });
+    refreshSkipLinks(view);
     Array.prototype.forEach.call(document.querySelectorAll(".views a"), function (a) {
       var on = a.getAttribute("data-view") === (view === "preview" ? "library" : view);
       if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
@@ -1346,6 +1356,11 @@
   }
 
   window.addEventListener("hashchange", function () { applyRoute(false); });
+  window.addEventListener("load", function () {
+    if (viewer) return;
+    viewerFailed = true;
+    if (route.view === "preview" && libItem(route.id)) renderPreview();
+  });
 
   // Skip links move focus without touching the hash (a hash change would be a route change).
   Array.prototype.forEach.call(document.querySelectorAll("a.skip"), function (a) {
@@ -1360,7 +1375,7 @@
 
   // Shared with viewer.js (a separate ES module); see T055.
   window.PT = {
-    h: h, svg: svg, clear: clear, plural: plural, announce: announce, getJSON: getJSON,
+    h: h, svg: svg, clear: clear, rayGlyph: rayGlyph, refreshSkipLinks: refreshSkipLinks, plural: plural, announce: announce, getJSON: getJSON,
     postJSON: postJSON, failMessage: failMessage, reducedMotion: reducedMotion,
     route: function () { return route; }, libItem: libItem, loadLibrary: loadLibrary,
     libraryAdd: libraryAdd, libraryRemove: libraryRemove, libraryHash: libraryHash,

@@ -14,7 +14,7 @@
   <a class="skip" data-skip="triage" href="#chat-heading">Skip to chat</a>
   <a class="skip" data-skip="library" href="#library-list" hidden>Skip to saved papers</a>
   <a class="skip" data-skip="preview" href="#pv-pages" hidden>Skip to PDF</a>
-  <a class="skip" data-skip="preview" href="#pv-panel" hidden>Skip to highlights and chat</a>
+  <a class="skip" data-skip="preview" data-skip-needs="pv-panel" href="#pv-panel" hidden>Skip to highlights and chat</a>
 
   <header class="global-nav">
     <div class="container global-nav__inner">
@@ -104,11 +104,43 @@
   </main>
 
   <main id="preview" class="preview" data-route="preview" aria-labelledby="preview-heading" hidden>
-    <div class="pv-bar">
-      <button id="pv-back" type="button" class="btn btn--secondary btn--small pv-back">Library</button>
-      <h1 id="preview-heading" class="pv-title" tabindex="-1">Preview</h1>
+    <div class="pv-toolbar">
+      <div class="pv-bar">
+        <button id="pv-back" type="button" class="btn btn--secondary btn--small pv-back">Library</button>
+        <h1 id="preview-heading" class="pv-title" tabindex="-1">Preview</h1>
+        <a id="pv-external" class="ext-link pv-external" href="#" target="_blank" rel="noopener noreferrer" hidden>Open PDF in new tab<svg class="ext" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M3.5 8.5 8.5 3.5M4 3.5h4.5V8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      </div>
+      <div id="pv-controls" class="pv-controls" role="toolbar" aria-label="PDF controls" hidden>
+        <div class="pv-group">
+          <button id="pv-prev" type="button" class="icon-btn" aria-label="Previous page" aria-keyshortcuts="p"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3.5 10 8 5.5l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <label class="pv-page"><span class="pv-page__label">Page</span>
+            <input id="pv-page-input" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" aria-describedby="pv-page-of" value="1"></label>
+          <span id="pv-page-of" class="pv-page__of">of 0</span>
+          <button id="pv-next" type="button" class="icon-btn" aria-label="Next page" aria-keyshortcuts="n"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3.5 6 8 10.5 12.5 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
+        <div class="pv-group">
+          <button id="pv-zoom-out" type="button" class="icon-btn" aria-label="Zoom out" aria-keyshortcuts="-"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3.5 8h9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+          <select id="pv-zoom" class="pv-zoom" aria-label="Zoom">
+            <option value="fit-width">Fit width</option>
+            <option value="fit-page">Fit page</option>
+            <option value="50">50%</option>
+            <option value="75">75%</option>
+            <option value="100">100%</option>
+            <option value="125">125%</option>
+            <option value="150">150%</option>
+            <option value="200">200%</option>
+          </select>
+          <button id="pv-zoom-in" type="button" class="icon-btn" aria-label="Zoom in" aria-keyshortcuts="+"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3.5 8h9M8 3.5v9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+        </div>
+      </div>
     </div>
-    <div id="pv-stage" class="pv-stage"></div>
+    <div id="pv-layout" class="pv-layout">
+      <div class="pv-main">
+        <div id="pv-pages" class="pv-well" role="region" aria-label="PDF pages" tabindex="0" hidden></div>
+        <div id="pv-stage" class="pv-stage"></div>
+      </div>
+      <aside id="pv-panel" class="pv-panel" aria-label="Highlights and chat" tabindex="-1" hidden></aside>
+    </div>
   </main>
 </body>
 </html>

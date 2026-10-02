@@ -393,3 +393,237 @@ def test_saved_state_follows_library_after_view_switch(app):
     page.evaluate("PT.libraryRemove('2401.00001')")
     page.click('nav.views a[data-view="triage"]')
     expect(save_btn(page, 1)).to_have_text("Save")
+
+
+# ---- T055: viewer shell (stubbed PDF = fixtures/sample.pdf) ----
+
+
+def preview(page, items, hash_=None, **stub_kw):
+    stub = LibraryStub(page, items, **stub_kw)
+    page.add_init_script("window.__PT_POLL_MS = 300")
+    page.set_viewport_size({"width": 1280, "height": 800})
+    page.goto("/" + (hash_ or "#/library/paper/" + quote(items[0]["paper_id"], safe="")))
+    return stub
+
+
+def page_width(page, n=1):
+    return page.locator(f'.pdf-page[data-page="{n}"]').evaluate(
+        "e => e.getBoundingClientRect().width"
+    )
+
+
+def test_viewer_renders_pages_text_layer_and_stays_local(app):
+    page = app
+    urls = []
+    page.on("request", lambda r: urls.append(r.url))
+    preview(page, [lib_item(1)])
+    expect(page.locator("#preview-heading")).to_have_text("Saved paper 1: stubbed title")
+    expect(page.locator(".pdf-page")).to_have_count(3)
+    expect(page.locator("#pv-pages canvas").first).to_be_attached()
+    expect(page.locator('.pdf-page[data-page="1"].is-drawn')).to_have_count(1, timeout=10_000)
+    expect(page.locator('.pdf-page[data-page="1"] .textLayer')).to_contain_text("Distillation")
+    expect(page.locator("#pv-pages")).to_have_attribute("role", "region")
+    expect(page.locator("#pv-pages")).to_have_attribute("aria-label", "PDF pages")
+    expect(page.locator('.pdf-page[data-page="2"]')).to_have_attribute("aria-label", "Page 2")
+    expect(page.locator("#pv-page-of")).to_have_text("of 3")
+    expect(page.locator("#pv-zoom")).to_have_value("fit-width")
+    ext = page.locator("#pv-external")
+    expect(ext).to_have_attribute("href", "/api/library/pdf?paper_id=2401.00001")
+    expect(ext).to_have_attribute("target", "_blank")
+    assert any(u.endswith("/vendor/pdfjs/pdf.worker.min.mjs") for u in urls)
+    assert all(u.startswith(("http://127.0.0.1", "blob:", "data:")) for u in urls), urls
+
+
+def test_viewer_page_navigation_clamps_and_tracks_scroll(app):
+    page = app
+    preview(page, [lib_item(1)])
+    expect(page.locator(".pdf-page")).to_have_count(3)
+    inp = page.locator("#pv-page-input")
+    expect(inp).to_have_value("1")
+    expect(page.locator("#pv-prev")).to_have_attribute("aria-disabled", "true")
+    page.click("#pv-next")
+    expect(inp).to_have_value("2")
+    expect(page.locator("#pv-prev")).not_to_have_attribute("aria-disabled", "true")
+    top2 = page.locator('.pdf-page[data-page="2"]').evaluate("e => e.getBoundingClientRect().top")
+    well_top = page.locator("#pv-pages").evaluate("e => e.getBoundingClientRect().top")
+    assert abs(top2 - well_top) < 40
+    inp.fill("99")
+    inp.press("Enter")
+    expect(inp).to_have_value("3")
+    expect(page.locator("#pv-next")).to_have_attribute("aria-disabled", "true")
+    inp.fill("0")
+    inp.press("Enter")
+    expect(inp).to_have_value("1")
+    # Scrolling by hand updates the page number.
+    page.locator("#pv-pages").evaluate(
+        "w => { w.scrollTop = w.querySelector('[data-page=\"3\"]').offsetTop }"
+    )
+    expect(inp).to_have_value("3")
+
+
+def test_viewer_zoom_changes_page_width(app):
+    page = app
+    preview(page, [lib_item(1)])
+    expect(page.locator('.pdf-page[data-page="1"].is-drawn')).to_have_count(1, timeout=10_000)
+    fit = page_width(page)
+    page.select_option("#pv-zoom", "50")
+    page.wait_for_function(
+        "document.querySelector('.pdf-page').getBoundingClientRect().width < 450"
+    )
+    assert abs(page_width(page) - 612 * 96 / 72 * 0.5) < 3
+    page.select_option("#pv-zoom", "200")
+    page.wait_for_function(
+        "document.querySelector('.pdf-page').getBoundingClientRect().width > 1500"
+    )
+    page.click("#pv-zoom-out")
+    expect(page.locator("#pv-zoom")).to_have_value("150")
+    page.click("#pv-zoom-in")
+    expect(page.locator("#pv-zoom")).to_have_value("200")
+    expect(page.locator("#pv-zoom-in")).to_have_attribute("aria-disabled", "true")
+    page.select_option("#pv-zoom", "fit-width")
+    page.wait_for_function(
+        f"Math.abs(document.querySelector('.pdf-page').getBoundingClientRect().width - {fit}) < 2"
+    )
+    page.select_option("#pv-zoom", "fit-page")
+    page.wait_for_function(
+        f"document.querySelector('.pdf-page').getBoundingClientRect().width < {fit} - 50"
+    )
+
+
+def test_viewer_keys_work_in_the_pages_region_only(app):
+    page = app
+    preview(page, [lib_item(1)])
+    expect(page.locator(".pdf-page")).to_have_count(3)
+    fit = page_width(page)
+    # Not focused in the region: keys do nothing.
+    page.locator("#pv-prev").focus()
+    page.keyboard.press("+")
+    page.keyboard.press("n")
+    assert abs(page_width(page) - fit) < 2
+    expect(page.locator("#pv-page-input")).to_have_value("1")
+    page.locator("#pv-pages").focus()
+    page.keyboard.press("+")
+    page.wait_for_function(
+        f"Math.abs(document.querySelector('.pdf-page').getBoundingClientRect().width - {fit}) > 2"
+    )
+    page.keyboard.press("0")
+    expect(page.locator("#pv-zoom")).to_have_value("fit-width")
+    page.keyboard.press("n")
+    expect(page.locator("#pv-page-input")).to_have_value("2")
+    page.keyboard.press("p")
+    expect(page.locator("#pv-page-input")).to_have_value("1")
+    page.keyboard.press("-")
+    expect(page.locator("#pv-zoom")).not_to_have_value("fit-width")
+    for sel, key in (
+        ("#pv-zoom-in", "+"),
+        ("#pv-zoom-out", "-"),
+        ("#pv-next", "n"),
+        ("#pv-prev", "p"),
+    ):
+        assert page.locator(sel).get_attribute("aria-keyshortcuts") == key
+
+
+def test_viewer_downloading_state_polls_until_ready(app):
+    page = app
+    stub = preview(
+        page,
+        [
+            lib_item(
+                1,
+                pdf={"status": "pending", "error": None, "pages": None},
+                critique={
+                    "basis": "fulltext",
+                    "weak_claims": [],
+                    "overclaims": [],
+                    "missing_baselines": ["No teacher-free baseline"],
+                },
+            )
+        ],
+    )
+    working = page.locator("#pv-stage .working")
+    expect(working).to_contain_text("Downloading the PDF…")
+    expect(working).to_contain_text("You can read the critique below while you wait.")
+    expect(page.locator("#pv-stage .critique")).to_contain_text("No teacher-free baseline")
+    expect(page.locator("#pv-pages")).to_be_hidden()
+    stub.items[0]["pdf"] = {"status": "ready", "error": None, "pages": 3}
+    expect(page.locator(".pdf-page")).to_have_count(3, timeout=10_000)
+    expect(page.locator("#pv-stage .working")).to_have_count(0)
+    expect(page.locator("#status")).to_have_text("PDF ready.")
+
+
+def test_viewer_unavailable_state_retry(app):
+    page = app
+    stub = preview(
+        page, [lib_item(1, pdf={"status": "failed", "error": "Not a PDF.", "pages": None})]
+    )
+    alert = page.locator("#pv-stage .alert")
+    expect(alert).to_contain_text("This PDF could not be downloaded.")
+    expect(alert).to_contain_text("Not a PDF.")
+    expect(alert.get_by_role("link", name="Open the source page")).to_have_attribute(
+        "href", "https://arxiv.org/abs/2401.00001"
+    )
+    expect(page.locator("#pv-controls")).to_be_hidden()
+    alert.get_by_role("button", name="Try again").click()
+    expect(page.locator("#pv-stage .working")).to_be_visible()
+    assert [c[3] for c in stub.calls_to("POST", "/api/library/retry")] == [
+        {"paper_id": "2401.00001"}
+    ]
+    stub.items[0]["pdf"] = {"status": "ready", "error": None, "pages": 3}
+    expect(page.locator(".pdf-page")).to_have_count(3, timeout=10_000)
+
+
+def test_viewer_render_failed_state(app):
+    page = app
+    preview(page, [lib_item(1)], pdf="garbage")
+    alert = page.locator("#pv-stage .alert")
+    expect(alert).to_contain_text("This PDF could not be displayed.", timeout=10_000)
+    expect(alert).to_contain_text(
+        "The file may be damaged or use features the viewer does not support."
+    )
+    expect(alert.get_by_role("link", name="Open PDF in new tab")).to_have_attribute(
+        "href", "/api/library/pdf?paper_id=2401.00001"
+    )
+
+
+def test_viewer_not_saved_state(app):
+    page = app
+    preview(page, [lib_item(1)], hash_="#/library/paper/9999.99999")
+    expect(page.locator("#pv-stage")).to_contain_text("This paper is not in your Library.")
+    expect(page.locator("#pv-stage").get_by_role("link", name="Go to Library")).to_be_visible()
+    expect(page.locator("#pv-controls")).to_be_hidden()
+    expect(page.locator("#pv-pages")).to_be_hidden()
+
+
+def test_open_from_library_then_back_closes_viewer(app):
+    page = app
+    stub = LibraryStub(page, [lib_item(1)])
+    page.goto("/#/library")
+    page.click(".open-preview")
+    expect(page.locator(".pdf-page")).to_have_count(3)
+    page.click("#pv-back")
+    expect(page.locator("#library")).to_be_visible()
+    expect(page.locator("#pv-pages .pdf-page")).to_have_count(0)
+    page.click(".open-preview")
+    expect(page.locator(".pdf-page")).to_have_count(3)
+    assert len(stub.calls_to("GET", "/api/library/pdf")) >= 1
+
+
+def test_real_api_save_then_open_preview_renders_pdf(app, live_server):
+    """No stubs: save through the UI, open the Library item, see real pages (BE T047-T050)."""
+    page = app
+    page.goto("/")
+    try:
+        page.fill("#query", "2401.00001")
+        page.click("#submit")
+        expect(page.locator("#paper-list li.paper")).to_have_count(1, timeout=15_000)
+        save_btn(page, 1).click()
+        expect(save_btn(page, 1)).to_have_text("Saved", timeout=10_000)
+        expect(page.locator(".views__count")).to_have_text("1")
+        page.click('nav.views a[data-view="library"]')
+        page.locator(".open-preview").first.click()
+        expect(page.locator(".pdf-page")).to_have_count(3, timeout=20_000)
+        expect(page.locator('.pdf-page[data-page="1"] .textLayer')).to_contain_text(
+            "Distillation", timeout=10_000
+        )
+    finally:
+        page.request.delete(f"{live_server.url}/api/library?paper_id=2401.00001")

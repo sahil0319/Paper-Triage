@@ -91,7 +91,13 @@ class LibraryStub:
             return self._save(route, body)
         if key == ("DELETE", "/api/library"):
             return self._unsave(route, query.get("paper_id"))
+        if key == ("POST", "/api/library/retry"):
+            return self._retry(route, body)
         if key == ("GET", "/api/library/pdf"):
+            if self.pdf == "garbage":
+                return route.fulfill(
+                    status=200, content_type="application/pdf", body=b"%PDF-1.4 not really"
+                )
             if self.pdf and SAMPLE_PDF.exists():
                 return route.fulfill(
                     status=200,
@@ -101,6 +107,15 @@ class LibraryStub:
                 )
             return _json(route, {"detail": "not found"}, 404)
         return route.fallback()
+
+    def _retry(self, route, body):
+        for it in self.items:
+            if it["paper_id"] == body["paper_id"]:
+                if it["pdf"]["status"] != "failed":
+                    return _json(route, {"detail": "PDF is not in a failed state"}, 409)
+                it["pdf"] = {"status": "pending", "error": None, "pages": None}
+                return _json(route, {"pdf": it["pdf"]}, 202)
+        return _json(route, {"detail": "not in the library"}, 404)
 
     def _save(self, route, body):
         pid = body["paper_id"]

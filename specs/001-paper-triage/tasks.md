@@ -446,7 +446,7 @@ hooks. Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest 
   /api/library?paper_id=`; errors per L5; nav count update; announcements. e2e with
   `page.route` stubs shaped per contracts: save, saved-on-load, confirm/keep, confirm/remove,
   error line.
-- [ ] T055 [FE] [US5] Viewer shell (FR-019, FR-024; brief L15-L17, L21). New ES module
+- [x] T055 [FE] [US5] Viewer shell (FR-019, FR-024; brief L15-L17, L21). New ES module
   `pt/static/viewer.js` (static import `./vendor/pdfjs/pdf.min.mjs`, worker
   `/vendor/pdfjs/pdf.worker.min.mjs`): open `#/library/paper/<id>` -> `getDocument({url:
   "/api/library/pdf?paper_id=<id>"})`; `section.pdf-page[data-page]` per page with canvas +

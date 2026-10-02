@@ -16,8 +16,10 @@ NEW_IDS = {f"2401.{n:05d}" for n in range(11, 16)}
 
 
 def _ids(page):
-    return [i[len("paper-"):] for i in page.eval_on_selector_all(
-        "#paper-list li.paper", "els => els.map(e => e.id)")]
+    return [
+        i[len("paper-") :]
+        for i in page.eval_on_selector_all("#paper-list li.paper", "els => els.map(e => e.id)")
+    ]
 
 
 def search(page, query, rows):
@@ -55,7 +57,7 @@ def test_every_arxiv_row_links_to_abs_and_pdf(home):
     rows = page.locator("#paper-list li.paper")
     for i in range(rows.count()):
         row = rows.nth(i)
-        pid = row.get_attribute("id")[len("paper-"):]
+        pid = row.get_attribute("id")[len("paper-") :]
         abs_link = row.locator('a[data-link="abs"]')
         pdf_link = row.locator('a[data-link="pdf"]')
         assert abs_link.get_attribute("href") == f"https://arxiv.org/abs/{pid}"
@@ -192,8 +194,12 @@ def test_load_more_error_keeps_chat_and_scope(home):
     ask(page, "What is the capital of France?")
     expect(page.locator("#chat-log li.turn")).to_have_count(1)
 
-    page.route("**/api/triage", lambda route: route.fulfill(
-        status=502, content_type="application/json", body='{"detail": "boom"}'))
+    page.route(
+        "**/api/triage",
+        lambda route: route.fulfill(
+            status=502, content_type="application/json", body='{"detail": "boom"}'
+        ),
+    )
     page.click("#load-more")
     expect(page.locator(".load-more__error")).to_be_visible(timeout=10_000)
     page.unroute("**/api/triage")
