@@ -338,7 +338,7 @@ hooks. Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest 
 
 ### Wave F — BE lane (storage and API first)
 
-- [ ] T043 [BE] [US6] Tag normalizer (FR-021, R17). Test first `tests/test_tags.py`:
+- [x] T043 [BE] [US6] Tag normalizer (FR-021, R17). Test first `tests/test_tags.py`:
   `keywords("Diffusion models, for VIDEO generation")` -> `["diffusion", "models", "video",
   "generation"]`; surrounding punctuation stripped (`"(rag)."` -> `"rag"`), inner hyphen kept
   (`"self-supervised"`); 1-character tokens and stop words dropped; duplicates removed keeping
