@@ -1,16 +1,17 @@
 """FastAPI app: JSON API per contracts/api.md plus the static single page."""
 
+import mimetypes
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
-from . import db
+from . import db, pdfstore
 from .chat import answer as chat_answer
 from .config import get_settings
 from .llm import LLMError, get_client
@@ -60,6 +61,10 @@ class SaveIn(BaseModel):
     topic: str = ""
 
 
+class RetryIn(BaseModel):
+    paper_id: str
+
+
 class DirIn(BaseModel):
     name: str
 
@@ -93,10 +98,13 @@ def create_app() -> FastAPI:
         app.state.http = make_http(s.mock)
         app.state.llm = get_client()
         app.state.lock = threading.Lock()  # one sqlite connection, one user
+        Path(s.data_dir).mkdir(parents=True, exist_ok=True)
+        pdfstore.sweep_pending(conn)
         yield
         conn.close()
         app.state.http[0].close()
 
+    mimetypes.add_type("text/javascript", ".mjs")  # module scripts (pdf.js) need a JS MIME type
     app = FastAPI(title="Paper Triage", lifespan=lifespan)
 
     @app.exception_handler(RequestValidationError)
@@ -152,7 +160,9 @@ def create_app() -> FastAPI:
         }
 
     @app.post("/api/library")
-    def post_library(body: SaveIn, request: Request, response: Response):
+    def post_library(
+        body: SaveIn, request: Request, response: Response, background: BackgroundTasks
+    ):
         st = request.app.state
         with st.lock:
             try:
@@ -167,6 +177,10 @@ def create_app() -> FastAPI:
             if created:
                 db.set_file_status(st.conn, body.paper_id, "pending", source_url=snapshot["pdf_url"])
             item = _item(st.conn, db.get_saved(st.conn, body.paper_id))
+        if created:
+            background.add_task(
+                pdfstore.download, body.paper_id, st.conn, st.http, st.lock, get_settings()
+            )
         response.status_code = 201 if created else 200
         return {"created": created, "paper": item}
 
@@ -177,8 +191,38 @@ def create_app() -> FastAPI:
             if db.get_saved(st.conn, paper_id) is None:
                 raise HTTPException(404, "not in the library")
             annotations = db.annotation_count(st.conn, paper_id)
+            path = (db.get_file(st.conn, paper_id) or {}).get("path")
             db.delete_saved(st.conn, paper_id)
+        pdfstore.delete_file(path)
         return {"deleted": True, "annotations": annotations}
+
+    @app.post("/api/library/retry", status_code=202)
+    def retry_library(body: RetryIn, request: Request, background: BackgroundTasks):
+        st = request.app.state
+        with st.lock:
+            if db.get_saved(st.conn, body.paper_id) is None:
+                raise HTTPException(404, "not in the library")
+            f = db.get_file(st.conn, body.paper_id)
+            if f is not None and f["status"] != "failed":
+                raise HTTPException(409, f"PDF is {f['status']}; retry only applies to failed")
+            db.set_file_status(st.conn, body.paper_id, "pending", error=None)
+        background.add_task(
+            pdfstore.download, body.paper_id, st.conn, st.http, st.lock, get_settings()
+        )
+        return {"pdf": {"status": "pending", "error": None, "pages": None}}
+
+    @app.get("/api/library/pdf")
+    def get_library_pdf(paper_id: str, request: Request):
+        st = request.app.state
+        with st.lock:
+            f = db.get_file(st.conn, paper_id)
+        if f is None or f["status"] != "ready" or not f["path"] or not Path(f["path"]).is_file():
+            raise HTTPException(404, "PDF not available")
+        return FileResponse(
+            f["path"],
+            media_type="application/pdf",
+            headers={"Content-Disposition": "inline", "Cache-Control": "private, max-age=3600"},
+        )
 
     @app.post("/api/chat")
     def post_chat(body: ChatIn, request: Request):

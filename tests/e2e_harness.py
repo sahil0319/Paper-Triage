@@ -33,6 +33,7 @@ class _TriageDelay:
 class LiveServer:
     def __init__(self, db_path: str, port: int | None = None):
         self.db_path = db_path
+        self.data_dir = os.path.join(os.path.dirname(db_path) or ".", "data")  # saved PDFs
         self.port = port or int(os.environ.get("E2E_PORT", "8766"))
         self.triage_delay = 0.0
         self._server: uvicorn.Server | None = None
@@ -59,7 +60,10 @@ class LiveServer:
 
     def start(self) -> None:
         self._check_port_free()
-        for key, value in (("MOCK_LLM", "1"), ("PAPER_TRIAGE_DB", self.db_path)):
+        for key, value in (
+            ("MOCK_LLM", "1"), ("PAPER_TRIAGE_DB", self.db_path),
+            ("PAPER_TRIAGE_DATA_DIR", self.data_dir),
+        ):
             self._saved_env[key] = os.environ.get(key)
             os.environ[key] = value
         from paper_triage.app import create_app

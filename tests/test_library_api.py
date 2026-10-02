@@ -1,3 +1,6 @@
+import mimetypes
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -279,3 +282,139 @@ def test_move_unknown_404(client):
     d = mk_dir(client, "net").json()
     r = client.post("/api/library/move", json={"paper_id": "nope", "directory_id": d["id"]})
     assert r.status_code == 404
+
+
+# ---- PDF wiring (T050) -----------------------------------------------------------------------
+
+SAMPLE_BYTES = (
+    Path(__file__).parent.parent / "src/paper_triage/fixtures/sample.pdf"
+).read_bytes()
+
+
+def saved_one(client, topic="diffusion models", n=5):
+    search(client, topic, n)
+    save(client, "2401.00001", topic)  # mock PDF is valid; 2401.00005 is the non-PDF one
+    return "2401.00001"
+
+
+def lib_item(client, pid):
+    return next(p for p in client.get("/api/library").json()["papers"] if p["paper_id"] == pid)
+
+
+def test_save_downloads_pdf_in_background(client):
+    pid = saved_one(client)
+    item = lib_item(client, pid)
+    assert item["pdf"] == {"status": "ready", "error": None, "pages": 3}
+    path = db.get_file(client.app.state.conn, pid)["path"]
+    assert Path(path).is_file() and Path(path).parent.name == "pdfs"
+
+
+def test_save_response_is_pending_before_download(client):
+    body = search(client, "diffusion models", 1)
+    r = save(client, body["results"][0]["paper_id"], "diffusion models")
+    assert r.json()["paper"]["pdf"] == {"status": "pending", "error": None, "pages": None}
+
+
+def test_pdf_endpoint_serves_inline_with_cache_header(client):
+    pid = saved_one(client)
+    r = client.get("/api/library/pdf", params={"paper_id": pid})
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "application/pdf"
+    assert r.headers["content-disposition"].startswith("inline")
+    assert r.headers["cache-control"] == "private, max-age=3600"
+    assert r.content == SAMPLE_BYTES
+
+
+def test_pdf_endpoint_honors_range(client):
+    pid = saved_one(client)
+    r = client.get("/api/library/pdf", params={"paper_id": pid}, headers={"Range": "bytes=0-99"})
+    assert r.status_code == 206
+    assert r.content == SAMPLE_BYTES[:100]
+    assert r.headers["content-range"] == f"bytes 0-99/{len(SAMPLE_BYTES)}"
+
+
+def test_pdf_endpoint_404_unsaved_or_not_ready(client):
+    assert client.get("/api/library/pdf", params={"paper_id": "nope"}).status_code == 404
+    body = search(client, "diffusion models", 5)
+    bad = next(x["paper_id"] for x in body["results"] if x["paper_id"] == "2401.00005")
+    save(client, bad, "diffusion models")
+    assert lib_item(client, bad)["pdf"]["status"] == "failed"
+    assert client.get("/api/library/pdf", params={"paper_id": bad}).status_code == 404
+    assert client.get("/api/library/pdf").status_code == 422
+
+
+def test_failed_pdf_reports_error(client):
+    body = search(client, "diffusion models", 5)
+    save(client, "2401.00005", body["topic"])
+    assert lib_item(client, "2401.00005")["pdf"] == {
+        "status": "failed", "error": "Not a PDF.", "pages": None,
+    }
+
+
+def test_retry_failed_then_ready(client):
+    pid = saved_one(client)
+    conn = client.app.state.conn
+    db.set_file_status(conn, pid, "failed", error="Download failed (HTTP 503).")
+    r = client.post("/api/library/retry", json={"paper_id": pid})
+    assert r.status_code == 202
+    assert r.json() == {"pdf": {"status": "pending", "error": None, "pages": None}}
+    assert lib_item(client, pid)["pdf"] == {"status": "ready", "error": None, "pages": 3}
+
+
+def test_retry_still_failing_stays_failed(client):
+    body = search(client, "diffusion models", 5)
+    save(client, "2401.00005", body["topic"])
+    assert client.post("/api/library/retry", json={"paper_id": "2401.00005"}).status_code == 202
+    assert lib_item(client, "2401.00005")["pdf"]["status"] == "failed"
+
+
+def test_retry_conflicts_and_404(client):
+    pid = saved_one(client)
+    assert client.post("/api/library/retry", json={"paper_id": pid}).status_code == 409  # ready
+    db.set_file_status(client.app.state.conn, pid, "pending")
+    assert client.post("/api/library/retry", json={"paper_id": pid}).status_code == 409
+    assert client.post("/api/library/retry", json={"paper_id": "nope"}).status_code == 404
+    assert client.post("/api/library/retry", json={}).status_code == 422
+
+
+def test_unsave_deletes_file_from_disk(client):
+    pid = saved_one(client)
+    path = Path(db.get_file(client.app.state.conn, pid)["path"])
+    assert path.is_file()
+    assert client.delete("/api/library", params={"paper_id": pid}).status_code == 200
+    assert not path.exists()
+    assert client.get("/api/library/pdf", params={"paper_id": pid}).status_code == 404
+
+
+def test_second_save_does_not_download_again(client):
+    pid = saved_one(client)
+    before = db.get_file(client.app.state.conn, pid)
+    r = save(client, pid, "diffusion models")
+    assert r.status_code == 200 and r.json()["paper"]["pdf"]["status"] == "ready"
+    assert db.get_file(client.app.state.conn, pid)["updated_at"] == before["updated_at"]
+
+
+def test_startup_creates_data_dir_and_sweeps_pending(tmp_db, tmp_path, monkeypatch):
+    data = tmp_path / "fresh" / "data"
+    monkeypatch.setenv("PAPER_TRIAGE_DB", tmp_db)
+    monkeypatch.setenv("PAPER_TRIAGE_DATA_DIR", str(data))
+    with TestClient(create_app()) as c:
+        assert data.is_dir()
+        pid = saved_one(c)
+        db.set_file_status(c.app.state.conn, pid, "pending", pages=None, path=None)
+    with TestClient(create_app()) as c2:
+        assert lib_item(c2, pid)["pdf"] == {
+            "status": "failed", "error": "Download interrupted. Try again.", "pages": None,
+        }
+
+
+def test_mjs_mime_type_registered():
+    create_app()
+    assert mimetypes.guess_type("a.mjs")[0] == "text/javascript"
+
+
+def test_paper_pages_stay_empty_after_save_list_and_pdf_fetch(client):
+    pid = saved_one(client)
+    client.get("/api/library")
+    client.get("/api/library/pdf", params={"paper_id": pid})
+    assert db.get_pages(client.app.state.conn, pid) == []

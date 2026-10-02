@@ -401,7 +401,7 @@ hooks. Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest 
   `sweep_pending`, `delete_file`; stream with cap, `%PDF-` check, temp file + `os.replace`,
   connect 10 s / read 60 s, network outside the lock) and `pt/extract.py`
   `page_count(pdf_bytes)`.
-- [ ] T050 [BE] [US5] PDF API wiring (FR-018, FR-019). Test first `tests/test_library_api.py`:
+- [x] T050 [BE] [US5] PDF API wiring (FR-018, FR-019). Test first `tests/test_library_api.py`:
   save -> background download done by TestClient -> `GET /api/library` shows `ready`, `pages
   3`; `GET /api/library/pdf?paper_id=` -> 200 `application/pdf` inline, Range `bytes=0-99`
   -> 206; failed paper -> 404 on pdf, `POST /api/library/retry` -> 202 then `ready`/`failed`;
