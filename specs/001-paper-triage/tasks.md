@@ -489,7 +489,7 @@ hooks. Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest 
 
 ### Wave G — FE lane (real API)
 
-- [ ] T060 [FE] [US5] [US6] Library view (FR-020, FR-022; brief L7, L10, L11, L12, L14).
+- [x] T060 [FE] [US5] [US6] Library view (FR-020, FR-022; brief L7, L10, L11, L12, L14).
   `pt/static/library.js` + `index.html` + `app.css`: loads `GET /api/library`; rows
   `li.lib-row[data-paper-id]` (title, authors, tags line, meta with `[data-pdf-status]`,
   `Saved <d Mon>`, highlight count, links, rank `for "<topic>"`, critique disclosure, `Open

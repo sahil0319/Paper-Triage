@@ -559,12 +559,52 @@ a.btn--secondary { color: var(--color-ink); }
 .confirm__text { font: var(--type-body-md); line-height: var(--leading-prose); color: var(--color-ink); flex-basis: 100%; }
 .btn--remove { color: var(--color-coral); border-color: var(--color-coral); }
 
-/* ---- Library view (L7, L14) ---- */
+/* ---- Library view (L7-L14) ---- */
 
 .library { padding-block: var(--space-xl) var(--space-xxl); }
-.library__h { font: var(--type-title-lg); letter-spacing: var(--tracking-title-lg); }
-.library .papers:empty { display: none; }
+.lib-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-xxl); }
+.lib-main { min-width: 0; }
+.lib-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-md); }
+.library__h { font: var(--type-title-lg); letter-spacing: var(--tracking-title-lg); overflow-wrap: anywhere; }
 .library [tabindex="-1"]:focus-visible { outline: none; }
+.lib-content > .papers:not([hidden]) { margin-top: var(--space-lg); }
+
+.lib-filters { margin-top: var(--space-md); }
+.lib-filter-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-xs) var(--space-md); }
+.lib-filter { display: flex; flex-direction: column; gap: var(--space-xxs); flex: 1 1 16rem; max-width: 480px; }
+.lib-filter__label, .lib-tags__label { font: var(--type-caption); letter-spacing: var(--tracking-caption);
+  color: var(--color-muted); }
+.lib-filter input[type="search"] { height: 44px; }
+.lib-tagbar { margin-top: var(--space-md); display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-xs) var(--space-md); }
+.lib-tags { display: flex; flex-wrap: wrap; gap: var(--space-xs); flex: 1 1 100%; }
+.lib-tags.is-clamped { max-height: calc(2 * 32px + var(--space-xs)); overflow: hidden; }
+.lib-note { font: var(--type-caption); letter-spacing: var(--tracking-caption); font-weight: 400;
+  color: var(--color-muted); margin-top: var(--space-xs); }
+.lib-tagbar .lib-note { margin-top: 0; }
+
+.tag {
+  display: inline-flex; align-items: center; gap: var(--space-xxs); min-height: 32px; padding: 4px 10px;
+  font: var(--type-chip); color: var(--color-ink); background: var(--color-canvas);
+  border: 1px solid var(--color-edge-input); border-radius: var(--radius-sm); cursor: pointer;
+}
+.tag__count { color: var(--color-muted); margin-left: var(--space-xxs); font-variant-numeric: tabular-nums; }
+.tag[aria-pressed="true"] { background: var(--color-primary); color: var(--color-on-primary); border-color: var(--color-primary); }
+.tag[aria-pressed="true"] .tag__count { color: var(--color-on-primary); }
+.tag[aria-pressed="true"]:focus-visible { box-shadow: var(--ring-focus); outline: none; }
+.tag__check { flex: none; }
+
+.rank__for { font: var(--type-chip); font-weight: 400; color: var(--color-muted); margin-top: var(--space-xs);
+  overflow-wrap: anywhere; max-width: 100%; }
+.lib-for { display: none; }
+.lib-pdf { display: inline-flex; align-items: center; gap: var(--space-xs); font: var(--type-caption);
+  letter-spacing: var(--tracking-caption); font-weight: 400; color: var(--color-muted); }
+.lib-pdf--failed { color: var(--color-coral); }
+.lib-saved, .lib-hl { font: var(--type-caption); letter-spacing: var(--tracking-caption); font-weight: 400;
+  color: var(--color-muted); }
+.text-btn--underlined { text-decoration: underline; text-underline-offset: 3px; padding: 4px 2px; min-height: 0; }
+.lib-actions:empty { display: none; }
+.lib-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-md);
+  margin-top: var(--space-sm); }
 
 /* ---- Preview view (L15-L17, L21): toolbar, page well, text layer ---- */
 
@@ -670,6 +710,8 @@ a.btn--secondary { color: var(--color-ink); }
   .brand { font: var(--type-body-md); font-weight: 500; }
   .paper__head { flex-wrap: wrap; }
   .pv-bar { flex-wrap: wrap; }
+  .lib-row .rank__for { display: none; }
+  .lib-for { display: block; }
   .pv-external { order: 3; flex-basis: 100%; }
 }
 
@@ -713,7 +755,7 @@ a.btn--secondary { color: var(--color-ink); }
   .working__glyph, .turn__glyph, .btn__glyph { color: CanvasText; }
   .rank__meter span { background: CanvasText; }
   .btn--primary { border: 1px solid ButtonText; }
-  .save.is-saved { border: 1px solid CanvasText; }
+  .save.is-saved, .tag[aria-pressed="true"] { border: 1px solid CanvasText; }
   :focus-visible { outline: 2px solid Highlight; }
 }
 

@@ -7,6 +7,7 @@
   <meta name="description" content="Rank a pile of papers by relevance, with an honest critique of each.">
   <link rel="stylesheet" href="app.css">
   <script src="app.js" defer></script>
+  <script src="library.js" defer></script>
   <script type="module" src="viewer.js"></script>
 </head>
 <body>
@@ -95,12 +96,37 @@
   </main>
 
   <main id="library" class="container library" data-route="library" aria-labelledby="library-heading" hidden>
-    <h1 id="library-heading" class="library__h" tabindex="-1">Library</h1>
-    <p id="library-count" class="results__count" hidden></p>
-    <p id="library-loading" class="results__count" hidden>Loading your library…</p>
-    <div id="library-alert" class="alert" role="alert" hidden></div>
-    <div id="library-empty" class="empty" hidden></div>
-    <ol id="library-list" class="papers" tabindex="-1"></ol>
+    <div class="lib-layout">
+      <div class="lib-main">
+        <div class="lib-head">
+          <h1 id="library-heading" class="library__h" tabindex="-1">Library</h1>
+        </div>
+        <p id="library-count" class="results__count" hidden></p>
+        <p id="library-loading" class="results__count" hidden>Loading your library…</p>
+        <div id="library-alert" class="alert" role="alert" hidden></div>
+        <div id="lib-content" class="lib-content" hidden>
+          <div class="lib-filters">
+            <div class="lib-filter-row">
+              <div class="lib-filter">
+                <label class="lib-filter__label" for="lib-filter">Filter</label>
+                <input id="lib-filter" type="search" autocomplete="off" spellcheck="false" placeholder="Tags or titles">
+              </div>
+              <button id="lib-clear" type="button" class="text-btn" hidden>Clear filters</button>
+            </div>
+            <div id="lib-tagbar" class="lib-tagbar">
+              <p id="lib-tags-label" class="lib-tags__label">Tags</p>
+              <div id="lib-tags" class="lib-tags" role="group" aria-labelledby="lib-tags-label"></div>
+              <button id="lib-tags-more" type="button" class="text-btn" aria-expanded="false" hidden></button>
+              <p id="lib-tags-none" class="lib-note" hidden>No tags yet. Tags are the search keywords that found each paper.</p>
+            </div>
+            <p id="lib-tags-summary" class="lib-note" hidden></p>
+          </div>
+          <div id="library-empty" class="empty" hidden></div>
+          <ol id="library-list" class="papers" tabindex="-1"></ol>
+        </div>
+        <div id="library-empty-all" class="empty" hidden></div>
+      </div>
+    </div>
   </main>
 
   <main id="preview" class="preview" data-route="preview" aria-labelledby="preview-heading" hidden>

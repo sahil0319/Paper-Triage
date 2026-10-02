@@ -143,8 +143,12 @@ def _open_buttons(page):
 
 def test_preview_back_restores_filters_scroll_and_focus(app):
     page = app
-    items = [lib_item(n) for n in range(1, 41)]
-    LibraryStub(page, items)
+    items = [
+        lib_item(n, title=f"Attn paper {n}", tags=["diffusion models", "video"], directory_id=1)
+        for n in range(1, 41)
+    ]
+    stub = LibraryStub(page, items)
+    stub.directories = [{"id": 1, "name": "network", "count": 40}]
     hash_ = "#/library?dir=network&tags=diffusion%20models,video&q=attn"
     page.set_viewport_size({"width": 1100, "height": 700})
     page.goto("/" + hash_)
@@ -740,3 +744,379 @@ def test_find_is_reset_when_the_preview_closes(app):
     expect(page.locator(".pdf-page")).to_have_count(3)
     expect(page.locator("#pv-find")).to_be_hidden()
     expect(page.locator("#pv-find-input")).to_have_value("")
+
+
+# ---- T060: Library list, filters, tags, states, polling ----
+
+
+def rows(page):
+    return page.locator("#library-list li.lib-row")
+
+
+def row_ids(page):
+    return rows(page).evaluate_all("els => els.map(e => e.dataset.paperId)")
+
+
+def tag_chip(page, name):
+    return page.locator(f'#lib-tags button.tag[data-tag="{name}"]')
+
+
+def lib_page(app, items, hash_="#/library", **kw):
+    stub = LibraryStub(app, items, **kw)
+    app.add_init_script("window.__PT_POLL_MS = 300")
+    app.set_viewport_size({"width": 1280, "height": 900})
+    app.goto("/" + hash_)
+    return stub
+
+
+def tagged(n, tags, **kw):
+    return lib_item(n, tags=tags, **kw)
+
+
+def test_library_row_content(app):
+    page = app
+    lib_page(
+        page,
+        [
+            lib_item(
+                1,
+                tags=["diffusion", "video"],
+                topic="diffusion video",
+                highlight_count=3,
+                saved_at="2026-10-03T10:00:00+00:00",
+                summary={"summary": "S.", "contributions": []},
+                critique={
+                    "basis": "fulltext",
+                    "weak_claims": [],
+                    "overclaims": [],
+                    "missing_baselines": [],
+                },
+            )
+        ],
+    )
+    li = rows(page).first
+    expect(li).to_have_attribute("data-paper-id", "2401.00001")
+    expect(li.locator(".paper__title")).to_have_text("Saved paper 1: stubbed title")
+    expect(li.locator(".paper__authors").first).to_have_text("A. Author, B. Author")
+    expect(li.locator(".lib-tagline")).to_have_text("Tags: diffusion, video")
+    expect(li.locator(".rank__for")).to_have_text('for "diffusion video"')
+    expect(li.locator(".lib-saved")).to_have_text("Saved 3 Oct")
+    expect(li.locator("[data-pdf-status]")).to_have_text("PDF ready")
+    expect(li.locator("[data-pdf-status]")).to_have_attribute("data-pdf-status", "ready")
+    expect(li.locator(".lib-hl")).to_have_text("3 highlights")
+    expect(li.locator('a[data-link="abs"]')).to_have_count(1)
+    expect(li.locator("details.disclosure")).to_have_count(1)
+    expect(li.locator("button.open-preview")).to_have_text("Open preview")
+    expect(page.locator("#library-count")).to_have_text("1 of 1 saved paper")
+    expect(page.locator("#library-heading")).to_have_text("Library")
+
+
+def test_library_row_omits_tags_topic_and_zero_highlights(app):
+    page = app
+    lib_page(page, [lib_item(1, tags=[], topic="", highlight_count=0)])
+    li = rows(page).first
+    expect(li.locator(".lib-tagline")).to_have_count(0)
+    expect(li.locator(".rank__for")).to_have_count(0)
+    expect(li.locator(".lib-hl")).to_have_count(0)
+
+
+def test_open_preview_button_opens_preview_route(app):
+    page = app
+    lib_page(page, [lib_item(1)])
+    rows(page).first.locator("button.open-preview").click()
+    assert page.evaluate("location.hash") == "#/library/paper/2401.00001"
+
+
+def test_tag_filter_is_and_and_chips_sorted(app):
+    page = app
+    items = [
+        tagged(1, ["diffusion", "video"]),
+        tagged(2, ["diffusion", "video", "rag"]),
+        tagged(3, ["diffusion"]),
+        tagged(4, ["rag"]),
+    ]
+    lib_page(page, items)
+    chips = page.locator("#lib-tags button.tag")
+    assert [c.get_attribute("data-tag") for c in chips.all()] == ["diffusion", "rag", "video"]
+    expect(tag_chip(page, "diffusion")).to_contain_text("3")
+    expect(tag_chip(page, "diffusion")).to_have_attribute("aria-pressed", "false")
+    tag_chip(page, "diffusion").click()
+    assert row_ids(page) == ["2401.00001", "2401.00002", "2401.00003"]
+    expect(tag_chip(page, "diffusion")).to_have_attribute("aria-pressed", "true")
+    expect(tag_chip(page, "diffusion").locator("svg.tag__check")).to_have_count(1)
+    tag_chip(page, "video").click()
+    assert row_ids(page) == ["2401.00001", "2401.00002"]
+    expect(page.locator("#lib-tags-summary")).to_have_text(
+        "Showing papers tagged diffusion and video."
+    )
+    expect(page.locator("#library-count")).to_have_text("2 of 4 saved papers")
+    assert page.evaluate("location.hash") == "#/library?tags=diffusion,video"
+    tag_chip(page, "rag").click()
+    assert row_ids(page) == ["2401.00002"]
+    # Unpress: filter widens again.
+    tag_chip(page, "rag").click()
+    tag_chip(page, "video").click()
+    assert row_ids(page) == ["2401.00001", "2401.00002", "2401.00003"]
+    # Pressed chips sort first: video (2) now precedes rag (2) only because it is pressed.
+    tag_chip(page, "diffusion").click()
+    tag_chip(page, "video").click()
+    chips = page.locator("#lib-tags button.tag")
+    assert [c.get_attribute("data-tag") for c in chips.all()] == ["video", "diffusion", "rag"]
+
+
+def test_title_filter_and_chip_text_rules(app):
+    page = app
+    items = [
+        tagged(1, ["diffusion"], title="Quartz attention"),
+        tagged(2, ["diffusion", "guidance"], title="Basalt steering"),
+        tagged(3, ["guidance"], title="Marble sampling"),
+    ]
+    lib_page(page, items)
+    flt = page.locator("#lib-filter")
+    flt.fill("QUARTZ")
+    expect(rows(page)).to_have_count(1)
+    assert row_ids(page) == ["2401.00001"]
+    assert page.evaluate("location.hash") == "#/library?q=QUARTZ"
+    # Text narrows the chips too: only tags containing the text.
+    flt.fill("guid")
+    expect(page.locator("#lib-tags button.tag")).to_have_count(1)
+    expect(tag_chip(page, "guidance")).to_be_visible()
+    expect(rows(page)).to_have_count(0)
+    # Selecting a chip clears the text and filters by the tag.
+    tag_chip(page, "guidance").click()
+    expect(flt).to_have_value("")
+    assert row_ids(page) == ["2401.00002", "2401.00003"]
+    # Title text and a tag combine with AND; selected chips never disappear.
+    flt.fill("marble")
+    expect(rows(page)).to_have_count(1)
+    assert row_ids(page) == ["2401.00003"]
+    expect(tag_chip(page, "guidance")).to_be_visible()
+    expect(page.locator("#lib-tags button.tag")).to_have_count(1)
+
+
+def test_clear_filters_and_escape(app):
+    page = app
+    lib_page(page, [tagged(1, ["a1"]), tagged(2, ["b2"])], hash_="#/library?tags=a1&q=saved")
+    expect(page.locator("#lib-filter")).to_have_value("saved")
+    expect(tag_chip(page, "a1")).to_have_attribute("aria-pressed", "true")
+    assert row_ids(page) == ["2401.00001"]
+    clear = page.locator("#lib-clear")
+    expect(clear).to_be_visible()
+    clear.click()
+    assert row_ids(page) == ["2401.00001", "2401.00002"]
+    expect(page.locator("#lib-filter")).to_be_focused()
+    expect(clear).to_be_hidden()
+    expect(page.locator("#status")).to_have_text("Filters cleared. 2 saved papers.")
+    assert page.evaluate("location.hash") == "#/library"
+    page.locator("#lib-filter").fill("paper 2")
+    expect(rows(page)).to_have_count(1)
+    assert row_ids(page) == ["2401.00002"]
+    page.locator("#lib-filter").press("Escape")
+    expect(page.locator("#lib-filter")).to_have_value("")
+    assert row_ids(page) == ["2401.00001", "2401.00002"]
+
+
+def test_slash_focuses_filter_in_library(app):
+    page = app
+    lib_page(page, [lib_item(1)])
+    expect(rows(page)).to_have_count(1)
+    page.locator("#library-heading").focus()
+    page.keyboard.press("/")
+    expect(page.locator("#lib-filter")).to_be_focused()
+
+
+def test_no_matches_state_offers_clear(app):
+    page = app
+    lib_page(page, [lib_item(1)], hash_="#/library?q=zzzz")
+    expect(page.locator("#library-empty .empty__title")).to_have_text("No saved papers match.")
+    expect(page.locator("#library-empty .empty__body")).to_have_text(
+        "Try fewer tags or a shorter filter."
+    )
+    expect(rows(page)).to_have_count(0)
+    page.locator("#library-empty").get_by_role("button", name="Clear filters").click()
+    expect(rows(page)).to_have_count(1)
+
+
+def test_tag_bar_overflow_show_all_and_no_tags_note(app):
+    page = app
+    many = [f"topicword{n:02d}" for n in range(30)]
+    lib_page(page, [tagged(1, many)])
+    more = page.locator("#lib-tags-more")
+    expect(more).to_have_text("Show all 30 tags")
+    expect(more).to_have_attribute("aria-expanded", "false")
+    tags_h = page.locator("#lib-tags").evaluate("e => e.clientHeight")
+    assert tags_h <= 80
+    more.click()
+    expect(more).to_have_text("Show fewer tags")
+    expect(more).to_have_attribute("aria-expanded", "true")
+    assert page.locator("#lib-tags").evaluate("e => e.clientHeight") > tags_h
+    more.click()
+    expect(more).to_have_text("Show all 30 tags")
+
+
+def test_no_tags_note(app):
+    page = app
+    lib_page(page, [tagged(1, [])])
+    expect(page.locator("#lib-tags-none")).to_have_text(
+        "No tags yet. Tags are the search keywords that found each paper."
+    )
+    expect(page.locator("#lib-tags")).to_be_hidden()
+
+
+def test_library_states_empty_error_loading(app):
+    page = app
+    LibraryStub(page, [])
+    page.goto("/#/library")
+    expect(page.locator("#library-empty-all .empty__title")).to_have_text("Nothing saved yet.")
+    expect(page.locator("#library-empty-all")).to_contain_text("Each saved paper keeps its rank")
+    page.locator("#library-empty-all").get_by_role("link", name="Go to Triage").click()
+    expect(page.locator("#main")).to_be_visible()
+
+
+def test_library_load_error_then_try_again(app):
+    page = app
+    stub = LibraryStub(page, [lib_item(1)])
+    stub.fail[("GET", "/api/library")] = (500, "db locked")
+    page.goto("/#/library")
+    expect(page.locator("#library-alert")).to_contain_text("Could not load your library.")
+    expect(page.locator("#library-alert")).to_contain_text("db locked")
+    expect(page.locator("#library-list")).to_be_hidden()
+    page.locator("#library-alert").get_by_role("button", name="Try again").click()
+    expect(rows(page)).to_have_count(1)
+    expect(page.locator("#library-alert")).to_be_hidden()
+
+
+def test_library_loading_caption_after_delay(app):
+    page = app
+    held = []
+    LibraryStub(page, [lib_item(1)])
+    page.route(
+        lambda url: url.endswith("/api/library"),
+        lambda route: held.append(route) if not held else route.fallback(),
+    )
+    page.goto("/#/library")
+    expect(page.locator("#library-loading")).to_have_text("Loading your library…")
+    held[0].fallback()
+    expect(rows(page)).to_have_count(1)
+    expect(page.locator("#library-loading")).to_be_hidden()
+
+
+def test_status_polls_until_ready_then_stops(app):
+    page = app
+    stub = lib_page(page, [lib_item(1, pdf={"status": "pending", "error": None, "pages": None})])
+    li = rows(page).first
+    expect(li.locator("[data-pdf-status]")).to_have_text("Downloading PDF…")
+    expect(li.locator("[data-pdf-status]")).to_have_attribute("data-pdf-status", "pending")
+    stub.items[0]["pdf"] = {"status": "ready", "error": None, "pages": 3}
+    expect(li.locator("[data-pdf-status]")).to_have_text("PDF ready", timeout=5_000)
+    n = len(stub.calls_to("GET", "/api/library"))
+    page.wait_for_timeout(1000)
+    assert len(stub.calls_to("GET", "/api/library")) == n, "polling did not stop"
+
+
+def test_no_polling_when_nothing_pending(app):
+    page = app
+    stub = lib_page(page, [lib_item(1), lib_item(2)])
+    expect(rows(page)).to_have_count(2)
+    n = len(stub.calls_to("GET", "/api/library"))
+    page.wait_for_timeout(1000)
+    assert len(stub.calls_to("GET", "/api/library")) == n
+
+
+def test_failed_status_try_again_posts_retry(app):
+    page = app
+    stub = lib_page(
+        page, [lib_item(1, pdf={"status": "failed", "error": "Not a PDF.", "pages": None})]
+    )
+    li = rows(page).first
+    expect(li.locator("[data-pdf-status]")).to_contain_text("PDF unavailable")
+    li.get_by_role("button", name="Try again").click()
+    expect(li.locator("[data-pdf-status]")).to_have_attribute("data-pdf-status", "pending")
+    assert [c[3] for c in stub.calls_to("POST", "/api/library/retry")] == [
+        {"paper_id": "2401.00001"}
+    ]
+    stub.items[0]["pdf"] = {"status": "ready", "error": None, "pages": 3}
+    expect(li.locator("[data-pdf-status]")).to_have_text("PDF ready", timeout=5_000)
+
+
+# Real harness (BE T047-T050): tags from topics, filters give exact rows, status reaches ready.
+
+
+@pytest.fixture
+def real_library(app, live_server):
+    api = app.request
+
+    def wipe():
+        data = api.get(f"{live_server.url}/api/library").json()
+        for p in data["papers"]:
+            api.delete(f"{live_server.url}/api/library?paper_id={p['paper_id']}")
+
+    wipe()
+    yield live_server.url
+    wipe()
+
+
+def _triage(page, base, query):
+    r = page.request.post(f"{base}/api/triage", data={"query": query})
+    assert r.ok, r.text()
+    return r.json()["topic"]
+
+
+def _save(page, base, topic, paper_id):
+    s = page.request.post(f"{base}/api/library", data={"paper_id": paper_id, "topic": topic})
+    assert s.ok, s.text()
+
+
+def test_real_tag_and_title_filters_give_exact_rows(app, real_library):
+    page, base = app, real_library
+    # Triage first: a later topic search that returns a saved paper merges its tags into it.
+    t1 = _triage(page, base, "diffusion distillation")
+    t2 = _triage(page, base, "diffusion guidance")
+    _save(page, base, t1, "2401.00001")
+    _save(page, base, t1, "2401.00002")
+    _save(page, base, t2, "2401.00003")
+    page.goto("/#/library")
+    expect(rows(page)).to_have_count(3)
+    assert sorted(row_ids(page)) == ["2401.00001", "2401.00002", "2401.00003"]
+    expect(page.locator("#lib-tags button.tag").first).to_have_attribute("data-tag", "diffusion")
+    tag_chip(page, "distillation").click()
+    assert sorted(row_ids(page)) == ["2401.00001", "2401.00002"]
+    tag_chip(page, "guidance").click()
+    expect(page.locator("#library-empty .empty__title")).to_have_text("No saved papers match.")
+    tag_chip(page, "guidance").click()
+    tag_chip(page, "distillation").click()
+    tag_chip(page, "guidance").click()
+    assert row_ids(page) == ["2401.00003"]
+    page.locator("#lib-clear").click()
+    title = rows(page).nth(0).locator(".paper__title").inner_text()
+    word = next(w for w in re.findall(r"[A-Za-z]{6,}", title))
+    expected = [
+        i
+        for i, t in zip(
+            row_ids(page),
+            rows(page).evaluate_all(
+                "els => els.map(e => e.querySelector('.paper__title').textContent)"
+            ),
+        )
+        if word.lower() in t.lower()
+    ]
+    page.locator("#lib-filter").fill(word)
+    expect(rows(page)).to_have_count(len(expected))
+    assert row_ids(page) == expected
+
+
+def test_real_status_reaches_pdf_ready(app, real_library):
+    page, base = app, real_library
+    _save(page, base, _triage(page, base, "diffusion distillation"), "2401.00001")
+    page.goto("/#/library")
+    expect(rows(page).first.locator("[data-pdf-status]")).to_have_text("PDF ready", timeout=5_000)
+
+
+def test_real_unavailable_pdf_offers_retry(app, real_library):
+    page, base = app, real_library
+    _save(page, base, _triage(page, base, "2401.00005"), "2401.00005")
+    page.goto("/#/library")
+    st = rows(page).first.locator("[data-pdf-status]")
+    expect(st).to_contain_text("PDF unavailable", timeout=5_000)
+    rows(page).first.get_by_role("button", name="Try again").click()
+    expect(st).to_contain_text("PDF unavailable", timeout=5_000)

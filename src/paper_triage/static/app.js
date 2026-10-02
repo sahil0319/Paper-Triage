@@ -238,7 +238,7 @@
 
   // ---- paper rows (D8, D9, D11) ----
 
-  function rankBlock(r, failed) {
+  function rankBlock(r, failed, forTopic) {
     var n = failed ? null : Math.max(0, Math.min(10, Number(r.rank) || 0));
     return h("div", { class: "rank" },
       h("div", { class: "rank__line" },
@@ -246,7 +246,8 @@
           failed ? "–" : String(n)),
         failed ? null : h("span", { class: "rank__of", "aria-hidden": "true" }, "/10")),
       failed ? null : h("div", { class: "rank__meter", "aria-hidden": "true", style: "--rank:" + n },
-        h("span", {})));
+        h("span", {})),
+      forTopic ? h("p", { class: "rank__for" }, "for \"" + forTopic + "\"") : null);
   }
 
   function row(r) {
@@ -1021,10 +1022,6 @@
 
   var libraryEl = document.getElementById("library");
   var libHeading = document.getElementById("library-heading");
-  var libCountEl = document.getElementById("library-count");
-  var libLoadingEl = document.getElementById("library-loading");
-  var libAlertEl = document.getElementById("library-alert");
-  var libEmptyEl = document.getElementById("library-empty");
   var libListEl = document.getElementById("library-list");
   var navCountEl = document.querySelector(".views__count");
   var previewHeading = document.getElementById("preview-heading");
@@ -1159,26 +1156,9 @@
     updateNavCount();
   }
 
-  // ---- Library view (placeholder list until T060 adds filters, directories and tags) ----
+  // ---- Library view: library.js registers the renderer (PT.registerLibrary) ----
 
-  var loadingTimer = null;
-
-  function libRow(it) {
-    var titleId = "lib-title-" + it.paper_id;
-    var open = h("button", { type: "button", class: "btn btn--secondary btn--small open-preview",
-      "data-open-preview": it.paper_id, "aria-describedby": titleId }, "Open preview");
-    open.addEventListener("click", function () { location.hash = previewHash(it.paper_id); });
-    var meta = h("div", { class: "paper__meta" },
-      h("span", { class: "paper__id" }, it.paper_id), paperLinks(it));
-    return h("li", { class: "paper", "data-paper-id": it.paper_id },
-      rankBlock(it, false),
-      h("div", { class: "paper__body" },
-        h("div", { class: "paper__head" },
-          h("h3", { class: "paper__title", id: titleId }, it.title), open),
-        authorsLine(it.authors) ? h("p", { class: "paper__authors" }, authorsLine(it.authors)) : null,
-        it.rank_reason ? h("p", { class: "paper__reason" }, it.rank_reason) : null,
-        meta, details(it)));
-  }
+  var libraryView = null;
 
   function restoreLibraryReturn() {
     if (!libReturn || libReturn.hash !== route.hash) return;
@@ -1194,44 +1174,22 @@
   }
 
   function renderLibrary(restore) {
-    window.clearTimeout(loadingTimer);
-    var waiting = !lib.loaded && !lib.error;
-    libLoadingEl.hidden = true;
-    if (waiting) {
-      loadingTimer = window.setTimeout(function () {
-        if (!lib.loaded && !lib.error && route.view === "library") libLoadingEl.hidden = false;
-      }, SHOW_DELAY_MS);
-    }
-    clear(libAlertEl);
-    libAlertEl.hidden = true;
-    libEmptyEl.hidden = true;
-    clear(libListEl);
-    libCountEl.hidden = true;
-    if (lib.error && !lib.loaded) {
-      var retry = h("button", { type: "button", class: "btn btn--on-dark" }, "Try again");
-      retry.addEventListener("click", function () { enterLibrary(true); });
-      libAlertEl.appendChild(h("p", { class: "alert__title" }, "Could not load your library."));
-      libAlertEl.appendChild(h("p", { class: "alert__detail" }, lib.error));
-      libAlertEl.appendChild(retry);
-      libAlertEl.hidden = false;
-      return;
-    }
-    if (!lib.loaded) return;
-    if (!lib.papers.length) {
-      clear(libEmptyEl);
-      libEmptyEl.appendChild(h("p", { class: "empty__title" }, "Nothing saved yet."));
-      libEmptyEl.appendChild(h("p", { class: "empty__body" },
-        "Save papers from your ranked results. Each saved paper keeps its rank, critique, tags and a local PDF."));
-      libEmptyEl.appendChild(h("p", { class: "empty__actions" },
-        h("a", { class: "btn btn--secondary", href: "#/" }, "Go to Triage")));
-      libEmptyEl.hidden = false;
-      return;
-    }
-    libCountEl.textContent = lib.papers.length + " of " + lib.total + " saved paper" +
-      (lib.total === 1 ? "" : "s");
-    libCountEl.hidden = false;
-    lib.papers.forEach(function (it) { libListEl.appendChild(libRow(it)); });
+    if (!libraryView) return;
+    libraryView.render();
     if (restore) restoreLibraryReturn();
+  }
+
+  // Filters live in the hash, but typing or clicking a chip must not add history entries.
+  function setLibraryParams(p) {
+    var hash = libraryHash(p);
+    route.params = p;
+    route.hash = hash;
+    if (window.history && history.replaceState) history.replaceState(null, "", hash);
+  }
+
+  function reloadLibrary() {
+    lib.sig = "";
+    return loadLibrary();
   }
 
   // Entering the Library from elsewhere shows the cached list at once and refreshes it in the
@@ -1380,6 +1338,12 @@
     route: function () { return route; }, libItem: libItem, loadLibrary: loadLibrary,
     libraryAdd: libraryAdd, libraryRemove: libraryRemove, libraryHash: libraryHash,
     previewHash: previewHash, rankBlock: rankBlock, details: details, paperLinks: paperLinks,
+    authorsLine: authorsLine, lib: function () { return lib; }, setLibraryParams: setLibraryParams, reloadLibrary: reloadLibrary,
+    enterLibrary: enterLibrary, jump: jump,
+    registerLibrary: function (v) {
+      libraryView = v;
+      if (route.view === "library") renderLibrary(true);
+    },
     registerViewer: function (v) {
       viewer = v;
       if (route.view === "preview" && lib.loaded) renderPreview();
