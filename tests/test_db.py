@@ -159,3 +159,193 @@ def test_touch_results_refreshes_latest_topic_only_for_given_papers(conn):
     db.touch_results(conn, "first", ["a", "missing"])
     assert db.latest_topic(conn) == "first"
     assert db.get_result(conn, "b", "second")["rank"] == 1
+
+
+# ---- v3: Library (T045) ---------------------------------------------------------------------
+
+SNAP = {"title": "T", "authors": ["A"], "rank": 8, "rank_reason": "why", "abstract": "abs"}
+
+
+def saved_conn(conn, pid="2401.00001"):
+    db.upsert_paper(conn, paper(pid))
+    return conn
+
+
+def test_v3_tables_exist(conn):
+    names = {r[0] for r in conn.execute("select name from sqlite_master where type='table'")}
+    assert {"directories", "saved_papers", "saved_tags"} <= names
+
+
+def test_save_paper_creates_and_lists(conn):
+    saved_conn(conn)
+    assert db.get_saved(conn, "2401.00001") is None
+    assert db.save_paper(conn, "2401.00001", SNAP, "diffusion models", ["diffusion", "models"])
+    s = db.get_saved(conn, "2401.00001")
+    assert s["snapshot"] == SNAP and s["topic"] == "diffusion models"
+    assert s["tags"] == ["diffusion", "models"] and s["directory_id"] is None and s["saved_at"]
+    assert db.saved_ids(conn, ["2401.00001", "x"]) == {"2401.00001"}
+    assert db.saved_ids(conn, []) == set()
+
+
+def test_save_paper_idempotent_keeps_snapshot_and_saved_at_merges_tags(conn):
+    saved_conn(conn)
+    db.save_paper(conn, "2401.00001", SNAP, "a topic", ["topic"])
+    first = db.get_saved(conn, "2401.00001")
+    created = db.save_paper(conn, "2401.00001", {**SNAP, "rank": 1}, "other", ["topic", "other"])
+    assert created is False
+    again = db.get_saved(conn, "2401.00001")
+    assert again["snapshot"] == SNAP and again["topic"] == "a topic"
+    assert again["saved_at"] == first["saved_at"]
+    assert again["tags"] == ["topic", "other"]
+    db.merge_tags(conn, "2401.00001", ["zeta", "topic"])
+    assert db.get_saved(conn, "2401.00001")["tags"] == ["topic", "other", "zeta"]
+
+
+def test_list_saved_newest_first(conn):
+    for pid in ("2401.00001", "2401.00002", "2401.00003"):
+        saved_conn(conn, pid)
+        db.save_paper(conn, pid, SNAP, "", [])
+    assert [s["paper_id"] for s in db.list_saved(conn)] == [
+        "2401.00003", "2401.00002", "2401.00001",
+    ]
+    assert db.get_saved(conn, "2401.00001")["tags"] == []
+
+
+def test_delete_saved_keeps_papers_and_results(conn):
+    saved_conn(conn)
+    db.save_result(conn, "2401.00001", "t", status="ok", rank=5, rank_reason="r")
+    db.save_paper(conn, "2401.00001", SNAP, "t", ["tt"])
+    assert db.delete_saved(conn, "2401.00001") is True
+    assert db.delete_saved(conn, "2401.00001") is False
+    assert db.get_saved(conn, "2401.00001") is None
+    assert conn.execute("select count(*) from saved_tags").fetchone()[0] == 0
+    assert db.get_paper(conn, "2401.00001") and db.get_result(conn, "2401.00001", "t")
+
+
+def test_directory_crud_and_unique_casefold(conn):
+    d = db.create_directory(conn, "  Network  ")
+    assert d == {"id": d["id"], "name": "Network", "count": 0}
+    with pytest.raises(db.DuplicateName, match='"network" already exists.'):
+        db.create_directory(conn, "network")
+    with pytest.raises(db.DuplicateName):
+        db.create_directory(conn, "Unsorted")
+    with pytest.raises(db.DuplicateName):
+        db.create_directory(conn, "all SAVED")
+    with pytest.raises(ValueError, match="Enter a name."):
+        db.create_directory(conn, "   ")
+    with pytest.raises(ValueError, match="Names can be up to 40 characters."):
+        db.create_directory(conn, "x" * 41)
+    assert db.create_directory(conn, "x" * 40)["name"] == "x" * 40
+    db.create_directory(conn, "alpha")
+    assert [x["name"] for x in db.list_directories(conn)] == ["alpha", "Network", "x" * 40]
+    renamed = db.rename_directory(conn, d["id"], "Graphs")
+    assert renamed["name"] == "Graphs"
+    assert db.rename_directory(conn, d["id"], "GRAPHS")["name"] == "GRAPHS"  # same row, new case
+    assert db.rename_directory(conn, 999, "zzz") is None
+    with pytest.raises(db.DuplicateName):
+        db.rename_directory(conn, d["id"], "ALPHA")
+
+
+def test_move_paper_counts_and_delete_directory_moves_members_to_null(conn):
+    d = db.create_directory(conn, "net")
+    for pid in ("2401.00001", "2401.00002"):
+        saved_conn(conn, pid)
+        db.save_paper(conn, pid, SNAP, "", [])
+    assert db.move_paper(conn, "2401.00001", d["id"]) is True
+    assert db.move_paper(conn, "2401.00002", d["id"]) is True
+    assert db.move_paper(conn, "nope", d["id"]) is False
+    assert db.move_paper(conn, "2401.00001", 999) is False
+    assert db.list_directories(conn)[0]["count"] == 2
+    assert db.move_paper(conn, "2401.00002", None) is True
+    assert db.list_directories(conn)[0]["count"] == 1
+    assert db.delete_directory(conn, d["id"]) == 1
+    assert db.get_saved(conn, "2401.00001")["directory_id"] is None
+    assert db.delete_directory(conn, d["id"]) is None
+    assert db.list_directories(conn) == []
+
+
+def test_rename_keeps_members(conn):
+    d = db.create_directory(conn, "net")
+    saved_conn(conn)
+    db.save_paper(conn, "2401.00001", SNAP, "", [])
+    db.move_paper(conn, "2401.00001", d["id"])
+    db.rename_directory(conn, d["id"], "graphs")
+    assert db.get_saved(conn, "2401.00001")["directory_id"] == d["id"]
+    assert db.list_directories(conn)[0] == {"id": d["id"], "name": "graphs", "count": 1}
+
+
+# ---- v3: files, pages, annotations (T046) ---------------------------------------------------
+
+
+def test_v3_file_tables_exist(conn):
+    names = {r[0] for r in conn.execute("select name from sqlite_master where type='table'")}
+    assert {"paper_files", "paper_pages", "annotations"} <= names
+
+
+def test_file_status_lifecycle(conn):
+    saved_conn(conn)
+    db.save_paper(conn, "2401.00001", SNAP, "", [])
+    assert db.get_file(conn, "2401.00001") is None
+    db.set_file_status(conn, "2401.00001", "pending", source_url="https://x/pdf")
+    assert db.get_file(conn, "2401.00001")["status"] == "pending"
+    assert db.pending_files(conn) == ["2401.00001"]
+    db.set_file_status(
+        conn, "2401.00001", "ready", path="/d/a.pdf", bytes=10, sha256="ab", pages=3, error=None
+    )
+    f = db.get_file(conn, "2401.00001")
+    assert (f["status"], f["path"], f["bytes"], f["sha256"], f["pages"]) == (
+        "ready", "/d/a.pdf", 10, "ab", 3,
+    )
+    assert f["source_url"] == "https://x/pdf" and f["updated_at"]
+    assert db.pending_files(conn) == []
+    db.set_file_status(conn, "2401.00001", "failed", error="Not a PDF.", path=None, pages=None)
+    f = db.get_file(conn, "2401.00001")
+    assert (f["status"], f["error"], f["path"], f["pages"]) == ("failed", "Not a PDF.", None, None)
+    with pytest.raises(ValueError):
+        db.set_file_status(conn, "2401.00001", "weird")
+
+
+def test_pages_replace_and_read(conn):
+    saved_conn(conn)
+    db.save_paper(conn, "2401.00001", SNAP, "", [])
+    assert db.get_pages(conn, "2401.00001") == []
+    db.put_pages(conn, "2401.00001", ["one", "", "three"])
+    assert db.get_pages(conn, "2401.00001") == ["one", "", "three"]
+    db.put_pages(conn, "2401.00001", ["only"])
+    assert db.get_pages(conn, "2401.00001") == ["only"]
+
+
+def test_annotation_crud_order_and_top(conn):
+    saved_conn(conn)
+    db.save_paper(conn, "2401.00001", SNAP, "", [])
+    a = db.create_annotation(
+        conn, "2401.00001", 2, "highlight", "mint", [[0.1, 0.5, 0.2, 0.02], [0.1, 0.3, 0.2, 0.02]],
+        "quote", "pre", "suf", "",
+    )
+    assert a["top"] == 0.3 and a["rects"] == [[0.1, 0.5, 0.2, 0.02], [0.1, 0.3, 0.2, 0.02]]
+    n = db.create_annotation(conn, "2401.00001", 1, "note", "yellow", [], "", "", "", "page note")
+    assert n["top"] == 0 and n["rects"] == [] and n["created_at"] == n["updated_at"]
+    b = db.create_annotation(
+        conn, "2401.00001", 2, "highlight", "yellow", [[0.1, 0.1, 0.2, 0.02]], "q2", "", "", ""
+    )
+    assert [x["id"] for x in db.list_annotations(conn, "2401.00001")] == [n["id"], b["id"], a["id"]]
+    assert db.annotation_count(conn, "2401.00001") == 3
+    assert db.get_annotation(conn, a["id"])["quote"] == "quote"
+    u = db.update_annotation(conn, a["id"], color="peach", note="hello")
+    assert (u["color"], u["note"]) == ("peach", "hello")
+    assert db.update_annotation(conn, a["id"], note="")["note"] == ""
+    assert db.update_annotation(conn, 999, note="x") is None
+    assert db.delete_annotation(conn, a["id"]) is True
+    assert db.delete_annotation(conn, a["id"]) is False
+    assert db.annotation_count(conn, "2401.00001") == 2
+
+
+def test_unsave_cascades_file_pages_and_annotations(conn):
+    saved_conn(conn)
+    db.save_paper(conn, "2401.00001", SNAP, "t", ["tt"])
+    db.set_file_status(conn, "2401.00001", "ready", pages=3)
+    db.put_pages(conn, "2401.00001", ["a", "b", "c"])
+    db.create_annotation(conn, "2401.00001", 1, "note", "yellow", [], "", "", "", "n")
+    db.delete_saved(conn, "2401.00001")
+    for table in ("paper_files", "paper_pages", "annotations", "saved_tags"):
+        assert conn.execute(f"select count(*) from {table}").fetchone()[0] == 0, table

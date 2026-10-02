@@ -27,6 +27,17 @@ def test_config_defaults(monkeypatch):
     assert (s.max_papers, s.default_papers, s.text_cap, s.chat_top_k) == (20, 10, 40000, 20)
 
 
+def test_config_v3_defaults_and_data_dir_env(monkeypatch):
+    monkeypatch.delenv("PAPER_TRIAGE_DATA_DIR", raising=False)
+    s = get_settings()
+    assert s.data_dir == "./paper_triage_data"
+    assert (s.pdf_max_bytes, s.paper_chat_cap, s.paper_chat_history) == (52_428_800, 300_000, 6)
+    monkeypatch.setenv("PAPER_TRIAGE_DATA_DIR", "/tmp/ptd")
+    assert get_settings().data_dir == "/tmp/ptd"
+    monkeypatch.setenv("PAPER_TRIAGE_DATA_DIR", "")
+    assert get_settings().data_dir == "./paper_triage_data"
+
+
 def test_config_reads_env_at_call_time(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_MODEL", "m-x")
     monkeypatch.setenv("PAPER_TRIAGE_DB", "/tmp/x.db")

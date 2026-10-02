@@ -19,6 +19,10 @@ class Settings:
     chat_top_k: int = 20
     chat_max_ids: int = 50  # max paper_ids per chat request
     concurrency: int = 4  # papers processed in parallel (TRIAGE_CONCURRENCY, min 1)
+    data_dir: str = "./paper_triage_data"  # saved PDFs live under <data_dir>/pdfs
+    pdf_max_bytes: int = 52_428_800  # 50 MB cap per saved PDF
+    paper_chat_cap: int = 300_000  # max characters of paper text sent to paper chat
+    paper_chat_history: int = 6  # max earlier turns accepted by paper chat
 
 
 def _concurrency() -> int:
@@ -40,4 +44,5 @@ def get_settings() -> Settings:
         mock=os.environ.get("MOCK_LLM") == "1",
         db_path=os.environ.get("PAPER_TRIAGE_DB") or "./paper_triage.db",
         concurrency=_concurrency(),
+        data_dir=os.environ.get("PAPER_TRIAGE_DATA_DIR") or "./paper_triage_data",
     )

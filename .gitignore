@@ -10,3 +10,4 @@ __pycache__/
 .local/
 .claude/settings.local.json.bak
 node_modules/
+paper_triage_data/

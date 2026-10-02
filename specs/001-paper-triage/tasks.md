@@ -353,7 +353,7 @@ hooks. Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest 
   `pt/net.py` mock: keep `2401.00005` non-PDF bytes; hosts ending `.invalid` -> 404 (already);
   `export.arxiv.org/pdf/<id>` served like `/pdf/` (host check). Audit tests that assumed one
   page.
-- [ ] T045 [BE] [US4] Config + Library schema/CRUD (data-model "v3 tables": directories,
+- [x] T045 [BE] [US4] Config + Library schema/CRUD (data-model "v3 tables": directories,
   saved_papers, saved_tags). `pt/config.py`: `data_dir` from `PAPER_TRIAGE_DATA_DIR` (default
   `./paper_triage_data`), `pdf_max_bytes = 52_428_800`, `paper_chat_cap = 300_000`,
   `paper_chat_history = 6`. `pt/db.py` tables exactly per data-model (`name` "trimmed, 1..40
