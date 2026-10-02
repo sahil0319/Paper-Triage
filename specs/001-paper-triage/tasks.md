@@ -365,7 +365,7 @@ hooks. Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest 
   with counts), `move_paper`. Test first `tests/test_db.py`: idempotent save keeps snapshot +
   saved_at and merges tags; directory delete moves members to NULL; unique casefold names.
   `.gitignore` adds `paper_triage_data/`; `.env.example` adds `PAPER_TRIAGE_DATA_DIR=`.
-- [ ] T046 [BE] [US5] [US8] Files/pages/annotations schema + CRUD (data-model: paper_files,
+- [x] T046 [BE] [US5] [US8] Files/pages/annotations schema + CRUD (data-model: paper_files,
   paper_pages, annotations; all `ON DELETE CASCADE` from saved_papers). `pt/db.py`:
   `set_file_status(conn, paper_id, status, **fields)` (`status` "pending | ready | failed"),
   `get_file`, `pending_files`, `put_pages(conn, paper_id, texts)`, `get_pages`,
