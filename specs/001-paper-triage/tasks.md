@@ -409,7 +409,7 @@ hooks. Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest 
   `mimetypes.guess_type("a.mjs")[0] == "text/javascript"`. Then `pt/app.py`: `BackgroundTasks` on new save and retry,
   lifespan creates `data_dir` and calls `sweep_pending`, `mimetypes.add_type`, FileResponse
   route with `Cache-Control: private, max-age=3600`.
-- [ ] T051 [BE] [US8] Annotations API (FR-025, FR-026; contracts "Annotations"). Test first
+- [x] T051 [BE] [US8] Annotations API (FR-025, FR-026; contracts "Annotations"). Test first
   `tests/test_annotations_api.py`: create highlight (color default "yellow", rects fractions
   0..1, quote 1..500) -> 201; color outside `yellow|mint|peach` -> 422; rect value 1.2 -> 422;
   0 or 51 rects -> 422; page > `pdf.pages` -> 422; PDF not ready -> 409; page note with note

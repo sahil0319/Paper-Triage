@@ -4,12 +4,13 @@ import mimetypes
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Literal
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from . import db, pdfstore
 from .chat import answer as chat_answer
@@ -59,6 +60,53 @@ class ChatIn(BaseModel):
 class SaveIn(BaseModel):
     paper_id: str
     topic: str = ""
+
+
+Color = Literal["yellow", "mint", "peach"]
+NOTE_MAX = 500
+
+
+def _rects_ok(rects: list[list[float]]) -> list[list[float]]:
+    for r in rects:
+        if len(r) != 4 or not all(0 <= v <= 1 for v in r):
+            raise ValueError("each rect must be [x, y, w, h] with values between 0 and 1")
+    return rects
+
+
+class AnnotationIn(BaseModel):
+    paper_id: str
+    page: int = Field(ge=1)
+    kind: Literal["highlight", "note"]
+    color: Color = "yellow"
+    rects: list[list[float]] = Field(default_factory=list, max_length=50)
+    quote: str = Field(default="", max_length=500)
+    prefix: str = Field(default="", max_length=64)
+    suffix: str = Field(default="", max_length=64)
+    note: str = Field(default="", max_length=NOTE_MAX)
+
+    @model_validator(mode="after")
+    def _kind_rules(self):
+        _rects_ok(self.rects)
+        if self.kind == "highlight":
+            if not self.rects:
+                raise ValueError("a highlight needs 1 to 50 rects")
+            if not self.quote:
+                raise ValueError("a highlight needs a quote of 1 to 500 characters")
+        else:
+            if self.rects or self.quote:
+                raise ValueError("a page note has no rects or quote")
+            if not self.note:
+                raise ValueError("a page note needs note text of 1 to 500 characters")
+        return self
+
+
+class AnnotationPatch(BaseModel):
+    color: Color | None = None
+    note: str | None = Field(default=None, max_length=NOTE_MAX)
+
+
+def _annotation_out(a: dict) -> dict:
+    return {k: v for k, v in a.items() if k != "top"}
 
 
 class RetryIn(BaseModel):
@@ -268,6 +316,52 @@ def create_app() -> FastAPI:
         if moved is None:
             raise HTTPException(404, "unknown directory")
         return {"deleted": True, "moved": moved}
+
+    @app.get("/api/annotations")
+    def get_annotations(paper_id: str, request: Request):
+        st = request.app.state
+        with st.lock:
+            if db.get_saved(st.conn, paper_id) is None:
+                raise HTTPException(404, "not in the library")
+            rows = db.list_annotations(st.conn, paper_id)
+        return {"annotations": [_annotation_out(a) for a in rows]}
+
+    @app.post("/api/annotations", status_code=201)
+    def post_annotation(body: AnnotationIn, request: Request):
+        st = request.app.state
+        with st.lock:
+            if db.get_saved(st.conn, body.paper_id) is None:
+                raise HTTPException(404, "not in the library")
+            f = db.get_file(st.conn, body.paper_id)
+            if f is None or f["status"] != "ready":
+                raise HTTPException(409, "the PDF is not ready yet")
+            if f["pages"] is not None and body.page > f["pages"]:
+                raise HTTPException(422, f"page: must be 1 to {f['pages']}")
+            made = db.create_annotation(
+                st.conn, body.paper_id, body.page, body.kind, body.color, body.rects, body.quote,
+                body.prefix, body.suffix, body.note,
+            )
+        return _annotation_out(made)
+
+    @app.patch("/api/annotations/{annotation_id}")
+    def patch_annotation(annotation_id: int, body: AnnotationPatch, request: Request):
+        st = request.app.state
+        with st.lock:
+            cur = db.get_annotation(st.conn, annotation_id)
+            if cur is None:
+                raise HTTPException(404, "unknown annotation")
+            if cur["kind"] == "note" and body.note == "":
+                raise HTTPException(422, "note: a page note needs text of 1 to 500 characters")
+            out = db.update_annotation(st.conn, annotation_id, body.color, body.note)
+        return _annotation_out(out)
+
+    @app.delete("/api/annotations/{annotation_id}", status_code=204)
+    def delete_annotation(annotation_id: int, request: Request):
+        st = request.app.state
+        with st.lock:
+            if not db.delete_annotation(st.conn, annotation_id):
+                raise HTTPException(404, "unknown annotation")
+        return Response(status_code=204)
 
     app.mount("/", StaticFiles(directory=STATIC, html=True), name="static")
     return app
