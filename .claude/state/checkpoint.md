@@ -8,7 +8,7 @@
 
 v2 project (T001-T042) complete and tested (236 pytest pass, 15 e2e stable, ruff clean).
 
-v3 user request live: save papers to local library; in-app PDF preview (pdfjs-dist vendored, Range-served); keyword tags with AND multi-select; user directories; PDF annotations (highlights 4 colors, notes); per-paper chat (transcript page-only); chat disabled when no PDF.
+v3 user request live: save papers to local library; in-app PDF preview (pdfjs-dist vendored, Range-served); keyword tags with AND multi-select; user directories; PDF annotations (highlights 3 colors, notes); per-paper chat (transcript page-only); chat disabled when no PDF.
 
 Research + design + spec amendment (phase 1) complete:
 - docs/research/v3-library-preview.md: pdfjs-dist 6.3.289 vendor option, pypdf per-page text, FileResponse Range support, arXiv throttle.
@@ -45,7 +45,7 @@ Research + design + spec amendment (phase 1) complete:
 - Evergreen browsers, modern pdf.js.
 - Notes don't feed chat.
 - Vendored pdf.js approved.
-- 4 highlight colors: yellow, green, blue, pink.
+- 3 highlight colors: yellow, green, blue.
 - Chat disabled when no PDF.
 - Unsave confirms and deletes PDF + annotations.
 
