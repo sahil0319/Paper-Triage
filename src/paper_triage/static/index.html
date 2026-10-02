@@ -132,10 +132,22 @@
           </select>
           <button id="pv-zoom-in" type="button" class="icon-btn" aria-label="Zoom in" aria-keyshortcuts="+"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3.5 8h9M8 3.5v9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
         </div>
+        <div class="pv-group">
+          <button id="pv-find-btn" type="button" class="icon-btn" aria-label="Find in paper" aria-keyshortcuts="f" aria-expanded="false" aria-controls="pv-find"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="7" cy="7" r="4.25" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m10.2 10.2 3.3 3.3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+        </div>
       </div>
     </div>
     <div id="pv-layout" class="pv-layout">
       <div class="pv-main">
+        <div id="pv-find" class="pv-find" role="search" aria-label="Find in paper" hidden>
+          <div class="pv-find__row">
+            <label class="sr-only" for="pv-find-input">Find in paper</label>
+            <input id="pv-find-input" type="search" autocomplete="off" spellcheck="false" placeholder="Find text" aria-describedby="pv-find-count">
+            <p id="pv-find-count" class="pv-find__count"></p>
+            <button id="pv-find-close" type="button" class="text-btn">Close</button>
+          </div>
+          <ul id="pv-find-results" class="pv-find__results" aria-label="Matches" hidden></ul>
+        </div>
         <div id="pv-pages" class="pv-well" role="region" aria-label="PDF pages" tabindex="0" hidden></div>
         <div id="pv-stage" class="pv-stage"></div>
       </div>

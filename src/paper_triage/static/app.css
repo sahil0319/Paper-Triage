@@ -635,6 +635,25 @@ a.btn--secondary { color: var(--color-ink); }
   animation: page-flash var(--dur-flash) var(--ease-out) forwards; }
 @keyframes page-flash { from { outline-color: var(--color-info-border); } to { outline-color: transparent; } }
 
+
+/* find in paper (L24) */
+.text-btn { background: none; border: 0; padding: 8px 4px; min-height: 32px; font: var(--type-body-md);
+  color: var(--color-link); cursor: pointer; border-radius: var(--radius-sm); }
+.text-btn:active { color: var(--color-link-active); }
+.pv-find { flex: none; background: var(--color-canvas); border-bottom: 1px solid var(--color-hairline);
+  padding: var(--space-sm) var(--pad-x); }
+.pv-find__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-md); }
+.pv-find__row input[type="search"] { height: 44px; flex: 1 1 14rem; max-width: 480px; }
+.pv-find__count { font: var(--type-caption); letter-spacing: var(--tracking-caption); font-weight: 400;
+  color: var(--color-muted); }
+.pv-find__results { margin-top: var(--space-xs); max-height: 15rem; overflow: auto; }
+.find-hit { display: block; width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
+  padding: var(--space-xs) var(--space-xs); min-height: 40px; border-radius: var(--radius-sm);
+  font: var(--type-body-md); line-height: var(--leading-prose); color: var(--color-body); }
+.find-hit:active { background: var(--color-surface-soft); }
+.find-match { font-weight: 500; color: var(--color-ink); }
+@media (max-width: 1023px) { .pv-find__results { max-height: 10rem; } }
+
 /* Text layer: transparent, selectable text positioned over the canvas by pdf.js. */
 .textLayer {
   position: absolute; inset: 0; overflow: clip; line-height: 1; text-align: initial; text-size-adjust: none;

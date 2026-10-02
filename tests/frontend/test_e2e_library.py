@@ -5,6 +5,7 @@ Every case runs through `offline_page`: any non-local request fails the test.
 """
 
 import json
+import re
 from urllib.parse import quote
 
 import pytest
@@ -627,3 +628,115 @@ def test_real_api_save_then_open_preview_renders_pdf(app, live_server):
         )
     finally:
         page.request.delete(f"{live_server.url}/api/library?paper_id=2401.00001")
+
+
+# ---- T056: find in paper ----
+
+
+def open_find(page):
+    expect(page.locator(".pdf-page")).to_have_count(3)
+    page.click("#pv-find-btn")
+    expect(page.locator("#pv-find")).to_be_visible()
+    expect(page.locator("#pv-find-input")).to_be_focused()
+
+
+def find(page, text):
+    page.fill("#pv-find-input", text)
+    page.press("#pv-find-input", "Enter")
+
+
+def test_find_lists_matches_and_jumps_with_outline(app):
+    page = app
+    preview(page, [lib_item(1)])
+    btn = page.locator("#pv-find-btn")
+    expect(btn).to_have_attribute("aria-label", "Find in paper")
+    expect(btn).to_have_attribute("aria-keyshortcuts", "f")
+    open_find(page)
+    expect(page.locator("#pv-find-input")).to_have_attribute("placeholder", "Find text")
+    find(page, "distillation")
+    count = page.locator("#pv-find-count")
+    expect(count).to_have_text(re.compile(r"^\d+ matches on 1 page$"))
+    hits = page.locator("#pv-find-results .find-hit")
+    assert hits.count() >= 2
+    for i in range(hits.count()):
+        assert hits.nth(i).inner_text().startswith("Page 1: ")
+    expect(page.locator("#pv-find-results .find-match").first).to_have_text(
+        re.compile("^distillation$", re.IGNORECASE)
+    )
+    expect(page.locator("#status")).to_contain_text("matches on 1 page")
+    # A word that only appears on page 2.
+    find(page, "Quartzite")
+    expect(count).to_have_text(re.compile(r"^\d+ match(es)? on 1 page$"))
+    hit = page.locator("#pv-find-results .find-hit").first
+    assert hit.inner_text().startswith("Page 2: ")
+    hit.click()
+    expect(page.locator("#pv-page-input")).to_have_value("2")
+    expect(page.locator('.pdf-page[data-page="2"]')).to_have_class(re.compile("is-flash"))
+    top2 = page.locator('.pdf-page[data-page="2"]').evaluate("e => e.getBoundingClientRect().top")
+    well_top = page.locator("#pv-pages").evaluate("e => e.getBoundingClientRect().top")
+    assert abs(top2 - well_top) < 40
+    find(page, "Obsidian")
+    assert page.locator("#pv-find-results .find-hit").first.inner_text().startswith("Page 3: ")
+
+
+def test_find_spans_pages_and_singular_copy(app):
+    page = app
+    preview(page, [lib_item(1)])
+    open_find(page)
+    find(page, "the")
+    expect(page.locator("#pv-find-count")).to_have_text(re.compile(r"^\d+ matches on [23] pages$"))
+    pages = {b.get_attribute("data-page") for b in page.locator("#pv-find-results .find-hit").all()}
+    assert len(pages) >= 2
+
+
+def test_find_no_matches(app):
+    page = app
+    preview(page, [lib_item(1)])
+    open_find(page)
+    find(page, "zzzxqjnonsense")
+    expect(page.locator("#pv-find-count")).to_have_text("No matches.")
+    expect(page.locator("#pv-find-results .find-hit")).to_have_count(0)
+    expect(page.locator("#status")).to_have_text("No matches.")
+
+
+def test_find_escape_closes_and_returns_focus(app):
+    page = app
+    preview(page, [lib_item(1)])
+    open_find(page)
+    find(page, "Quartzite")
+    expect(page.locator("#pv-find-results .find-hit").first).to_be_visible()
+    page.keyboard.press("Escape")
+    expect(page.locator("#pv-find")).to_be_hidden()
+    expect(page.locator("#pv-find-btn")).to_be_focused()
+    expect(page.locator("#pv-find-btn")).to_have_attribute("aria-expanded", "false")
+    page.click("#pv-find-btn")
+    page.click("#pv-find-close")
+    expect(page.locator("#pv-find")).to_be_hidden()
+    expect(page.locator("#pv-find-btn")).to_be_focused()
+
+
+def test_find_key_f_opens_inside_pages_region_only(app):
+    page = app
+    preview(page, [lib_item(1)])
+    expect(page.locator(".pdf-page")).to_have_count(3)
+    page.locator("#pv-prev").focus()
+    page.keyboard.press("f")
+    expect(page.locator("#pv-find")).to_be_hidden()
+    page.locator("#pv-pages").focus()
+    page.keyboard.press("f")
+    expect(page.locator("#pv-find")).to_be_visible()
+    expect(page.locator("#pv-find-input")).to_be_focused()
+
+
+def test_find_is_reset_when_the_preview_closes(app):
+    page = app
+    preview(page, [lib_item(1), lib_item(2)], hash_="#/library")
+    page.locator(".open-preview").first.click()
+    open_find(page)
+    find(page, "Quartzite")
+    expect(page.locator("#pv-find-results .find-hit").first).to_be_visible()
+    page.click("#pv-back")
+    page.locator(".open-preview").first.click()
+    expect(page.locator(".pdf-page")).to_have_count(3)
+    expect(page.locator("#pv-find")).to_be_hidden()
+    expect(page.locator("#pv-find-input")).to_have_value("")

@@ -21,6 +21,12 @@ const el = {
   zoom: $("pv-zoom"),
   zoomIn: $("pv-zoom-in"),
   zoomOut: $("pv-zoom-out"),
+  findBtn: $("pv-find-btn"),
+  find: $("pv-find"),
+  findInput: $("pv-find-input"),
+  findCount: $("pv-find-count"),
+  findClose: $("pv-find-close"),
+  findResults: $("pv-find-results"),
 };
 
 const CSS_PER_PT = 96 / 72; // PDF point to CSS pixel: "100%" is the size browsers show
@@ -82,6 +88,7 @@ function close() {
     el.well.removeEventListener("scroll", onScroll);
   }
   cur = null;
+  resetFind();
   PT.clear(el.well);
   el.well.hidden = true;
   el.controls.hidden = true;
@@ -233,6 +240,7 @@ function buildPages(proxies) {
   });
   c.page = 1;
   el.pageOf.textContent = `of ${c.pages.length}`;
+  setFindReady(true);
   el.zoom.value = String(c.mode);
   c.io = new IntersectionObserver(onIntersect, { root: el.well, rootMargin: "200% 0px" });
   c.pages.forEach((p) => c.io.observe(p.sec));
@@ -512,8 +520,148 @@ el.well.addEventListener("keydown", (ev) => {
   else if (k === "0") setMode("fit-width");
   else if (k === "n") goToPage(cur.page + 1);
   else if (k === "p") goToPage(cur.page - 1);
+  else if (k === "f") openFind();
   else return;
   ev.preventDefault();
+});
+
+// ---- find in paper (brief L24): plain text search over each page's text content ----
+
+const FIND_MAX_HITS = 100;
+const FIND_CONTEXT = 36;
+const FIND_NOT_READY = "Find is available once the PDF is ready.";
+let findToken = 0;
+
+function resetFind() {
+  findToken++;
+  el.find.hidden = true;
+  el.findBtn.setAttribute("aria-expanded", "false");
+  el.findInput.value = "";
+  PT.clear(el.findResults);
+  el.findResults.hidden = true;
+  el.findCount.textContent = "";
+  setFindReady(false);
+}
+
+function setFindReady(ready) {
+  el.findInput.disabled = !ready;
+  if (!ready) el.findCount.textContent = FIND_NOT_READY;
+  else if (el.findCount.textContent === FIND_NOT_READY) el.findCount.textContent = "";
+}
+
+function openFind() {
+  if (!cur || !cur.pages.length) return;
+  el.find.hidden = false;
+  el.findBtn.setAttribute("aria-expanded", "true");
+  el.findInput.focus();
+  el.findInput.select();
+  loadTexts(cur); // start extracting now; a search waits for it
+}
+
+function closeFind(refocus) {
+  findToken++;
+  el.find.hidden = true;
+  el.findBtn.setAttribute("aria-expanded", "false");
+  if (refocus) el.findBtn.focus();
+}
+
+// Page text, one string per page, whitespace collapsed. Cached for the open document.
+function loadTexts(c) {
+  if (!c.texts) {
+    c.texts = Promise.all(
+      c.pages.map((p) =>
+        p.proxy.getTextContent().then((tc) =>
+          tc.items
+            .map((it) => (it.str || "") + (it.hasEOL ? " " : ""))
+            .join("")
+            .replace(/\s+/g, " ")
+            .trim(),
+        ),
+      ),
+    );
+  }
+  return c.texts;
+}
+
+function snippet(text, at, len) {
+  const start = Math.max(0, at - FIND_CONTEXT);
+  const end = Math.min(text.length, at + len + FIND_CONTEXT);
+  return h(
+    "span",
+    { class: "find-hit__text" },
+    start > 0 ? "…" : "",
+    text.slice(start, at),
+    h("span", { class: "find-match" }, text.slice(at, at + len)),
+    text.slice(at + len, end),
+    end < text.length ? "…" : "",
+  );
+}
+
+async function runFind() {
+  const c = cur;
+  if (!c || !c.pages.length) return;
+  const q = el.findInput.value.replace(/\s+/g, " ").trim();
+  const my = ++findToken;
+  PT.clear(el.findResults);
+  el.findResults.hidden = true;
+  if (!q) {
+    el.findCount.textContent = "";
+    return;
+  }
+  el.findCount.textContent = "Searching…";
+  const texts = await loadTexts(c);
+  if (my !== findToken || stale(c.token)) return;
+  const needle = q.toLowerCase();
+  const hits = [];
+  let total = 0;
+  const pagesHit = new Set();
+  texts.forEach((text, i) => {
+    const hay = text.toLowerCase();
+    let at = hay.indexOf(needle);
+    while (at !== -1) {
+      total++;
+      pagesHit.add(i + 1);
+      if (hits.length < FIND_MAX_HITS) hits.push({ page: i + 1, at, text });
+      at = hay.indexOf(needle, at + needle.length);
+    }
+  });
+  if (!total) {
+    el.findCount.textContent = "No matches.";
+    PT.announce("No matches.");
+    return;
+  }
+  const line = `${(total === 1 ? "1 match" : `${total} matches`)} on ${PT.plural(pagesHit.size, "page")}`;
+  el.findCount.textContent = line;
+  PT.announce(`${line}.`);
+  hits.forEach((hit) => {
+    const b = h("button", { type: "button", class: "find-hit", "data-page": String(hit.page) }, `Page ${hit.page}: `, snippet(hit.text, hit.at, needle.length));
+    b.addEventListener("click", () => goToPage(hit.page, { flash: true }));
+    el.findResults.appendChild(h("li", {}, b));
+  });
+  el.findResults.hidden = false;
+}
+
+el.findBtn.addEventListener("click", () => (el.find.hidden ? openFind() : closeFind(false)));
+el.findClose.addEventListener("click", () => closeFind(true));
+el.findInput.addEventListener("keydown", (ev) => {
+  if (ev.key === "Enter") {
+    ev.preventDefault();
+    runFind();
+  }
+});
+el.find.addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape") {
+    ev.stopPropagation();
+    closeFind(true);
+  }
+});
+el.findInput.addEventListener("input", () => {
+  if (!el.findInput.value) {
+    findToken++;
+    PT.clear(el.findResults);
+    el.findResults.hidden = true;
+    el.findCount.textContent = "";
+  }
 });
 
 // ---- API for app.js and later viewer features ----
@@ -523,6 +671,7 @@ window.PTViewer = {
   close,
   goToPage,
   flashPage,
+  openFind,
   current: () => cur,
   els: el,
 };

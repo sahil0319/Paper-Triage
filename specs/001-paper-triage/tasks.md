@@ -456,7 +456,7 @@ hooks. Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest 
   Unavailable / Render failed / Not saved per L21. e2e with `page.route` serving
   `pt/fixtures/sample.pdf` and a stub library item: canvas count >= 1, text layer contains a
   page-1 word, next page and zoom change page width, zero non-local requests.
-- [ ] T056 [FE] [US5] Find in paper (brief L24, R18). `viewer.js` find row: input, count
+- [x] T056 [FE] [US5] Find in paper (brief L24, R18). `viewer.js` find row: input, count
   `<n> matches on <p> pages`, result buttons `Page N: …snippet…` from
   `page.getTextContent()`, activate -> jump + outline; disabled until ready. e2e (stubbed PDF):
   finding a page-1 word lists page 1; nonsense -> "No matches.".
