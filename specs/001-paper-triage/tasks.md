@@ -534,7 +534,7 @@ hooks. Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest 
   request before the first question (SC-014) -> unsave from the card with confirm removes the
   row (SC-015) -> card-to-PDF in 3 actions (SC-016); `2401.00005` shows "PDF unavailable" and a
   disabled chat input; zero non-local requests in every case. Needs T059-T063.
-- [ ] T065 [BE] `README.md` + `SETUP_LOG.md` v3: Library, tags, directories, PDF preview,
+- [x] T065 [BE] `README.md` + `SETUP_LOG.md` v3: Library, tags, directories, PDF preview,
   annotations, paper chat; `PAPER_TRIAGE_DATA_DIR`; vendored pdf.js (version, license, source);
   note that stored arXiv PDFs are for personal use only (do not deploy publicly). Needs T059.
 
