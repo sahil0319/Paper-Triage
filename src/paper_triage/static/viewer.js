@@ -2,6 +2,7 @@
    only near the viewport. pdf.js is vendored (static/vendor/pdfjs, same-origin worker); no CDN.
    Shares helpers with app.js through window.PT. Text is set with textContent only. */
 import * as pdfjsLib from "./vendor/pdfjs/pdf.min.mjs";
+import { initAnnotations } from "./annotations.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/vendor/pdfjs/pdf.worker.min.mjs";
 
@@ -27,7 +28,14 @@ const el = {
   findCount: $("pv-find-count"),
   findClose: $("pv-find-close"),
   findResults: $("pv-find-results"),
+  panel: $("pv-panel"),
+  layout: $("pv-layout"),
 };
+
+// Tiny event hub for the modules that hang off the viewer (annotations, paper chat).
+const listeners = {};
+const on = (name, fn) => (listeners[name] = listeners[name] || []).push(fn);
+const emit = (name, ...args) => (listeners[name] || []).forEach((fn) => fn(...args));
 
 const CSS_PER_PT = 96 / 72; // PDF point to CSS pixel: "100%" is the size browsers show
 const ZOOMS = [50, 75, 100, 125, 150, 200];
@@ -78,6 +86,9 @@ function stale(t) {
 
 function close() {
   token++;
+  emit("close");
+  el.panel.hidden = true;
+  el.layout.classList.remove("has-panel");
   if (cur) {
     window.clearInterval(cur.pollT);
     window.clearTimeout(cur.openingT);
@@ -107,8 +118,11 @@ function open(item, force) {
   const sameKey = cur && cur.id === item.paper_id;
   const keepZoom = sameKey ? cur.mode : null;
   close();
-  cur = { id: item.paper_id, item, key: statusKey(item), token, mode: keepZoom || "fit-width", pages: [] };
   const status = (item.pdf && item.pdf.status) || "none";
+  cur = { id: item.paper_id, item, key: statusKey(item), token, mode: keepZoom || "fit-width", pages: [], status };
+  el.panel.hidden = false;
+  el.layout.classList.add("has-panel");
+  emit("open", cur);
   if (status === "ready") showPdf();
   else if (status === "pending") showDownloading();
   else showUnavailable();
@@ -185,6 +199,7 @@ function showUnavailable() {
 
 function showRenderFailed() {
   const c = cur;
+  emit("render-failed");
   PT.clear(el.well);
   el.well.hidden = true;
   el.controls.hidden = true;
@@ -254,6 +269,7 @@ function buildPages(proxies) {
   el.well.addEventListener("scroll", onScroll, { passive: true });
   relayout();
   setPageUi();
+  emit("pages", c);
 }
 
 // ---- layout and zoom ----
@@ -390,7 +406,10 @@ async function drawText(p, t) {
       viewport,
     });
     await layer.render();
-    if (!stale(t)) p.sec.classList.add("has-text");
+    if (!stale(t)) {
+      p.sec.classList.add("has-text");
+      emit("text", p);
+    }
   } catch {
     p.textDone = false;
   }
@@ -408,6 +427,7 @@ function releasePage(p) {
   p.canvas = empty;
   PT.clear(p.text);
   p.sec.classList.remove("is-drawn", "has-text");
+  emit("release", p);
 }
 
 // ---- current page, jumps ----
@@ -672,7 +692,27 @@ el.findInput.addEventListener("input", () => {
 
 // ---- API for app.js and later viewer features ----
 
+// Shared with annotations.js (and the paper chat): the pieces they need from the viewer.
+const hub = {
+  el,
+  on,
+  cur: () => cur,
+  goToPage,
+  flashPage,
+  syncPage(n) {
+    if (!cur) return;
+    cur.page = n;
+    el.pageInput.value = String(n);
+    setPageUi();
+  },
+  showPanel() {
+    el.panel.hidden = false;
+  },
+};
+initAnnotations(hub);
+
 window.PTViewer = {
+  hub,
   open,
   close,
   goToPage,

@@ -58,6 +58,8 @@ class LibraryStub:
         self.pdf = pdf
         self.fail = {}  # (METHOD, path) -> (status, detail): next matching call fails once
         self.delay_ms = 0
+        self.annotations = []
+        self._ann_id = 0
         self.after_retry = None  # pdf dict a retried item takes on the first GET after the retry
         self._flip = None
         page.route(LIB_PATHS, self._handle)
@@ -99,9 +101,13 @@ class LibraryStub:
             return self._save(route, body)
         if key == ("DELETE", "/api/library"):
             return self._unsave(route, query.get("paper_id"))
+        if u.path == "/api/annotations" or u.path.startswith("/api/annotations/"):
+            return self._annotations(route, req.method, u.path, query, body)
         if key == ("POST", "/api/library/retry"):
             return self._retry(route, body)
         if key == ("GET", "/api/library/pdf"):
+            if isinstance(self.pdf, bytes):
+                return route.fulfill(status=200, content_type="application/pdf", body=self.pdf)
             if self.pdf == "garbage":
                 return route.fulfill(
                     status=200, content_type="application/pdf", body=b"%PDF-1.4 not really"
@@ -114,6 +120,53 @@ class LibraryStub:
                     headers={"Content-Disposition": "inline"},
                 )
             return _json(route, {"detail": "not found"}, 404)
+        return route.fallback()
+
+    def _annotations(self, route, method, path, query, body):
+        now = "2026-10-03T10:00:00+00:00"
+        if path == "/api/annotations" and method == "GET":
+            rows = [a for a in self.annotations if a["paper_id"] == query.get("paper_id")]
+            rows.sort(
+                key=lambda a: (a["page"], min((r[1] for r in a["rects"]), default=0), a["id"])
+            )
+            return _json(route, {"annotations": rows})
+        if path == "/api/annotations" and method == "POST":
+            self._ann_id += 1
+            ann = {
+                "id": self._ann_id,
+                "paper_id": body["paper_id"],
+                "page": body["page"],
+                "kind": body.get("kind", "highlight"),
+                "color": body.get("color", "yellow"),
+                "rects": body.get("rects", []),
+                "quote": body.get("quote", ""),
+                "prefix": body.get("prefix", ""),
+                "suffix": body.get("suffix", ""),
+                "note": body.get("note", ""),
+                "created_at": now,
+                "updated_at": now,
+            }
+            self.annotations.append(ann)
+            for it in self.items:
+                if it["paper_id"] == ann["paper_id"]:
+                    it["highlight_count"] = sum(
+                        1
+                        for a in self.annotations
+                        if a["paper_id"] == it["paper_id"] and a["kind"] == "highlight"
+                    )
+            return _json(route, ann, 201)
+        ann_id = int(path.rsplit("/", 1)[1])
+        ann = next((a for a in self.annotations if a["id"] == ann_id), None)
+        if ann is None:
+            return _json(route, {"detail": "not found"}, 404)
+        if method == "PATCH":
+            for k in ("color", "note"):
+                if k in body:
+                    ann[k] = body[k]
+            return _json(route, ann)
+        if method == "DELETE":
+            self.annotations.remove(ann)
+            return route.fulfill(status=204, body="")
         return route.fallback()
 
     def _retry(self, route, body):

@@ -505,7 +505,7 @@ hooks. Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest 
   "Manage directories"; row `select[data-act="move"]` -> `POST /api/library/move`, row
   collapse when filtered out; `Remove from Library` -> always-confirm group -> DELETE. Needs
   T048. e2e: create, move, rename, delete (papers back in Unsorted, SC-015 no loss).
-- [ ] T062 [FE] [US8] Highlights, notes, list, export (FR-025, FR-026; brief L16 highlight
+- [x] T062 [FE] [US8] Highlights, notes, list, export (FR-025, FR-026; brief L16 highlight
   control, L18, L19, L23). `viewer.js`: selection popover (3 swatches yellow/mint/peach + Add
   note), toolbar Highlight split control, rects as page-box fractions, `.hl[data-annotation-id]`
   layer redrawn on zoom (multiply blend), cross-page selection clipped with status copy;

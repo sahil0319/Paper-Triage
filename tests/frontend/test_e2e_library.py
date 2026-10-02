@@ -6,6 +6,7 @@ Every case runs through `offline_page`: any non-local request fails the test.
 
 import json
 import re
+from pathlib import Path
 from urllib.parse import quote
 
 import pytest
@@ -1418,3 +1419,413 @@ def test_find_result_moves_focus_to_the_viewer_region(app):
     find(page, "Quartzite")
     page.locator("#pv-find-results .find-hit").first.click()
     expect(page.locator("#pv-pages")).to_be_focused()
+
+
+# ---- T062: highlights, notes, panel list, export ----
+
+
+def hl_preview(page, items=None, hash_=None, **kw):
+    page.add_init_script("window.__PT_UNDO_MS = 800")
+    stub = preview(page, items or [lib_item(1)], hash_=hash_, **kw)
+    expect(page.locator(".pdf-page")).to_have_count(3)
+    expect(page.locator('.pdf-page[data-page="1"].has-text')).to_have_count(1, timeout=10_000)
+    expect(page.locator("#pv-panel")).to_be_visible()
+    return stub
+
+
+def line(page, text, n=1):
+    return page.locator(f'.pdf-page[data-page="{n}"] .textLayer span', has_text=text).first
+
+
+def drag_select(page, text, n=1):
+    box = line(page, text, n).bounding_box()
+    y = box["y"] + box["height"] / 2
+    page.mouse.move(box["x"] + 2, y)
+    page.mouse.down()
+    page.mouse.move(box["x"] + box["width"] - 2, y, steps=8)
+    page.mouse.up()
+
+
+def hls(page, n=1):
+    return page.locator(f'.pdf-page[data-page="{n}"] .hl')
+
+
+def items(page):
+    return page.locator("#pv-hl-list li.hl-item[data-annotation-id]")
+
+
+def test_highlight_via_toolbar_draws_lists_and_saves_fractions(app):
+    page = app
+    stub = hl_preview(page)
+    btn = page.locator("#pv-hl-btn")
+    expect(btn).to_have_attribute("aria-disabled", "true")
+    expect(page.locator("#pv-panel .pv-empty__title")).to_have_text("No highlights yet.")
+    line(page, "Abstract").select_text()
+    expect(btn).not_to_have_attribute("aria-disabled", "true")
+    btn.click()
+    expect(hls(page).first).to_be_attached()
+    expect(hls(page).first).to_have_class(re.compile("hl--yellow"))
+    expect(items(page)).to_have_count(1)
+    expect(page.locator("#pv-hl-count")).to_have_text("1")
+    expect(page.locator("#pv-tab-hl")).to_contain_text("Highlights")
+    expect(page.locator("#status")).to_have_text("Yellow highlight added on page 1.")
+    expect(items(page).first.locator(".hl-item__kind")).to_have_text("Yellow")
+    expect(items(page).first.locator(".hl-item__page")).to_have_text("Page 1")
+    assert "Abstract" in items(page).first.locator(".hl-item__quote").inner_text()
+    ann = stub.annotations[0]
+    assert ann["kind"] == "highlight" and ann["color"] == "yellow" and ann["page"] == 1
+    assert 1 <= len(ann["rects"]) <= 50
+    for x, y, w, h in ann["rects"]:
+        assert 0 <= x <= 1 and 0 <= y <= 1 and 0 < w <= 1 and 0 < h <= 1
+        assert x + w <= 1.0001 and y + h <= 1.0001
+    assert "Abstract" in ann["quote"]
+    # Selection is cleared and the button is disabled again.
+    expect(btn).to_have_attribute("aria-disabled", "true")
+
+
+def test_selection_popover_swatches_colors_and_last_used(app):
+    page = app
+    stub = hl_preview(page)
+    drag_select(page, "Abstract")
+    pop = page.locator("#pv-popover")
+    expect(pop).to_be_visible()
+    swatches = pop.locator("button.swatch")
+    assert [s.get_attribute("aria-label") for s in swatches.all()] == [
+        "Highlight yellow",
+        "Highlight mint",
+        "Highlight peach",
+    ]
+    expect(pop.get_by_role("button", name="Add note")).to_be_visible()
+    box = swatches.first.bounding_box()
+    assert abs(box["width"] - 32) < 1 and abs(box["height"] - 32) < 1
+    swatches.nth(1).click()
+    expect(pop).to_be_hidden()
+    expect(hls(page).first).to_have_class(re.compile("hl--mint"))
+    assert stub.annotations[0]["color"] == "mint"
+    expect(page.locator("#status")).to_have_text("Mint highlight added on page 1.")
+    expect(page.locator("#pv-hl-color")).to_have_value("mint")
+    # The last-used color carries the ring and is what the toolbar button applies.
+    drag_select(page, "Our method")
+    expect(page.locator("#pv-popover button.swatch.is-last")).to_have_attribute(
+        "aria-label", "Highlight mint"
+    )
+    page.keyboard.press("Escape")
+    expect(pop).to_be_hidden()
+    expect(page.locator("#pv-pages")).to_be_focused()
+
+
+def test_popover_add_note_opens_editor_in_panel(app):
+    page = app
+    stub = hl_preview(page)
+    drag_select(page, "Abstract")
+    page.locator("#pv-popover").get_by_role("button", name="Add note").click()
+    ta = page.locator("#pv-hl-list textarea")
+    expect(ta).to_be_focused()
+    ta.fill("check this claim")
+    ta.press("Control+Enter")
+    expect(items(page).first.locator(".hl-item__note")).to_have_text("check this claim")
+    assert stub.annotations[0]["note"] == "check this claim"
+    expect(items(page).first.get_by_role("button", name="Edit note")).to_be_focused()
+
+
+def test_note_editor_counter_max_cancel_and_empty_removes_note(app):
+    page = app
+    stub = hl_preview(page)
+    line(page, "Abstract").select_text()
+    page.click("#pv-hl-btn")
+    expect(items(page)).to_have_count(1)
+    it = items(page).first
+    it.get_by_role("button", name="Add note").first.click()
+    ta = it.locator("textarea")
+    expect(it.locator("label")).to_contain_text("Note")
+    expect(ta).to_have_attribute("maxlength", "500")
+    expect(ta).to_have_attribute("rows", "3")
+    counter = it.locator(".note-counter")
+    ta.fill("x" * 399)
+    expect(counter).to_be_hidden()
+    ta.fill("x" * 420)
+    expect(counter).to_have_text("420/500")
+    ta.fill("y" * 600)
+    expect(counter).to_have_text("500/500")
+    expect(counter).to_have_class(re.compile("is-max"))
+    ta.press("Escape")
+    expect(it.locator("textarea")).to_have_count(0)
+    assert stub.annotations[0]["note"] == ""
+    it.get_by_role("button", name="Add note").first.click()
+    it.locator("textarea").fill("short note")
+    it.get_by_role("button", name="Save note").click()
+    assert stub.annotations[0]["note"] == "short note"
+    # Empty save deletes the note, not the highlight.
+    it.get_by_role("button", name="Edit note").click()
+    it.locator("textarea").fill("   ")
+    it.locator("textarea").press("Control+Enter")
+    expect(it.locator(".hl-item__note")).to_have_count(0)
+    assert stub.annotations[0]["note"] == "" and len(stub.annotations) == 1
+    expect(hls(page).first).to_be_attached()
+
+
+def test_change_color_updates_page_and_api(app):
+    page = app
+    stub = hl_preview(page)
+    line(page, "Abstract").select_text()
+    page.click("#pv-hl-btn")
+    sel = items(page).first.locator('select[data-act="color"]')
+    expect(sel).to_have_value("yellow")
+    sel.select_option("peach")
+    expect(hls(page).first).to_have_class(re.compile("hl--peach"))
+    assert stub.annotations[0]["color"] == "peach"
+    expect(items(page).first.locator(".hl-item__kind")).to_have_text("Peach")
+
+
+def test_delete_with_undo_and_expiry(app):
+    page = app
+    stub = hl_preview(page)
+    line(page, "Abstract").select_text()
+    page.click("#pv-hl-btn")
+    expect(items(page)).to_have_count(1)
+    items(page).first.get_by_role("button", name="Add note").first.click()
+    items(page).first.locator("textarea").fill("keep me")
+    items(page).first.locator("textarea").press("Control+Enter")
+    items(page).first.get_by_role("button", name="Delete").click()
+    tomb = page.locator("#pv-hl-list li.hl-item--deleted")
+    expect(tomb).to_contain_text("Highlight deleted.")
+    expect(tomb.get_by_role("button", name="Undo")).to_be_focused()
+    expect(hls(page)).to_have_count(0)
+    assert stub.annotations == []
+    tomb.get_by_role("button", name="Undo").click()
+    expect(items(page)).to_have_count(1)
+    expect(hls(page).first).to_be_attached()
+    assert len(stub.annotations) == 1 and stub.annotations[0]["note"] == "keep me"
+    # Without Undo the row disappears after the window.
+    items(page).first.get_by_role("button", name="Delete").click()
+    expect(tomb).to_have_count(1)
+    expect(tomb).to_have_count(0, timeout=5_000)
+    expect(page.locator("#pv-panel .pv-empty__title")).to_be_visible()
+
+
+def test_page_note_add_edit_and_delete(app):
+    page = app
+    stub = hl_preview(page)
+    page.click("#pv-note-add")
+    li = page.locator("#pv-hl-list li[data-draft]")
+    expect(li).to_contain_text("Page note")
+    expect(li).to_contain_text("Page 1")
+    li.locator("textarea").fill("overall unclear on baselines")
+    li.get_by_role("button", name="Save note").click()
+    note = page.locator('#pv-hl-list li[data-kind="note"][data-annotation-id]')
+    expect(note.locator(".hl-item__note")).to_have_text("overall unclear on baselines")
+    expect(note.locator('select[data-act="color"]')).to_have_count(0)
+    assert stub.annotations[0]["kind"] == "note" and stub.annotations[0]["rects"] == []
+    expect(page.locator("#pv-hl-count")).to_have_text("0")  # the tab counts highlights
+    note.get_by_role("button", name="Delete").click()
+    expect(page.locator("#pv-hl-list li.hl-item--deleted")).to_contain_text("Note deleted.")
+    assert stub.annotations == []
+
+
+def test_go_to_scrolls_to_quarter_and_flashes(app):
+    page = app
+    hl_preview(page)
+    page.locator("#pv-pages").evaluate(
+        "w => { w.scrollTop = w.querySelector('[data-page=\"2\"]').offsetTop }"
+    )
+    expect(page.locator('.pdf-page[data-page="2"].has-text')).to_have_count(1, timeout=10_000)
+    line(page, "Quartzite", 2).select_text()
+    page.click("#pv-hl-btn")
+    expect(items(page)).to_have_count(1)
+    page.locator("#pv-pages").evaluate("w => { w.scrollTop = 0 }")
+    expect(page.locator("#pv-page-input")).to_have_value("1")
+    go = items(page).first.get_by_role("button", name="Go to highlight on page 2")
+    go.click()
+    expect(page.locator("#pv-page-input")).to_have_value("2")
+    expect(hls(page, 2).first).to_have_class(re.compile("is-flash"))
+    expect(page.locator("#pv-pages")).to_be_focused()
+    well = page.locator("#pv-pages").bounding_box()
+    hl = hls(page, 2).first.bounding_box()
+    frac = (hl["y"] - well["y"]) / well["height"]
+    assert 0.1 < frac < 0.4, frac
+
+
+def test_cross_page_selection_highlights_only_the_start_page(app):
+    page = app
+    stub = hl_preview(page)
+    page.locator("#pv-pages").evaluate(
+        "w => { w.scrollTop = w.querySelector('[data-page=\"2\"]').offsetTop - 300 }"
+    )
+    expect(page.locator('.pdf-page[data-page="2"].has-text')).to_have_count(1, timeout=10_000)
+    page.evaluate(
+        """() => {
+          const a = [...document.querySelectorAll('[data-page="1"] .textLayer span')].find(s => s.textContent.includes('Abstract'));
+          const b = [...document.querySelectorAll('[data-page="2"] .textLayer span')].find(s => s.textContent.includes('Quartzite'));
+          getSelection().setBaseAndExtent(a.firstChild, 0, b.firstChild, 5);
+        }"""
+    )
+    expect(page.locator("#pv-hl-btn")).not_to_have_attribute("aria-disabled", "true")
+    page.click("#pv-hl-btn")
+    expect(page.locator("#status")).to_have_text(
+        "Highlighted the part on page 1. Select across pages one page at a time."
+    )
+    assert len(stub.annotations) == 1 and stub.annotations[0]["page"] == 1
+
+
+def test_highlight_save_failure_keeps_dashed_mark_and_retries(app):
+    page = app
+    stub = hl_preview(page)
+    stub.fail[("POST", "/api/annotations")] = (500, "disk full")
+    line(page, "Abstract").select_text()
+    page.click("#pv-hl-btn")
+    it = items(page).first
+    expect(it.locator(".row-error")).to_contain_text("Could not save. disk full")
+    expect(hls(page).first).to_have_class(re.compile("hl--failed"))
+    it.get_by_role("button", name="Try again").click()
+    expect(items(page).first.locator(".row-error")).to_have_count(0)
+    expect(hls(page).first).not_to_have_class(re.compile("hl--failed"))
+    assert len(stub.annotations) == 1
+
+
+def test_export_notes_downloads_markdown(app):
+    page = app
+    hl_preview(page)
+    export = page.locator("#pv-export")
+    expect(export).to_have_attribute("aria-disabled", "true")
+    expect(export).to_have_text("Export notes")
+    line(page, "Abstract").select_text()
+    page.click("#pv-hl-btn")
+    expect(export).not_to_have_attribute("aria-disabled", "true")
+    items(page).first.get_by_role("button", name="Add note").first.click()
+    items(page).first.locator("textarea").fill("weak baseline")
+    items(page).first.locator("textarea").press("Control+Enter")
+    with page.expect_download() as dl:
+        export.click()
+    d = dl.value
+    assert d.suggested_filename == "2401.00001-notes.md"
+    text = Path(d.path()).read_text(encoding="utf-8")
+    lines = text.splitlines()
+    assert lines[0] == "# Saved paper 1: stubbed title"
+    assert lines[1].startswith("2401.00001 · https://arxiv.org/abs/2401.00001")
+    assert lines[2] == ""
+    assert lines[3].startswith("> ") and lines[3].endswith("(p.1)") and "Abstract" in lines[3]
+    assert lines[4] == "weak baseline"
+    expect(page.locator("#status")).to_have_text("Notes exported.")
+
+
+def _blank_pdf():
+    import io
+
+    from pypdf import PdfWriter
+
+    w = PdfWriter()
+    w.add_blank_page(width=612, height=792)
+    buf = io.BytesIO()
+    w.write(buf)
+    return buf.getvalue()
+
+
+def test_scanned_page_shows_message_and_still_takes_page_notes(app):
+    page = app
+    page.add_init_script("window.__PT_UNDO_MS = 800")
+    stub = preview(
+        page, [lib_item(1, pdf={"status": "ready", "error": None, "pages": 1})], pdf=_blank_pdf()
+    )
+    expect(page.locator(".pdf-page")).to_have_count(1)
+    msg = page.locator(".pdf-page__notext")
+    expect(msg).to_contain_text("No selectable text on this page.", timeout=10_000)
+    page.click("#pv-note-add")
+    page.locator("#pv-hl-list li[data-draft] textarea").fill("scanned appendix")
+    page.get_by_role("button", name="Save note").click()
+    expect(page.locator('#pv-hl-list li[data-kind="note"]')).to_contain_text("scanned appendix")
+    assert stub.annotations[0]["kind"] == "note"
+
+
+def test_panel_states_when_pdf_not_ready(app):
+    page = app
+    preview(page, [lib_item(1, pdf={"status": "pending", "error": None, "pages": None})])
+    expect(page.locator("#pv-panel")).to_be_visible()
+    expect(page.locator("#pv-hl-msg")).to_have_text(
+        "Highlights are available once the PDF is ready."
+    )
+    expect(page.locator("#pv-hl-list")).to_be_hidden()
+    expect(page.locator("#pv-hl-btn")).to_be_hidden()
+    expect(page.locator("#pv-export")).to_be_hidden()
+
+
+def test_panel_is_a_separate_column_on_wide_screens(app):
+    page = app
+    hl_preview(page)
+    panel = page.locator("#pv-panel").bounding_box()
+    well = page.locator("#pv-pages").bounding_box()
+    assert abs(panel["width"] - 384) < 2
+    assert well["x"] + well["width"] <= panel["x"] + 1
+    expect(page.locator("a.skip[data-skip=preview]")).to_have_count(2)
+    expect(page.locator("a.skip:not([hidden])")).to_have_count(2)
+
+
+# Real harness (BE T051): highlight and note persist; zoom keeps the mark proportional.
+
+
+def _real_preview(app, base):
+    page = app
+    topic = _triage(page, base, "diffusion distillation")
+    _save(page, base, topic, "2401.00001")
+    page.set_viewport_size({"width": 1280, "height": 900})
+    page.goto("/#/library/paper/2401.00001")
+    expect(page.locator(".pdf-page")).to_have_count(3, timeout=20_000)
+    expect(page.locator('.pdf-page[data-page="1"].has-text')).to_have_count(1, timeout=10_000)
+    return page
+
+
+def test_real_highlight_persists_and_scales_with_zoom(app, real_library):
+    page = _real_preview(app, real_library)
+    line(page, "Abstract").select_text()
+    page.click("#pv-hl-btn")
+    expect(hls(page).first).to_be_attached()
+    ratio_fit = hls(page).first.evaluate(
+        "e => e.getBoundingClientRect().width / e.closest('.pdf-page').clientWidth"
+    )
+    page.select_option("#pv-zoom", "200")
+    page.wait_for_function(
+        "document.querySelector('.pdf-page').getBoundingClientRect().width > 1500"
+    )
+    ratio_zoom = hls(page).first.evaluate(
+        "e => e.getBoundingClientRect().width / e.closest('.pdf-page').clientWidth"
+    )
+    assert abs(ratio_fit - ratio_zoom) < 0.005
+    page.select_option("#pv-zoom", "50")
+    page.wait_for_function(
+        "document.querySelector('.pdf-page').getBoundingClientRect().width < 450"
+    )
+    ratio_small = hls(page).first.evaluate(
+        "e => e.getBoundingClientRect().width / e.closest('.pdf-page').clientWidth"
+    )
+    assert abs(ratio_fit - ratio_small) < 0.005
+    api = page.request.get(f"{real_library}/api/annotations?paper_id=2401.00001").json()[
+        "annotations"
+    ]
+    assert len(api) == 1 and 0 < api[0]["rects"][0][2] <= 1
+    # Add a note, reload: both persist.
+    items(page).first.get_by_role("button", name="Add note").first.click()
+    items(page).first.locator("textarea").fill("real note")
+    items(page).first.locator("textarea").press("Control+Enter")
+    page.reload()
+    expect(page.locator(".pdf-page")).to_have_count(3, timeout=20_000)
+    expect(items(page)).to_have_count(1, timeout=10_000)
+    expect(items(page).first.locator(".hl-item__note")).to_have_text("real note")
+    expect(hls(page).first).to_be_attached()
+    expect(page.locator("#pv-hl-count")).to_have_text("1")
+    # The Library row and nav reflect the highlight count.
+    page.goto("/#/library")
+    expect(page.locator(".lib-row .lib-hl")).to_have_text("1 highlight")
+
+
+def test_real_go_to_jumps_to_the_page(app, real_library):
+    page = _real_preview(app, real_library)
+    page.locator("#pv-pages").evaluate(
+        "w => { w.scrollTop = w.querySelector('[data-page=\"2\"]').offsetTop }"
+    )
+    expect(page.locator('.pdf-page[data-page="2"].has-text')).to_have_count(1, timeout=10_000)
+    line(page, "Quartzite", 2).select_text()
+    page.click("#pv-hl-btn")
+    expect(items(page)).to_have_count(1)
+    page.select_option("#pv-zoom", "fit-page")
+    page.locator("#pv-pages").evaluate("w => { w.scrollTop = 0 }")
+    items(page).first.get_by_role("button", name=re.compile("Go to highlight on page 2")).click()
+    expect(page.locator("#pv-page-input")).to_have_value("2")

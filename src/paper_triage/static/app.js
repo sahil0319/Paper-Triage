@@ -1263,7 +1263,8 @@
     Array.prototype.forEach.call(document.querySelectorAll("[data-skip]"), function (el) {
       var need = el.getAttribute("data-skip-needs");
       var t = need ? document.getElementById(need) : null;
-      el.hidden = el.getAttribute("data-skip") !== view || (!!need && (!t || t.hidden));
+      el.hidden = el.getAttribute("data-skip") !== view ||
+        (!!need && (!t || t.hidden || !t.getClientRects().length));
     });
   }
 
@@ -1314,6 +1315,7 @@
   }
 
   window.addEventListener("hashchange", function () { applyRoute(false); });
+  window.addEventListener("resize", function () { if (route.view === "preview") refreshSkipLinks(); });
   window.addEventListener("load", function () {
     if (viewer) return;
     viewerFailed = true;
