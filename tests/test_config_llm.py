@@ -336,3 +336,49 @@ def test_mock_wins_over_openai(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "openai")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     assert isinstance(get_client(), MockClient)
+
+
+# ---- v3 T057: MockClient page mode ----------------------------------------------------------
+
+
+def _page_prompt(question, history=""):
+    return (
+        '<page n="1">Distillation of diffusion models.</page>\n'
+        '<page n="2">Quartzite filters remove residue.</page>\n'
+        '<page n="3">Obsidian checkpoints are released.</page>\n'
+        f"{history}<question>\n{question}\n</question>"
+    )
+
+
+def test_llm_mock_page_mode_cites_first_page_with_shared_word():
+    m = MockClient()
+    assert m.text("sys", _page_prompt("Where is quartzite discussed?")) == (
+        "Mock answer from this paper [p.2]."
+    )
+    assert m.text("sys", _page_prompt("Tell me about obsidian")).endswith("[p.3].")
+    assert m.text("sys", _page_prompt("diffusion")).endswith("[p.1].")
+
+
+def test_llm_mock_page_mode_refuses_unrelated():
+    m = MockClient()
+    assert m.text("sys", _page_prompt("What is the capital of France?")).startswith(SENTINEL)
+    assert m.text("sys", _page_prompt("Which paper does this talk about?")).startswith(SENTINEL)
+    assert m.text("sys", _page_prompt("ok")).startswith(SENTINEL)  # < 4 letters
+
+
+def test_llm_mock_page_mode_ignores_history_text():
+    hist = "<history><turn><q>quartzite</q><a>x</a></turn></history>\n"
+    assert m_text(_page_prompt("capital of France?", hist)).startswith(SENTINEL)
+
+
+def m_text(prompt):
+    return MockClient().text("sys", prompt)
+
+
+def test_llm_mock_page_mode_no_question_refuses():
+    assert m_text('<page n="1">quartzite</page>').startswith(SENTINEL)
+
+
+def test_llm_mock_results_chat_unchanged_by_page_mode():
+    out = MockClient().text("sys", _chat_prompt("Tell me about cobalt?"))
+    assert out.endswith("[2401.00002].")

@@ -18,6 +18,7 @@ SENTINEL = "NOT_IN_STORED_PAPERS"
 MAX_TOKENS = 16000
 _PAPER_TAG = re.compile(r'<paper id="([^"]*)"(?:[^>]*?basis="(fulltext|abstract)")?')
 _CHAT_PAPER = re.compile(r'<paper id="([^"]*)"(?: title="([^"]*)")?[^>]*>(.*?)</paper>', re.DOTALL)
+_PAGE = re.compile(r'<page n="(\d+)">(.*?)</page>', re.DOTALL)
 _QUESTION = re.compile(r"<question>(.*?)</question>", re.DOTALL)
 _WORD = re.compile(r"[a-z]{4,}")
 _STOP_TEXT = (
@@ -74,6 +75,8 @@ class MockClient:
         (>= 4 lowercase letters, not a stop word) with a context paper's title or abstract."""
         refusal = f"{SENTINEL} The stored papers do not cover this."
         q = _QUESTION.search(user)
+        if '<page n="' in user:
+            return self._page_answer(user, q, refusal)
         papers = _CHAT_PAPER.findall(user[: q.start()] if q else user)
         if q is None or not papers:
             return refusal
@@ -89,6 +92,19 @@ class MockClient:
             if words & set(_WORD.findall(f"{title} {abstract}".lower())):
                 hit = pid
         return f"Mock answer based on the stored papers [{hit}]." if hit else refusal
+
+
+    @staticmethod
+    def _page_answer(user: str, q, refusal: str) -> str:
+        """Paper-chat mode (prompt has <page n=> blocks): cite the first page that shares a content
+        word with the question, else refuse."""
+        if q is None:
+            return refusal
+        words = set(_WORD.findall(q.group(1).lower())) - _MOCK_STOP_WORDS
+        for n, text in _PAGE.findall(user[: q.start()]):
+            if words & set(_WORD.findall(text.lower())):
+                return f"Mock answer from this paper [p.{n}]."
+        return refusal
 
 
 class AnthropicClient:

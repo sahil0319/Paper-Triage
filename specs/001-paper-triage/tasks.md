@@ -463,7 +463,7 @@ hooks. Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest 
 
 ### Wave G — BE lane (paper chat, harness)
 
-- [ ] T057 [BE] [US9] Page extraction + MockClient page mode (R16). Test first
+- [x] T057 [BE] [US9] Page extraction + MockClient page mode (R16). Test first
   `tests/test_extract.py`: `extract_pages(sample.pdf)` -> 3 strings, page 2 contains
   "Quartzite"; `tests/test_config_llm.py`: prompt with `<page n="1">..</page><page n="2">
   ..Quartzite..</page>` and `<question>Where is quartzite discussed?</question>` ->
