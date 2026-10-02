@@ -4,7 +4,7 @@ import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -14,8 +14,19 @@ from . import db
 from .chat import answer as chat_answer
 from .config import get_settings
 from .llm import LLMError, get_client
+from .models import LibraryItem
 from .net import make_http
-from .pipeline import sort_results, to_out, triage
+from .pipeline import (
+    NoStoredResult,
+    ResultFailed,
+    build_snapshot,
+    library_item,
+    mark_saved,
+    sort_results,
+    to_out,
+    triage,
+)
+from .tags import keywords
 
 STATIC = Path(__file__).parent / "static"
 
@@ -42,6 +53,15 @@ class ChatIn(BaseModel):
     @classmethod
     def _dedupe(cls, v: list[str]) -> list[str]:
         return list(dict.fromkeys(v))
+
+
+class SaveIn(BaseModel):
+    paper_id: str
+    topic: str = ""
+
+
+def _item(conn, saved: dict) -> dict:
+    return LibraryItem(**library_item(conn, saved)).model_dump()
 
 
 def create_app() -> FastAPI:
@@ -95,7 +115,51 @@ def create_app() -> FastAPI:
             if topic is None:
                 topic = db.latest_topic(conn) or ""
             rows = db.list_results(conn, topic)
-        return {"topic": topic, "results": sort_results([to_out(r) for r in rows])}
+            results = sort_results([to_out(r) for r in rows])
+            mark_saved(conn, results)
+        return {"topic": topic, "results": results}
+
+    @app.get("/api/library")
+    def get_library(request: Request):
+        conn = request.app.state.conn
+        with request.app.state.lock:
+            saved = db.list_saved(conn)
+            papers = [_item(conn, s) for s in saved]
+            dirs = db.list_directories(conn)
+        unsorted = sum(1 for p in papers if p["directory_id"] is None)
+        return {
+            "papers": papers, "directories": dirs, "unsorted_count": unsorted,
+            "total": len(papers),
+        }
+
+    @app.post("/api/library")
+    def post_library(body: SaveIn, request: Request, response: Response):
+        st = request.app.state
+        with st.lock:
+            try:
+                snapshot = build_snapshot(st.conn, body.paper_id, body.topic)
+            except NoStoredResult:
+                raise HTTPException(404, "no stored result for this paper") from None
+            except ResultFailed:
+                raise HTTPException(409, "only completed results can be saved") from None
+            created = db.save_paper(
+                st.conn, body.paper_id, snapshot, body.topic, keywords(body.topic)
+            )
+            if created:
+                db.set_file_status(st.conn, body.paper_id, "pending", source_url=snapshot["pdf_url"])
+            item = _item(st.conn, db.get_saved(st.conn, body.paper_id))
+        response.status_code = 201 if created else 200
+        return {"created": created, "paper": item}
+
+    @app.delete("/api/library")
+    def delete_library(paper_id: str, request: Request):
+        st = request.app.state
+        with st.lock:
+            if db.get_saved(st.conn, paper_id) is None:
+                raise HTTPException(404, "not in the library")
+            annotations = db.annotation_count(st.conn, paper_id)
+            db.delete_saved(st.conn, paper_id)
+        return {"deleted": True, "annotations": annotations}
 
     @app.post("/api/chat")
     def post_chat(body: ChatIn, request: Request):

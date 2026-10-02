@@ -16,11 +16,12 @@ from .input_parse import parse_query
 from .llm import LLMClient, LLMError
 from .ranker import rank
 from .summarizer import summarize
+from .tags import keywords
 
 _RETRY_ON = (LLMError, ValidationError)  # LLMRefusal is an LLMError
 _OUT_KEYS = (
     "paper_id", "title", "authors", "source", "basis", "rank", "rank_reason", "summary",
-    "critique", "status", "error", "abs_url", "pdf_url",
+    "critique", "status", "error", "abs_url", "pdf_url", "saved",
 )
 
 
@@ -43,7 +44,58 @@ def to_out(row: dict) -> dict:
     """db.list_results row -> API result item (contracts/api.md)."""
     row = dict(row)
     row["abs_url"], row["pdf_url"] = source_urls(row["paper_id"], row["source"], row.get("pdf_url"))
+    row.setdefault("saved", False)
     return {k: row.get(k) for k in _OUT_KEYS}
+
+
+def mark_saved(conn: sqlite3.Connection, items: list[dict], topic: str | None = None) -> None:
+    """Set `saved` on result items. With a topic, also merge its keywords into saved papers' tags."""
+    saved = db.saved_ids(conn, [i["paper_id"] for i in items])
+    tags = keywords(topic) if topic else []
+    for item in items:
+        item["saved"] = item["paper_id"] in saved
+        if item["saved"] and tags:
+            db.merge_tags(conn, item["paper_id"], tags)
+
+
+class NoStoredResult(LookupError):
+    """No stored (paper, topic) result to save (HTTP 404)."""
+
+
+class ResultFailed(ValueError):
+    """The stored result failed, so it cannot be saved (HTTP 409)."""
+
+
+def build_snapshot(conn: sqlite3.Connection, paper_id: str, topic: str) -> dict:
+    """Frozen card data for a saved paper, built from stored data only (never from the client)."""
+    paper = db.get_paper(conn, paper_id)
+    result = db.get_result(conn, paper_id, topic) if paper else None
+    if paper is None or result is None:
+        raise NoStoredResult(paper_id)
+    if result["status"] != "ok":
+        raise ResultFailed(paper_id)
+    abs_url, pdf_url = source_urls(paper_id, paper["source"], paper.get("pdf_url"))
+    return {
+        "title": paper["title"], "authors": paper["authors"], "source": paper["source"],
+        "published": paper.get("published"), "abstract": paper.get("abstract") or "",
+        "basis": paper["basis"], "rank": result["rank"], "rank_reason": result["rank_reason"],
+        "summary": result["summary"], "critique": result["critique"],
+        "abs_url": abs_url, "pdf_url": pdf_url,
+    }
+
+
+def library_item(conn: sqlite3.Connection, saved: dict) -> dict:
+    """db.get_saved row -> API library item (contracts/api.md)."""
+    f = db.get_file(conn, saved["paper_id"]) or {}
+    return {
+        **saved["snapshot"],
+        "paper_id": saved["paper_id"], "topic": saved["topic"], "tags": saved["tags"],
+        "directory_id": saved["directory_id"], "saved_at": saved["saved_at"],
+        "pdf": {
+            "status": f.get("status", "pending"), "error": f.get("error"), "pages": f.get("pages"),
+        },
+        "highlight_count": db.annotation_count(conn, saved["paper_id"], "highlight"),
+    }
 
 
 def sort_results(items: list[dict]) -> list[dict]:
@@ -150,7 +202,6 @@ def triage(
                     "source": paper["source"], "basis": paper["basis"],
                     "pdf_url": paper.get("pdf_url")})
         )
-    return {
-        "topic": topic, "results": sort_results(results), "errors": errors, "offset": offset,
-        **page,
-    }
+    results = sort_results(results)
+    mark_saved(conn, results, topic)
+    return {"topic": topic, "results": results, "errors": errors, "offset": offset, **page}

@@ -372,7 +372,7 @@ hooks. Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest 
   `create_annotation`, `update_annotation`, `delete_annotation`, `list_annotations` (order
   page, top, id), `annotation_count`. Test first `tests/test_db.py`: unsave cascades to file
   row, pages and annotations; `top` = min rect y (0 for notes).
-- [ ] T047 [BE] [US4] Library API (contracts "GET/POST/DELETE /api/library", "v3 change to
+- [x] T047 [BE] [US4] Library API (contracts "GET/POST/DELETE /api/library", "v3 change to
   POST /api/triage and GET /api/papers"). Test first `tests/test_library_api.py`: save after a
   mock topic search -> 201, item has snapshot fields, tags = `keywords(topic)`,
   `directory_id null`; save again with another topic -> 200 `created false`, original
