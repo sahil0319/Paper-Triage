@@ -707,6 +707,8 @@ a.btn--secondary { color: var(--color-ink); }
 .pv-bar { display: flex; align-items: center; gap: var(--space-md); padding-block: var(--space-sm); }
 .pv-break { display: none; }
 .pv-back { flex: none; display: inline-flex; align-items: center; gap: var(--space-xs); }
+/* Ghost variant with a chevron (DESIGN.md 8.8); the markup keeps its button classes. */
+.btn.pv-back { background: transparent; border-color: transparent; color: var(--color-link); }
 .pv-back::before {
   content: ""; width: 7px; height: 7px; border-left: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
   transform: rotate(45deg); margin-left: 3px;
@@ -1021,6 +1023,7 @@ button.cite:active { background: var(--color-cite-surface-active); }
   .btn--primary:hover:not(:disabled) { background: var(--color-primary-hover); }
   .btn--primary:active:not(:disabled) { background: var(--color-primary-active); }
   .btn--secondary:hover:not(:disabled):not([aria-disabled="true"]) { background: var(--color-surface-hover); }
+  .btn--secondary.pv-back:hover:not(:disabled):not([aria-disabled="true"]) { background: var(--color-surface-hover); color: var(--color-link-hover); }
   .btn--on-dark:hover, #load-more:hover, .alert .btn--secondary:hover:not(:disabled) { background: var(--color-secondary-hover); }
   .btn--remove:hover:not(:disabled) { background: var(--color-error-hover); border-color: var(--color-error-hover); color: var(--color-ink-inverse); }
   .text-btn:hover:not([aria-disabled="true"]), .ext-link:hover { background: var(--color-surface-hover); color: var(--color-link-hover); }

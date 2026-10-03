@@ -1126,3 +1126,16 @@ def test_forced_colours_underline_only_the_current_nav_link_and_tab(offline_page
     canvas = page.evaluate("getComputedStyle(document.body).backgroundColor")
     assert other == canvas, (other, canvas)
     assert current != canvas, (current, canvas)
+
+
+def test_preview_back_button_is_a_ghost_with_a_chevron(pv):
+    page = pv
+    back = page.locator("#pv-back")
+    assert back.evaluate("e => getComputedStyle(e).backgroundColor") == "rgba(0, 0, 0, 0)"
+    assert back.evaluate("e => getComputedStyle(e).borderTopColor") == "rgba(0, 0, 0, 0)"
+    assert back.evaluate("e => getComputedStyle(e).color") == PRIMARY
+    assert abs(back.bounding_box()["height"] - 40) < 1
+    assert back.evaluate("e => getComputedStyle(e, '::before').content") != "none"
+    back.hover()
+    expect(back).to_have_css("background-color", "rgb(232, 232, 232)")
+    expect(back).to_have_css("color", "rgb(0, 67, 206)")
