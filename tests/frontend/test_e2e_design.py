@@ -1085,3 +1085,16 @@ def test_no_text_page_note_is_an_info_notification(offline_page, live_server):
     assert note.evaluate("e => getComputedStyle(e).borderLeftColor") == PRIMARY
     assert note.evaluate("e => getComputedStyle(e).borderLeftWidth") == "3px"
     assert note.evaluate("e => getComputedStyle(e).borderTopLeftRadius") == "0px"
+
+
+# ---- v4 audit fixes ----
+
+
+@pytest.mark.parametrize("hover", [False, True])
+def test_rail_count_meets_aa_on_current_and_hovered_items(offline_page, live_server, hover):
+    page = offline_page
+    _library(page, live_server, 1440)
+    _assert_contrast(page, [("#dir-rail .rail__item[aria-current='true'] .rail__count", 4.5)])
+    if hover:
+        page.locator("#dir-rail .rail__item:not([aria-current='true'])").first.hover()
+        _assert_contrast(page, [("#dir-rail .rail__item:hover .rail__count", 4.5)])

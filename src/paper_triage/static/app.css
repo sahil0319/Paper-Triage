@@ -637,6 +637,8 @@ a.btn--secondary { color: var(--color-ink); }
 }
 .rail__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rail__count { flex: none; font: var(--type-label); letter-spacing: var(--tracking-label); color: var(--color-ink-subtle); font-variant-numeric: tabular-nums; }
+/* ink-subtle fails AA on surface-selected and surface-hover (DESIGN.md 2.1): use ink-muted there. */
+.rail__item[aria-current="true"] .rail__count { color: var(--color-ink-muted); }
 .rail__new { margin-top: var(--space-md); }
 .rail__new .dir-new { width: 100%; }
 
@@ -1026,6 +1028,7 @@ button.cite:active { background: var(--color-cite-surface-active); }
   .views a:hover { color: var(--color-ink); background: var(--color-surface-hover); }
   .tag:hover:not([aria-pressed="true"]) { background: var(--color-surface-hover); }
   .rail__item:hover:not([aria-current="true"]) { background: var(--color-surface-hover); }
+  .rail__item:hover .rail__count { color: var(--color-ink-muted); }
   .pv-tab:hover { background: var(--color-surface-hover); }
   .find-hit:hover { background: var(--color-surface-hover); }
   a.cite:hover, button.cite:hover { background: var(--color-cite-surface-active); }
