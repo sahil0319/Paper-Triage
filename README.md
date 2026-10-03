@@ -87,6 +87,22 @@ The page follows `DESIGN.md`, `PRODUCT.md` and the v3 brief `docs/design/v3-libr
   e-prints for personal use but not redistributing them, so do not deploy this app publicly or
   share the data directory.
 
+### Design and fonts
+
+The page follows `DESIGN.md` (v4), which is built on IBM Carbon: a light theme only (white canvas,
+`#f4f4f4` layers, one IBM Blue accent, 1px rules, square corners, no shadows except overlays).
+There is no dark mode.
+
+The UI uses IBM Plex Sans (weights 400 and 600) and IBM Plex Mono (400), vendored as 8 woff2
+files (about 125 KB, SIL Open Font License 1.1) under `src/paper_triage/static/vendor/fonts/`,
+with `plex.css` holding the `@font-face` rules and `LICENSE-IBM-Plex.txt` the licence text. The
+exact npm packages and versions (`@fontsource/ibm-plex-sans@5.3.0`,
+`@fontsource/ibm-plex-mono@5.3.0`, `@ibm/plex-sans@1.1.0`), the file mapping and the sha256
+checksums are listed in `static/vendor/fonts/README`. The files were fetched once at build time
+with `npm pack`; the app makes no font request to the network at run time, and there is no CDN,
+npm install or build step. To update a font, replace the files and update that README. The app
+registers `.woff2` as `font/woff2` at startup so the type is correct on every OS.
+
 ### Vendored pdf.js
 
 The viewer uses pdf.js (`pdfjs-dist` 6.3.289, modern build, Apache-2.0) committed under
@@ -198,6 +214,17 @@ uv run playwright install chromium
 MOCK_LLM=1 uv run pytest -q -m e2e
 ```
 
+The v4 design checks (zero non-local requests, `font/woff2` responses, contrast, focus ring,
+reduced motion, forced colors, and screenshots of Triage, Library and Preview at widths 390, 820
+and 1440) live in `tests/frontend/test_e2e_design.py`. To run them and keep the screenshots:
+
+```sh
+MOCK_LLM=1 V4_SHOTS_DIR=docs/qa/screenshots/v4 uv run pytest -q -m e2e tests/frontend/test_e2e_design.py
+```
+
+Screenshots are written as `<view>-<width>.png`. When `V4_SHOTS_DIR` is not set they go to a
+pytest temp directory.
+
 ## Notes
 
 - arXiv rate limit: live mode waits at least 3 s between arXiv requests (`net.py` `Throttle`),
@@ -223,7 +250,7 @@ src/paper_triage/
   llm.py          the single LLM client wrapper (Anthropic or OpenAI; honors MOCK_LLM=1)
   db.py models.py config.py
   fixtures/       sample arXiv feed + PDF used in mock mode
-  static/         the UI (static/vendor/pdfjs/ is the vendored pdf.js)
+  static/         the UI (static/vendor/pdfjs/ is the vendored pdf.js, static/vendor/fonts/ the IBM Plex fonts)
 tests/            pytest, offline; e2e_harness.py + e2e-marked tests need chromium
 ```
 

@@ -727,7 +727,7 @@ runs use `E2E_PORT=8765`.
 
 ### Wave R2 — BE lane
 
-- [ ] T075 [P] [BE] `README.md` + `SETUP_LOG.md` v4 design note: Carbon-based DESIGN.md (light
+- [x] T075 [P] [BE] `README.md` + `SETUP_LOG.md` v4 design note: Carbon-based DESIGN.md (light
   theme only), vendored IBM Plex Sans/Mono (8 woff2 files, about 125 KB, OFL 1.1, packages and
   versions from `pt/static/vendor/fonts/README`), the one-time build-time font fetch (no runtime
   network), and the design e2e command with `V4_SHOTS_DIR`. Needs T067. Files `README.md`,
