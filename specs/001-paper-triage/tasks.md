@@ -615,7 +615,7 @@ runs use `E2E_PORT=8765`.
 
 ### Wave R2 — FE lane (sequential: every task edits `app.css`)
 
-- [ ] T069 [FE] [US1] Shell, nav, buttons and query (FR-030a-c; brief items 5-8; D8.1, D8.2,
+- [x] T069 [FE] [US1] Shell, nav, buttons and query (FR-030a-c; brief items 5-8; D8.1, D8.2,
   D8.3, D8.4 intro band). `app.css`: `.global-nav` 48px with `border-subtle` bottom rule; view
   links 48px `ink-muted`, current link `ink`, weight 600, 2px `primary` bottom rule; brand
   `body-emphasis`; mock badge pill with 1px `info` border and `info` `label` text;
