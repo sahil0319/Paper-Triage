@@ -153,3 +153,31 @@ When FE Wave F done → tester FE Wave F (verify T052-T055, smoke T056) → FE W
 4. sentinel: mark DONE=true (all tasks + tester pass green)
 
 **Blocker**: None. Parallel work ready to resume.
+## Checkpoint: v4 Build Started (2026-10-03)
+
+**Task**: Update checkpoint after v3 complete and v4 wave R1 complete
+**Status**: DONE
+**Findings**: v3 complete (T001-T065 all done, tester GREEN). v4 wave R1 complete (T066-T067, T075 done, F-016/F-017/F-019 fixes verified). FE lane T068-T074 queued (strict sequence). Phase: v4 build.
+
+### Actions taken
+- Verified tasks.md: T001-T067 and T075 ticked; T068-T074, T076 unticked
+- Verified git commits: F-016 325f7f3, F-017 57a8e71, F-019 6a1912c, T066 10b7c4d, T067 3b98ff2, T075 40b7ac1 all present
+- Updated checkpoint.md: phase="v4 build", R1 summary, T068-T076 queue, next: FE T068 strict sequence
+- Updated progress.json: T066-T067→done, T075→done, T068-T074→in-progress/waiting, T076→waiting, phase="v4 build", DONE=false
+- Appended sentinel.md (this file)
+
+### Verified
+- v3 final: all 65 tasks ticked, all commits landed, pytest 532 x2, ruff clean, docs/qa/final.md PASS
+- v4 wave R1: T066 MIME (10b7c4d), T067 fonts 8 woff2 (3b98ff2), T075 README (40b7ac1) all done
+- Fixes verified: F-016 highlight selection, F-017 previous results opacity, F-019 preview Ask tab
+- Tester gate: docs/qa/v4-fixes.md GREEN (pytest 532 x2, ruff clean)
+- No task/commit mismatches
+
+### FE sequence ready
+- T068: token layer + global type styles (in progress)
+- T069-T074: per-component CSS restyle (waiting)
+- T076: design e2e sweep + screenshots (waiting)
+
+### Next
+Frontend-builder continues at T068. Loop until T074, then T076 design e2e, then tester final pass.
+

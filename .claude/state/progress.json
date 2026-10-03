@@ -1,5 +1,5 @@
 {
-  "phase": "done (v3)",
+  "phase": "v4 build",
   "tasks": {
     "T001": "done",
     "T002": "done",
@@ -65,12 +65,23 @@
     "T062": "done",
     "T063": "done",
     "T064": "done",
-    "T065": "done"
+    "T065": "done",
+    "T066": "done",
+    "T067": "done",
+    "T068": "in-progress",
+    "T069": "waiting",
+    "T070": "waiting",
+    "T071": "waiting",
+    "T072": "waiting",
+    "T073": "waiting",
+    "T074": "waiting",
+    "T075": "done",
+    "T076": "waiting"
   },
-  "last_checkpoint_ts": 1728057603,
-  "context_pct": 78.3,
-  "last_warn_level": 1,
-  "last_warn_ts": 1791010076.409174,
-  "DONE": true,
+  "last_checkpoint_ts": 1728227603,
+  "context_pct": 23.0,
+  "last_warn_level": 0,
+  "last_warn_ts": 1791047688.501025,
+  "DONE": false,
   "last_precompact_ts": 1790846263.5785239
 }
