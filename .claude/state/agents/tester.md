@@ -52,3 +52,9 @@ Goal: verify T060-T063 + fixes. Status: PASS. Full pytest 470/471 (F-012 flaky t
 ## v3 final pass (paused by user)
 Done: pytest run1 497 pass, run2 497 pass (87s each); ruff clean; e2e run1 132 pass (runs 2-3 not confirmed, command exited 144 on pause/timeout); tasks.md T001-T065 all ticked + matching commits; .gitignore covers paper_triage_data/, *.db, .env; no db/data tracked (only .env.example); pdfjs LICENSE tracked; impeccable detect 4 findings (layout-transition app.css:661, 2 cramped-padding, flat-type-hierarchy) - not yet compared against baseline.
 Remaining: e2e x2 more, static guard + F-012 solo rerun, README spot-check, real-API smoke on 8766, load-more chat reset, F-012/F-013/F-014 closure in failures.md, v3 section in final.md. No files edited. Gate skipped (no bare repo).
+
+## v4 T068 verify (2026-10-04, HEAD 94ed09e, worktree)
+- Goal: verify token layer commit. Status: one [FE] flake. pytest 544 pass (E2E_PORT=8766), ruff clean, test_design_tokens solo x3 12 pass, assets served 200, detect 7+2 (all accepted).
+- F-020 [FE] medium: sheet-up slowed 200->240ms, test_audit_sheet_header_is_one_row_on_canvas fails ~1/3 (parent 12/12). Wait for animation end in test.
+- Deviations (notifications, working card surface-1, tag pressed inverse, rail bar, ink-disabled rgb(140,140,140)) all match DESIGN.md.
+- Report docs/qa/v4-T068.md. Servers killed. Next: frontend-builder fixes F-020 test, then T069.
