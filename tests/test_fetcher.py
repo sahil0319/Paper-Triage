@@ -317,3 +317,64 @@ def test_fetch_items_have_no_paging(env):
     f, _, _, _ = env
     _, _, page = f.fetch("", [("arxiv", "2401.00001")], 10)
     assert page == {"next_offset": None, "has_more": False}
+
+
+# ---- F-018: long / punctuated topics ----
+
+
+@pytest.mark.parametrize(
+    "topic,expected",
+    [
+        ("diffusion distillation", "all:diffusion AND all:distillation"),
+        ("a b diffusion", "all:diffusion"),
+        ("Diffusion  Distillation, Diffusion!", "all:diffusion AND all:distillation"),
+        ("self-supervised learning", 'all:"self supervised" AND all:learning'),
+        ("vision: (ViT) \"x\" a/b", 'all:vision AND all:vit'),
+        ("how to", "all:how AND all:to"),
+        ("x", "all:x"),
+        ("", ""),
+        ("?! -", ""),
+    ],
+)
+def test_build_query(topic, expected):
+    from paper_triage.fetcher import build_query
+
+    assert build_query(topic) == expected
+
+
+def test_build_query_long_topic_is_or_joined_and_capped():
+    from paper_triage.fetcher import MAX_QUERY_TERMS, build_query
+
+    q = build_query("graph neural networks molecule property prediction benchmark survey")
+    assert " AND " not in q and q.count(" OR ") == 7
+    q = build_query(" ".join(f"term{i}" for i in range(30)))
+    assert q.count("all:") == MAX_QUERY_TERMS
+    assert build_query("alpha beta gamma delta").count(" AND ") == 3  # <= 4 terms stay strict
+
+
+@pytest.mark.parametrize(
+    "topic",
+    [
+        "graph neural networks molecule property prediction benchmark survey",
+        "large language model agents tool use planning memory reasoning evaluation safety",
+        "deep learning, transformers; attention (self-supervised) vision: ViT 'quantum' \"x\" a/b",
+    ],
+)
+def test_triage_long_topic_succeeds(tmp_db, monkeypatch, topic):
+    from fastapi.testclient import TestClient
+
+    from paper_triage.app import create_app
+
+    monkeypatch.setenv("PAPER_TRIAGE_DB", tmp_db)
+    with TestClient(create_app()) as c:
+        r = c.post("/api/triage", json={"query": topic, "max_results": 3})
+    assert r.status_code == 200
+    body = r.json()
+    assert len(body["results"]) == 3 and body["errors"] == []
+
+
+def test_search_long_topic_sends_or_query(env):
+    f, requests, _, _ = env
+    f.search("graph neural networks molecule property prediction", 3)
+    sq = requests[0].url.params["search_query"]
+    assert sq == "all:graph OR all:neural OR all:networks OR all:molecule OR all:property OR all:prediction"

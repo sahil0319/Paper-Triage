@@ -10,6 +10,7 @@ import httpx
 
 from . import db
 from .extract import ExtractError, extract_text, pdf_title
+from .tags import STOP_WORDS
 
 API_URL = "https://export.arxiv.org/api/query"
 _NS = {
@@ -19,6 +20,10 @@ _NS = {
 FULL_TEXT_CAP = 200_000
 ABSTRACT_CHARS = 1500
 _ABS = re.compile(r"^https?://arxiv\.org/abs/(.+?)(?:v(\d+))?$")
+# A topic with more than this many terms is OR-joined: arXiv ANDs every term across title, abstract
+# and full metadata, so five or six keywords usually match nothing (F-018).
+MAX_AND_TERMS = 4
+MAX_QUERY_TERMS = 12
 
 
 class FetchError(Exception):
@@ -77,6 +82,26 @@ def parse_total(xml: str) -> int | None:
         return None
 
 
+def build_query(topic: str) -> str:
+    """Topic text -> arXiv `search_query`, or "" when it has no searchable word.
+
+    Punctuation is stripped (a stray `:`, `(` or `"` makes arXiv reject the query or return an
+    error entry), stop words and repeats are dropped, a hyphenated word becomes a quoted phrase,
+    and long topics are OR-joined (relevance sort still ranks papers matching more terms first).
+    """
+    terms: list[str] = []
+    for raw in topic.lower().split():
+        parts = [w for w in re.findall(r"[a-z0-9]+", raw) if len(w) > 1]
+        term = " ".join(parts)
+        if term and term not in terms and not (len(parts) == 1 and term in STOP_WORDS):
+            terms.append(term)
+    terms = terms[:MAX_QUERY_TERMS]
+    if not terms:  # only stop words or single letters ("how to", "x"): search them, don't fail
+        terms = list(dict.fromkeys(re.findall(r"[a-z0-9]+", topic.lower())))[:MAX_QUERY_TERMS]
+    fields = [f'all:"{t}"' if " " in t else f"all:{t}" for t in terms]
+    return (" AND " if len(fields) <= MAX_AND_TERMS else " OR ").join(fields)
+
+
 class Fetcher:
     def __init__(self, conn: sqlite3.Connection, client: httpx.Client, throttle):
         self.conn = conn
@@ -105,12 +130,12 @@ class Fetcher:
 
     def search(self, topic: str, n: int, offset: int = 0) -> tuple[list[dict], int | None]:
         """One page of a topic search: (papers, source-reported total or None)."""
-        words = topic.lower().split()
-        if not words:
+        query = build_query(topic)
+        if not query:
             return [], 0
-        key = f"q:{' '.join(words)}:{n}:{offset}"
+        key = f"q:{' '.join(topic.lower().split())}:{n}:{offset}"
         params = {
-            "search_query": " AND ".join(f"all:{w}" for w in words),
+            "search_query": query,
             "start": offset,
             "max_results": n,
             "sortBy": "relevance",
