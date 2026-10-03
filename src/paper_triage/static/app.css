@@ -781,6 +781,9 @@ a.btn--secondary { color: var(--color-ink); }
 /* ---- toolbar controls: one height, one Highlight split control (audit 9, 10) ---- */
 
 .pv-toolbar .btn, .pv-toolbar .select, .pv-toolbar input[type="text"] { height: 40px; min-height: 40px; }
+/* Row 1 ghost actions are 40px controls too (F-022); .ext-link's negative margin is dropped here. */
+.pv-toolbar #pv-export, .pv-toolbar #pv-external { min-height: var(--control-md); margin: 0; padding: 0 var(--space-xxs); }
+.pv-toolbar #pv-external { padding-inline: 0; }
 .pv-hlctl { gap: 0; }
 .pv-hlctl #pv-hl-btn { border-radius: var(--radius-none) 0 0 var(--radius-none); }
 .pv-hlctl .select {

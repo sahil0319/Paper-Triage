@@ -332,6 +332,13 @@ def test_toolbar_controls_are_40px_and_square(pv):
         assert abs(c.bounding_box()["height"] - 40) < 1, c.get_attribute("id")
         assert c.evaluate("e => getComputedStyle(e).borderTopLeftRadius") == "0px"
     assert seen >= 8
+    # Row 1 actions are controls too (F-022), at desktop and mobile widths.
+    for width in (1440, 820, 390):
+        page.set_viewport_size({"width": width, "height": 900})
+        for sel in ("#pv-export", "#pv-external"):
+            box = page.locator(sel).bounding_box()
+            assert abs(box["height"] - 40) < 1, (width, sel, box["height"])
+    page.set_viewport_size({"width": 1440, "height": 900})
     title = page.locator("#preview-heading")
     assert title.evaluate("e => getComputedStyle(e).fontWeight") == "600"
     assert title.evaluate("e => getComputedStyle(e).fontSize") == "16px"
