@@ -1158,3 +1158,25 @@ def test_directory_form_submit_and_save_note_are_primary_32px_buttons(offline_pa
     expect(save).to_be_visible()
     assert save.evaluate("e => getComputedStyle(e).backgroundColor") == PRIMARY
     assert abs(save.bounding_box()["height"] - 32) < 1
+
+
+def test_mobile_row_buttons_and_unsave_confirm_do_not_crowd_the_authors(offline_page, live_server):
+    page = offline_page
+    _triage(page, live_server, 390)
+    _search(page)
+    row = page.locator("#paper-list li.paper").first
+    gap = row.evaluate(
+        """e => {
+          const btn = e.querySelector('.paper__head .btn').getBoundingClientRect();
+          const authors = e.querySelector('.paper__authors').getBoundingClientRect();
+          return authors.top - btn.bottom;
+        }"""
+    )
+    assert gap >= 8, gap
+    save = row.locator("button.save")
+    save.click()
+    expect(save).to_have_attribute("aria-pressed", "true")
+    save.click()
+    confirm = row.locator(".confirm")
+    expect(confirm).to_be_visible()
+    assert confirm.evaluate("e => getComputedStyle(e).marginBottom") == "12px"

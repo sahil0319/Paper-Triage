@@ -569,7 +569,7 @@ a.btn--secondary { color: var(--color-ink); }
   margin-top: var(--space-sm); overflow-wrap: anywhere; }
 .confirm {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-sm);
-  margin-top: var(--space-sm); max-width: var(--measure);
+  margin-top: var(--space-sm); margin-bottom: var(--space-sm); max-width: var(--measure);
 }
 .confirm__text { font: var(--type-body); color: var(--color-ink); flex-basis: 100%; }
 .btn--remove { color: var(--color-error); border-color: var(--color-error); }
@@ -1009,6 +1009,7 @@ button.cite:active { background: var(--color-cite-surface-active); }
   input[type="search"], input[type="text"] { font-size: 16px; }
   .triage-form .btn { width: 100%; }
   .paper__links { margin-left: 0; flex-basis: 100%; }
+  .paper__head .btn { margin-bottom: var(--space-xs); }
 }
 
 /* ---- hover and colour transitions (DESIGN.md 7): hover rules live only inside the hover query ---- */
