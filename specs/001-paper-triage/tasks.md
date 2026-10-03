@@ -631,7 +631,7 @@ runs use `E2E_PORT=8765`.
   `rgb(15, 98, 254)` bottom border; `#submit` background `rgb(15, 98, 254)`, border-radius
   `0px`, height 48 at 1440 and full width at 390; `#query` height 48 with a 1px bottom border
   `rgb(141, 141, 141)`. Files `pt/static/app.css`, `tests/frontend/test_e2e_design.py`.
-- [ ] T070 [FE] [US1] [US2] Result rows and results chat (FR-030a-c; brief items 9, 10, 11, 15,
+- [x] T070 [FE] [US1] [US2] Result rows and results chat (FR-030a-c; brief items 9, 10, 11, 15,
   16; D8.4 rows, critique, save, confirm; D8.6). `app.css`: `.paper` rank column 56 / 72px,
   padding-block 16 / 24, 1px `border-subtle` top rule except the first; `.rank__n`
   `numeral-md` / `numeral-lg`, `.rank__of` `label` `ink-subtle`, `.rank__meter` 4px square bar
