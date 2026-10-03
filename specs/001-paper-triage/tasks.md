@@ -586,7 +586,7 @@ runs use `E2E_PORT=8765`.
   the same version, copy the OFL text, and write `plex.css` (pattern D3.2) and `README` (sources,
   versions, file mapping, sha256 per file). Files `pt/static/vendor/fonts/**`,
   `pt/static/index.html` (the one `<link>`), `tests/frontend/test_static_assets.py`.
-- [ ] T068 [FE] Token layer + global type, focus, hover and motion (FR-030a, FR-030c, FR-030e;
+- [x] T068 [FE] Token layer + global type, focus, hover and motion (FR-030a, FR-030c, FR-030e;
   brief items 3, 4; D2, D3.2, D3.3, D4, D5, D6, D7, D9; R21). Test first new
   `tests/frontend/test_design_tokens.py` (static parse of `pt/static/app.css`): `:root` declares
   `--color-*` per D2 (exact hex for `primary #0f62fe`, `ink #161616`, `ink-muted #525252`,

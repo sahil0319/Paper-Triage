@@ -2489,7 +2489,7 @@ def test_audit_disabled_text_button_looks_disabled(app):
     muted = page.locator("#pv-export").evaluate("e => getComputedStyle(e).color")
     live = page.locator("#pv-note-add").evaluate("e => getComputedStyle(e).color")
     assert muted != live
-    assert muted == "rgb(65, 69, 77)"
+    assert muted == "rgb(140, 140, 140)"  # ink-disabled
 
 
 def test_audit_popover_never_covers_the_toolbar(app):
