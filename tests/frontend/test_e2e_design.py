@@ -238,3 +238,65 @@ def test_chat_panel_is_a_square_layer_with_canvas_field(desktop):
     assert _css(page, ".chat h2", "fontSize") == "20px"
     assert _css(page, "#question", "backgroundColor") == "rgb(255, 255, 255)"
     assert abs(_box(page, "#ask")["height"] - 40) < 0.5
+
+
+# ---- T071: Library view ----
+
+
+@pytest.fixture
+def library(offline_page, live_server):
+    from ptstubs import LibraryStub, lib_item
+
+    live_server.set_triage_delay(0)
+    page = offline_page
+    LibraryStub(page, [lib_item(1), lib_item(2)])
+    page.set_viewport_size({"width": 1440, "height": 900})
+    page.goto("/#/library")
+    expect(page.locator(".lib-row")).to_have_count(2)
+    return page
+
+
+def test_current_rail_item_is_selected_with_a_primary_bar(library):
+    page = library
+    item = '#dir-rail .rail__item[aria-current="true"]'
+    assert _css(page, item, "fontWeight") == "600"
+    shadow = _css(page, item, "boxShadow")
+    assert PRIMARY in shadow and "3px 0px 0px 0px inset" in shadow
+    assert _css(page, item, "backgroundColor") == "rgb(224, 224, 224)"  # surface-selected
+    assert abs(_box(page, item)["height"] - 32) < 0.5
+
+
+def test_pressed_tag_is_inverse(library):
+    page = library
+    tag = page.locator("#lib-tags button.tag").first
+    tag.click()
+    page.mouse.move(0, 0)
+    expect(tag).to_have_attribute("aria-pressed", "true")
+    expect(tag).to_have_css("background-color", "rgb(22, 22, 22)")
+    expect(tag).to_have_css("color", "rgb(255, 255, 255)")
+    assert abs(tag.bounding_box()["height"] - 32) < 0.5
+    assert tag.evaluate("e => getComputedStyle(e).borderTopLeftRadius") != "0px"
+
+
+def test_row_select_is_a_32px_carbon_select(library):
+    page = library
+    select = page.locator('.lib-row select[data-act="move"]').first
+    assert abs(select.bounding_box()["height"] - 32) < 0.5
+    assert select.evaluate("e => getComputedStyle(e).appearance") == "none"
+    assert select.evaluate("e => getComputedStyle(e).backgroundImage").startswith("url(")
+    assert select.evaluate("e => getComputedStyle(e).borderTopWidth") == "0px"
+    assert select.evaluate("e => getComputedStyle(e).borderBottomWidth") == "1px"
+
+
+def test_row_removal_does_not_transition_height(library):
+    page = library
+    prop = _css(page, ".lib-row >> nth=0", "transitionProperty")
+    assert "height" not in prop
+
+
+def test_library_filter_field_is_carbon(library):
+    page = library
+    field = page.locator("#lib-title-filter, .lib-filter input[type=search]").first
+    assert abs(field.bounding_box()["height"] - 40) < 0.5
+    assert field.evaluate("e => getComputedStyle(e).borderTopWidth") == "0px"
+    assert field.evaluate("e => getComputedStyle(e).borderBottomColor") == BORDER_STRONG

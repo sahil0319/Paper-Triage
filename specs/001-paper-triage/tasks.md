@@ -650,7 +650,7 @@ runs use `E2E_PORT=8765`.
   `2px`; a refusal `.turn__a--refused` has background `rgb(237, 245, 255)` and a 3px left border
   `rgb(15, 98, 254)`; a saved row's `button.save[aria-pressed="true"]` background `rgb(224,
   224, 224)`. Files `pt/static/app.css`, `tests/frontend/test_e2e_design.py`.
-- [ ] T071 [FE] [US5] [US6] [US7] Library view (FR-030a-c; brief items 18-22; D8.7). `app.css`:
+- [x] T071 [FE] [US5] [US6] [US7] Library view (FR-030a-c; brief items 18-22; D8.7). `app.css`:
   `.rail` items 32px (40 on `pointer: coarse`), `.rail__item[aria-current="true"]`
   `surface-selected` fill, weight 600, `box-shadow: inset 3px 0 0 var(--color-primary)`, hover
   `surface-hover`, counts `label` `ink-subtle`; `.tag` pill 32px, 1px `border-strong`, `label`,

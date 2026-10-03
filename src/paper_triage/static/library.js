@@ -839,12 +839,8 @@
 
   function collapse(li, done) {
     if (PT.reducedMotion()) { done(); return; }
-    li.style.height = li.offsetHeight + "px";
-    li.style.overflow = "hidden";
-    void li.offsetHeight;
     li.classList.add("is-collapsing");
-    li.style.height = "0px";
-    window.setTimeout(done, 220);
+    window.setTimeout(done, 250);
   }
 
   function confirmRemove(it, trigger) {
