@@ -178,3 +178,81 @@ def test_nav_has_view_links_and_per_view_regions():
         assert f'data-route="{view}"' in html
         assert f'data-skip="{view}"' in html
     assert 'type="module" src="viewer.js"' in html
+
+
+# ---- v4 (T067): vendored IBM Plex fonts ----
+
+FONTS = VENDOR / "fonts"
+FONT_FILES = [
+    "plex-sans-latin-400",
+    "plex-sans-latin-600",
+    "plex-sans-latin-ext-400",
+    "plex-sans-latin-ext-600",
+    "plex-sans-greek-400",
+    "plex-sans-greek-600",
+    "plex-mono-latin-400",
+    "plex-mono-latin-ext-400",
+]
+
+
+def _plex_css():
+    return (FONTS / "plex.css").read_text(encoding="utf-8")
+
+
+def test_plex_font_files_exist_are_woff2_and_small():
+    total = 0
+    for name in FONT_FILES:
+        f = FONTS / f"{name}.woff2"
+        assert f.is_file(), name
+        data = f.read_bytes()
+        assert data[:4] == b"wOF2", f"{name} is not a woff2 file"
+        total += len(data)
+    assert 0 < total <= 250_000, total
+
+
+def test_plex_licence_and_readme_record_sources():
+    lic = (FONTS / "LICENSE-IBM-Plex.txt").read_text(encoding="utf-8")
+    assert "SIL Open Font License" in lic
+    readme = (FONTS / "README").read_text(encoding="utf-8")
+    for pkg in (
+        "@fontsource/ibm-plex-sans@5.3.0",
+        "@fontsource/ibm-plex-mono@5.3.0",
+        "@ibm/plex-sans@1.1.0",
+    ):
+        assert pkg in readme, pkg
+    for name in FONT_FILES:
+        assert f"{name}.woff2" in readme, name
+
+
+def test_plex_css_has_one_face_per_file_with_swap_and_unicode_range():
+    css = _plex_css()
+    faces = re.findall(r"@font-face\s*\{(.*?)\}", css, re.DOTALL)
+    plex = [f for f in faces if "IBM Plex Sans Fallback" not in f]
+    assert len(plex) == len(FONT_FILES)
+    for name in FONT_FILES:
+        face = next(f for f in plex if f'"{name}.woff2"' in f)
+        assert "font-display: swap" in face, name
+        assert "unicode-range:" in face, name
+        assert 'format("woff2")' in face, name
+        if "greek" in name:
+            assert "U+0370-03FF" in face, name
+    fallback = [f for f in faces if "IBM Plex Sans Fallback" in f]
+    assert len(fallback) == 1
+    assert "local(" in fallback[0] and "url(" not in fallback[0]
+
+
+def test_plex_css_urls_are_relative():
+    urls = re.findall(r"url\(\s*['\"]?([^)'\"]+?)['\"]?\s*\)", _plex_css())
+    assert urls
+    for u in urls:
+        assert not re.match(r"(?i)[a-z][a-z0-9+.-]*:", u), u
+        assert not u.startswith(("/", "//")), u
+        assert (FONTS / u).is_file(), u
+
+
+def test_index_links_plex_css_relatively_before_app_css():
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    plex = html.index('href="vendor/fonts/plex.css"')
+    app = html.index('href="app.css"')
+    assert plex < app
+    assert 'rel="stylesheet"' in html[html.rindex("<link", 0, plex) : plex + 60]

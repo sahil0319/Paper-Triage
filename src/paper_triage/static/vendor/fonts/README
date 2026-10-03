@@ -1,0 +1,34 @@
+IBM Plex fonts (vendored)
+========================
+
+These woff2 files are served from this directory so the app never loads a font from the
+network. Licence: SIL Open Font License 1.1 (LICENSE-IBM-Plex.txt, copyright IBM Corp.).
+
+Sources (fetched once at build time with `npm pack`; no tarball and no node_modules committed):
+  @fontsource/ibm-plex-sans@5.3.0   Latin and Latin-ext Sans, weights 400 and 600
+  @fontsource/ibm-plex-mono@5.3.0   Latin and Latin-ext Mono, weight 400
+  @ibm/plex-sans@1.1.0              Greek Sans split files, Regular (400) and SemiBold (600)
+
+The files are byte-identical to the package files. They were only renamed. The unicode-range
+values in plex.css are copied verbatim from the Fontsource 5.3.0 CSS for the same subsets
+(Greek uses U+0370-03FF).
+
+File mapping and checksums (total 125228 bytes):
+plex-sans-latin-400.woff2   22588 bytes  sha256 3b646991d30055a93a4ecc499713d4347953a74a947ecab435ab72070cbdab0e
+    from @fontsource/ibm-plex-sans@5.3.0 files/ibm-plex-sans-latin-400-normal.woff2
+plex-sans-latin-600.woff2   24252 bytes  sha256 8960851d691c054ed38e259bdcf1a6190d157b4203ed5bb32c632a863fb8ec2f
+    from @fontsource/ibm-plex-sans@5.3.0 files/ibm-plex-sans-latin-600-normal.woff2
+plex-sans-latin-ext-400.woff2   15980 bytes  sha256 c93d2a12aaa280f68b9ab7b726ff8dfedda67c99ef9abed047c1847a1cc6d583
+    from @fontsource/ibm-plex-sans@5.3.0 files/ibm-plex-sans-latin-ext-400-normal.woff2
+plex-sans-latin-ext-600.woff2   16448 bytes  sha256 b25dfd4f979e442ae1e25cd0894463434cf01ba21ac1a35d39f4a82bd4cc060e
+    from @fontsource/ibm-plex-sans@5.3.0 files/ibm-plex-sans-latin-ext-600-normal.woff2
+plex-sans-greek-400.woff2    8832 bytes  sha256 3b8a8b6b655aeba128d65b7a5904766d743574e19450b83a7185facfe285ae15
+    from @ibm/plex-sans@1.1.0 fonts/split/woff2/IBMPlexSans-Regular-Greek.woff2
+plex-sans-greek-600.woff2    9072 bytes  sha256 b262d4716b1ae6f02171ecd562c7f816e8b6d31dd0fc2f4b6cef1455f7ff84b6
+    from @ibm/plex-sans@1.1.0 fonts/split/woff2/IBMPlexSans-SemiBold-Greek.woff2
+plex-mono-latin-400.woff2   14708 bytes  sha256 08949f728dc52d528e69b1667d15c89a5686a4ee9a296ff90983985f99c380f7
+    from @fontsource/ibm-plex-mono@5.3.0 files/ibm-plex-mono-latin-400-normal.woff2
+plex-mono-latin-ext-400.woff2   13348 bytes  sha256 6bc0f226a5b7884a8170e3f62c63d7675609d4631bdc5931b5cdab81821f00eb
+    from @fontsource/ibm-plex-mono@5.3.0 files/ibm-plex-mono-latin-ext-400-normal.woff2
+
+Weights 300, 500 and 700 are not shipped. Set font-synthesis: none on html.

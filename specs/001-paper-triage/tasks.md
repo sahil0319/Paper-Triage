@@ -566,7 +566,7 @@ runs use `E2E_PORT=8765`.
 
 ### Wave R1 — FE lane (starts after the F-016, F-017 and F-019 fix commits land)
 
-- [ ] T067 [FE] Vendor IBM Plex fonts + static guard (FR-030b, SC-017; brief items 1, 2; D3.1,
+- [x] T067 [FE] Vendor IBM Plex fonts + static guard (FR-030b, SC-017; brief items 1, 2; D3.1,
   D3.2; R19). Test first `tests/frontend/test_static_assets.py`: the 8 files
   `pt/static/vendor/fonts/{plex-sans-latin-400,plex-sans-latin-600,plex-sans-latin-ext-400,
   plex-sans-latin-ext-600,plex-sans-greek-400,plex-sans-greek-600,plex-mono-latin-400,
