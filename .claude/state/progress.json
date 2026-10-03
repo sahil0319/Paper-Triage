@@ -1,5 +1,5 @@
 {
-  "phase": "v4 build",
+  "phase": "done (v4)",
   "tasks": {
     "T001": "done",
     "T002": "done",
@@ -74,14 +74,14 @@
     "T071": "done",
     "T072": "done",
     "T073": "done",
-    "T074": "waiting",
+    "T074": "done",
     "T075": "done",
-    "T076": "waiting"
+    "T076": "done"
   },
-  "last_checkpoint_ts": 1791051645,
-  "context_pct": 35.2,
+  "last_checkpoint_ts": 1728057600,
+  "context_pct": 54.4,
   "last_warn_level": 0,
-  "last_warn_ts": 1791051645,
-  "DONE": false,
-  "last_precompact_ts": 1791051645
+  "last_warn_ts": 1728057600,
+  "DONE": true,
+  "last_precompact_ts": 1728057600
 }

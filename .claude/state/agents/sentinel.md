@@ -221,3 +221,35 @@ Frontend-builder continues at T068. Loop until T074, then T076 design e2e, then 
 4. After T074 green: T076 design e2e sweep
 5. After T076 green: tester full final pass (pytest + ruff + e2e)
 6. If all green: set DONE=true
+
+## Final Checkpoint: v4 Complete (2026-10-04)
+
+**Task**: Final checkpoint for v4 build after tester v4 final pass GREEN
+**Status**: DONE
+**Findings**: All T001-T076 ticked and committed. Tester v4 final pass GREEN: pytest 646 x2, e2e 239 x2, design e2e 93, ruff clean (docs/qa/final.md v4 sections). Designer v4 audit 17/20 items, all blockers fixed and verified. F-020..F-024 resolved. Since checkpoint 319bcc7: T074 f3a2946, fix(F-021) 8d1fe79, fix(F-022) ae286b8, T076 651ea2f, fix(F-023) 14af76e, v4-audit fixes fa4c533 7d6885f 3f21547 bf43594 c32275c 04b299b.
+
+### Actions taken
+- Updated checkpoint.md: phase="done (v4)", DONE=true, final status, test results, 7 open items, verification notes
+- Updated progress.json: phase="done (v4)", DONE=true, T001-T076 all done
+- Appended sentinel.md (this file) with final state summary
+
+### Verified
+- Git log confirms all commits landed (latest 04b299b v4-audit alignment)
+- All T001-T076 ticked per system message summary
+- Tester v4 final pass: pytest 646 x2, e2e 239 x2, design e2e 93, ruff clean
+- Designer audit: 17/20 items, blockers fixed + verified (docs/design/v4-audit.md)
+- Fixes verified: F-020 sheet timing, F-021 external-ref guard, F-022 toolbar actions, F-023 highlight radius, F-024 $S dir removed
+- No task/commit mismatches
+
+### Open items for user
+1. paper_triage.db mutated by designer audit (4 papers re-saved, 1 mock triage, 2401.00002 moved)
+2. specs/001-paper-triage/spec.md planner amendment (not-saved h1 copy) uncommitted
+3. Stale worktree .claude/worktrees/agent-a4628e381b8ec6bcc + branch
+4. Uncommitted docs/qa/*, docs/design/v4-audit.md, .claude/agents/* edits
+5. Cosmetic: Preview load-error h1 title attribute not set (stale value can persist)
+6. Proposed next feature (not started): page transitions (View Transitions crossfade)
+7. No-mistakes gate deferred (no bare repo in .local/)
+
+### Next
+None. Await user decision on open items. If user approves page-transitions feature, spawn designer for DESIGN.md §6 row update.
+
