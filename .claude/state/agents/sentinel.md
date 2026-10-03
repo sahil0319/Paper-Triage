@@ -120,3 +120,36 @@ When planner phase 2 reports → spawn backend-builder + frontend-builder in par
 
 ### Next
 When FE Wave F done → tester FE Wave F (verify T052-T055, smoke T056) → FE Wave G builders (T060-T063) → tester → restart Claude Code → FE T064 → final tester pass.
+
+## Checkpoint: v3 Final Verification (Paused) (2026-10-03)
+
+**Task**: v3 final verification checkpoint (tester paused by user due to context ~70%)
+**Status**: DONE
+**Findings**: All T001-T065 complete (T064 merged 098950a). Tester final pass 50% done (pytest x2 497 pass, ruff clean, e2e run 1 132 pass; e2e runs 2-3/static guard/README/smoke remaining). Designer re-check 90% done (13 must-fix verified PASS; 1 regression found + fix identified). FE focus-order fix pending.
+
+### Actions taken
+- Updated checkpoint.md: full summary, paused state, exact next commands for designer/FE/tester
+- Updated progress.json: T064→done, all 65 tasks done, phase="v3 final verification (paused)", context_pct=70, DONE=false
+- Appended sentinel.md (this file)
+
+### Verified
+- All v3 tasks T001-T065 ticked in tasks.md, all have matching commits (latest: 098950a T064, f6bb184 F-012, 22781d9 F-013, 6e1b9a1 audit, d6a6dfc F-014)
+- Backend: 344 pytest, 88/88 live API, ruff clean (docs/qa/v3-wave-FG-be.md)
+- Frontend: 497 pytest, ruff clean, e2e 112 pass (waves F+G verified, T064 done)
+- Tester completed: pytest x2, ruff, e2e run 1, hygiene (no secrets, pdfjs LICENSE, .gitignore correct), impeccable 4 findings
+- Designer re-check: all 13 must-fix visual PASS, 1 regression identified (#pv-sheet-open focus order, fix: move DOM after #pv-controls)
+- No task/commit mismatches
+
+### Paused state
+- Router context ~70% (checkpoint triggered)
+- Tester final pass: e2e runs 2-3 incomplete, static guard + F-012 rerun pending, README/smoke/failures.md/final.md pending
+- Designer: Re-check section not written (has findings), toolbar decision pending (noted: accept per prior approval)
+- FE: #pv-sheet-open focus-order fix not applied
+
+### Next (on resume)
+1. designer: write Re-check section in docs/design/v3-audit.md, commit (17/20 score)
+2. frontend-builder: fix #pv-sheet-open DOM, verify F-012 solo rerun, commit [FE]
+3. tester: e2e runs 2-3, static guard, README, real-API smoke, failures.md + final.md v3 section, commit docs/qa/ (all expected GREEN)
+4. sentinel: mark DONE=true (all tasks + tester pass green)
+
+**Blocker**: None. Parallel work ready to resume.

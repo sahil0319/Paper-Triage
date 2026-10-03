@@ -33,3 +33,22 @@ T025 verify: PASS, 167 tests, ruff clean, no failures. DONE
 - checklist: 11 ticked. report docs/qa/final.md (v2 section). servers killed. Next: DONE.
 ## v2 re-verify F-002..F-005 2026-10-01 HEAD 568d480
 - pytest 230, e2e 9 x3, ruff clean, detect 2 (known FP). F-002 tests fail on pre-fix copy (scratch), repro ok. F-005 clear busy-port error. F-003 tint + static verb ok. F-004 assertions real (residual note). All closed in failures.md, final.md updated. servers killed. DONE.
+## F-006 verify 2026-10-03 HEAD c205d59
+- pytest 233, e2e 12 x3 stable, static 9, ruff clean, detect 2 (known FP). Own Playwright (8766, normal+reduced motion): load-more reset, error keeps chat, new-search reset, 50 cap ids, in-flight drop, focus not stolen all PASS.
+- logged low: F-007 [FE] new-search reset not in #status; F-008 [FE] Ask disabled while stale reply in flight. Not run: pre-fix mutation of new specs (sandbox blocked).
+- report docs/qa/F-006.md. servers killed. Next: DONE (F-006 closed; F-007/F-008 optional FE).
+## F-007/F-008 re-verify 2026-10-03 HEAD c911fa1
+- pytest 236, e2e 15 x3, static 9, ruff clean, detect 2 (known FP). Playwright 8766 normal+reduced: reset announced once (observer), Ask free during stale reply, stale-vs-new-ask no cross-talk, failed-row note ok. F-007/F-008 RESOLVED. servers killed. DONE.
+
+## v3 BE Waves F+G (HEAD 6d9f720)
+goal: verify T043-T051, T057-T059 BE only. status: PASS. pytest --ignore=tests/frontend 344 pass, ruff clean, live probe on 8766 88/88 (library, pdf, retry, range, dirs, annotations, paper-chat, sweep, unsave). No failures, failures.md untouched. Notes: POST /api/library topic must be response `topic` (normalized), not raw query; Range unit other than bytes gives 400. Results: docs/qa/v3-wave-FG-be.md. Not run: frontend tests, e2e, gate. next: tester full pass after FE wave.
+
+## v3 FE Wave F (a2bf9e3, T052-T056)
+goal: verify FE lane in worktree. status: PASS + F-009 medium [FE] (Retry on failed PDF stuck on Downloading: viewer.js mutates cached item, app.js loadLibrary sig unchanged), F-010 low (selection blue literal vs cream), F-011 low (find result focus). pytest 406, ruff clean, e2e 47 x3, static 16, detect 2 FP, Playwright ~110 checks. Details docs/qa/v3-wave-F-fe.md. next: frontend-builder fix F-009 before final pass.
+
+## 2026-10-03 v3 Wave G FE verify (HEAD 0cd0726)
+Goal: verify T060-T063 + fixes. Status: PASS. Full pytest 470/471 (F-012 flaky test), ruff clean, e2e x3 112 each, static guard 16, impeccable 3 (2 known + row-collapse height, accepted: reduced motion instant). F-009, F-011 RESOLVED. New low [FE]: F-012 (test race on optimistic .hl swap), F-013 (rgba literals). Report: docs/qa/v3-wave-G-fe.md. Next: Wave H T064 FE.
+
+## v3 final pass (paused by user)
+Done: pytest run1 497 pass, run2 497 pass (87s each); ruff clean; e2e run1 132 pass (runs 2-3 not confirmed, command exited 144 on pause/timeout); tasks.md T001-T065 all ticked + matching commits; .gitignore covers paper_triage_data/, *.db, .env; no db/data tracked (only .env.example); pdfjs LICENSE tracked; impeccable detect 4 findings (layout-transition app.css:661, 2 cramped-padding, flat-type-hierarchy) - not yet compared against baseline.
+Remaining: e2e x2 more, static guard + F-012 solo rerun, README spot-check, real-API smoke on 8766, load-more chat reset, F-012/F-013/F-014 closure in failures.md, v3 section in final.md. No files edited. Gate skipped (no bare repo).

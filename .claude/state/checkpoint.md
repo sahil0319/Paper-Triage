@@ -1,52 +1,59 @@
-# Checkpoint: v3 Build Complete + Final Test Phase
+# Checkpoint: v3 Final Verification (Paused)
 
-**Phase**: v3 build (fix + T064)
+**Phase**: v3 final verification (paused by user due to router context ~70%)
 
-**Status**: v3 FEATURE COMPLETE. T001-T063 verified. T064 final e2e pending. FE+BE running parallel (F-012/F-013 audit fixes, F-014 BE refusal) before final test wave.
+**Status**: v3 FEATURE COMPLETE. All T001-T065 ticked with matching commits. Final verification pass interrupted mid-run. Awaiting: designer Re-check section + decision, FE focus-order fix, tester completion (e2e runs 2-3, static guard, smoke tests, final.md v3 section).
 
 ## Summary
 
-### v2 (T001-T042)
-Complete. 236 pytest, 15 e2e stable, ruff clean.
+### Build Status (COMPLETE)
+- **Backend** (T043-T051, T057-T059, T065): 344 pytest, 88/88 live API probe, ruff clean. VERIFIED docs/qa/v3-wave-FG-be.md.
+- **Frontend** (T052-T063, T056, T064): All waves deployed. F-009/F-011 fixed. 497 pytest, ruff clean, e2e stable. VERIFIED docs/qa/v3-wave-G-fe.md + T064.
+- **Latest commits**: 098950a T064 e2e harness, f6bb184 F-012 highlight, 22781d9 F-013 rgba tokens, 6e1b9a1 audit fixes, d6a6dfc F-014 refusal.
 
-### v3 Build
+### Tester Final Pass (PAUSED)
+**Completed**:
+- pytest run 1-2: 497 pass each (87s each run)
+- ruff: clean
+- e2e run 1: 132 pass (runs 2-3 incomplete on pause; command exited 144)
+- tasks.md: T001-T065 all ticked + commits match
+- hygiene: .gitignore correct, no secrets/db tracked, pdfjs LICENSE present
+- impeccable: 4 findings (layout-transition, 2x cramped-padding, flat-type-hierarchy)
 
-**Backend lane** (T043-T065): COMPLETE and GREEN
-- T043-T051: Tag normalizer, library, directories, files, annotations, PDF store, API wiring
-- T057-T059: Page extraction, paper chat agent, harness + v3 smoke
-- T065: README + SETUP_LOG v3
-- pytest 344 pass, live API probe 88/88 endpoints, ruff clean
-- Verified: docs/qa/v3-wave-FG-be.md
+**Remaining**:
+- e2e runs 2-3 (112 pass expected each)
+- static guard + F-012 solo rerun
+- README spot-check
+- real-API smoke (8766: load-more, chat reset)
+- failures.md update (F-012/F-013/F-014 closure)
+- final.md v3 section + summary
 
-**Frontend lane** (T052-T063): ALL WAVES DONE
-- **Wave F** (T052-T055): Vendor pdfjs, shell nav, save toggle, viewer [VERIFIED]
-  - F-009, F-011 fixed b829885
-  - F-010: accepted deviation (selection colour)
-- **Wave G** (T060-T063): Library, directories, highlights/notes, paper chat sheet [VERIFIED]
-  - T060 8be3853: Library view tags/title filters, polling, retry
-  - T061 700199b: Directories rail, CRUD, move/remove
-  - T062 0b611ff: Highlights, notes, panel list, undo, page notes, Markdown export
-  - T063 0cd0726: Ask paper panel, cite chips jump, sheet below 1024px
-  - pytest 470/1 flaky, e2e 112 x3, ruff clean
-  - Verified: docs/qa/v3-wave-G-fe.md
-- T056: Find in paper [DONE a2bf9e3]
+### Designer Re-check (PAUSED)
+**Done**: 13 must-fix verified PASS (desktop, tablet, mobile screenshots).
 
-### Open (Low Priority, Pre-Final-Test)
-- **F-012** [FE]: Flaky highlight test (test-side fix)
-- **F-013** [FE]: rgba literals  
-- **F-014** [BE]: Mock paper-chat starters refused + refusal wording
-- **Designer audit** docs/design/v3-audit.md: 14/20, 13 must-fix [FE]
+**Finding**: 1 regression—#pv-sheet-open moved by CSS `display: contents`, breaks focus order at <1024px. Fix: move #pv-sheet-open DOM to .pv-toolbar after #pv-controls (not inside).
 
-FE + BE running parallel on these before final test.
+**Pending**:
+- Write "Re-check" section in docs/design/v3-audit.md (findings above, propose 17/20)
+- Decide: accept mobile toolbar deviation (231px, 4 rows vs 3)? User approval noted in designer.md; mark as accepted.
+
+### Frontend Fix (PENDING)
+- **F-015** [FE]: Move #pv-sheet-open DOM after #pv-controls to restore focus order (1-line change in template, test with F-012 solo rerun during tester final pass).
 
 ## Files Touched
 - `.claude/state/checkpoint.md` (this)
-- `.claude/state/progress.json` (T060-T063 marked done)
+- `.claude/state/progress.json` (T064→done, phase, last_checkpoint_ts, context_pct update)
 - `.claude/state/agents/sentinel.md` (appended)
 
-## Exact Next Command
-When FE + BE report → tester: full suite (pytest, e2e x3, static guard, impeccable, no-mistakes gate if feasible, audit re-check) → sentinel → mark DONE.
+## Exact Next Command (On Resume)
 
-**Task Summary**: 22/23 v3 done (T001-T063). Only T064 (e2e harness) remains.
+1. **designer**: Write Re-check section in docs/design/v3-audit.md from findings above. Commit only that file. Report: 17/20 score achieved, toolbar deviation accepted per prior notes.
+2. **frontend-builder**: Fix #pv-sheet-open focus order: move DOM line after `#pv-controls` in template. Verify with F-012 solo rerun. Commit. [FE]
+3. **tester**: Complete final pass: e2e runs 2-3, static guard, F-012 solo rerun, README check, real-API smoke (8766), failures.md + final.md v3 section. Commit docs/qa/. Report: all green or failures tagged [BE]/[FE].
+4. **sentinel**: Mark DONE=true (all tasks ticked + tester pass green + no blockers).
 
-**DONE flag**: false (awaiting final test pass + T064).
+---
+
+**Task Count**: 23/23 v3 ticked (T001-T065). T064 DONE (098950a).
+**DONE flag**: false (awaiting tester final pass completion).
+**Blocker**: None. Designer + FE + tester work ready to run in parallel on resume.
