@@ -6,7 +6,6 @@
   var form = document.getElementById("triage-form");
   var input = document.getElementById("query");
   var button = document.getElementById("submit");
-  var results = document.querySelector(".results");
   var statusEl = document.getElementById("status");
   var alertEl = document.getElementById("alert");
   var notesEl = document.getElementById("notes");
@@ -491,6 +490,10 @@
     // After a reload the server sends no paging fields: next offset = rows shown (data-model).
     state.nextOffset = stored ? rs.length : (data.next_offset === undefined ? null : data.next_offset);
     state.hasMore = stored ? !!state.topic : !!data.has_more;
+    // The old rows stay usable during a run, so focus can sit inside them when the new set lands. Keep it
+    // in the results region (the heading) instead of dropping it to the page body.
+    var focusInRows = !!document.activeElement && document.activeElement !== document.body &&
+      (listEl.contains(document.activeElement) || notesEl.contains(document.activeElement));
     clear(listEl);
     rs.forEach(function (r) { listEl.appendChild(row(r)); });
     showNotes(data.errors);
@@ -510,6 +513,10 @@
       countEl.hidden = true;
       showEmpty("none", data.topic);
       statusEl.textContent = "No papers found.";
+    }
+    if (focusInRows) {
+      heading.setAttribute("tabindex", "-1");
+      heading.focus();
     }
     // A new result set replaces the chat scope; a transcript about the old set no longer applies.
     resetChat(hadRows && rs.length > 0 && !stored);
@@ -604,11 +611,11 @@
     if (compact) return;
     // The first-run empty state would contradict the running indicator.
     emptyEl.hidden = true;
-    // Previous list stays visible but inert while a new run is in flight (D18).
-    [listEl, notesEl].forEach(function (el) {
-      el.setAttribute("inert", "");
-      el.classList.add("is-stale");
-    });
+    // The previous list stays fully usable (links, Save, critique, chat on the old scope) until the new
+    // results replace it (F-017). No inert, no pointer-events. .is-stale is only a styling hook; the
+    // list carries aria-busy because it is the region about to be replaced.
+    [listEl, notesEl].forEach(function (el) { el.classList.add("is-stale"); });
+    listEl.setAttribute("aria-busy", "true");
   }
 
   function stopWorking() {
@@ -619,10 +626,8 @@
     work.verbEl = work.timeEl = work.noteEl = null;
     [workingEl, workingMoreEl].forEach(function (el) { clear(el); el.hidden = true; });
     work.el = null;
-    [listEl, notesEl].forEach(function (el) {
-      el.removeAttribute("inert");
-      el.classList.remove("is-stale");
-    });
+    [listEl, notesEl].forEach(function (el) { el.classList.remove("is-stale"); });
+    listEl.removeAttribute("aria-busy");
   }
 
   // ---- submit ----
@@ -632,7 +637,6 @@
     button.disabled = busy;
     button.textContent = busy ? "Triaging…" : "Triage papers";
     if (busy) input.setAttribute("readonly", ""); else input.removeAttribute("readonly");
-    results.setAttribute("aria-busy", busy ? "true" : "false");
     if (busy) startWorking(); else stopWorking();
     refreshLoadMore();
   }

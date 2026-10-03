@@ -493,8 +493,8 @@ a.cite:active { background: var(--color-hairline); color: var(--color-ink); }
 @keyframes breathe { 0%, 100% { transform: scale(0.9); } 50% { transform: scale(1); } }
 @keyframes verb-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
-/* previous results while a new run is in flight (D18) */
-.is-stale { opacity: 0.4; }
+/* Previous results while a new run is in flight (D18, F-017): they stay at full opacity and fully
+   interactive. .is-stale is kept on the list and notes as a styling hook only. */
 
 /* ---- load 5 more (D19, D20) ---- */
 

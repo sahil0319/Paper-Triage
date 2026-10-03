@@ -8,6 +8,7 @@ import re
 
 import pytest
 from playwright.sync_api import expect
+from ptstubs import LibraryStub
 
 pytestmark = pytest.mark.e2e
 
@@ -259,3 +260,94 @@ def test_reset_frees_chat_while_stale_reply_in_flight(home):
     held[0].continue_()
     expect(page.locator("#chat-log li.turn")).to_have_count(1)
     expect(page.locator("#ask")).to_be_enabled()
+
+
+# ---- F-017: previous results stay interactive while a new search runs ----
+
+
+def _hold_triage(page):
+    """Hold every POST /api/triage until the test releases it (then it goes on to the real server)."""
+    held = []
+    page.route("**/api/triage", lambda route: held.append(route))
+    return held
+
+
+def test_old_results_stay_interactive_during_a_new_search(home):
+    page = home
+    stub = LibraryStub(page, [])
+    search(page, TOPIC, 10)
+    old_ids = _ids(page)
+    ask(page, "What is the capital of France?")
+    held = _hold_triage(page)
+    page.fill("#query", "2401.00001")
+    page.click("#submit")
+    expect(page.locator("#working")).to_be_visible(timeout=3_000)
+    expect(page.locator("#submit")).to_be_disabled()
+    assert _ids(page) == old_ids  # nothing is replaced until the reply lands
+
+    listing = page.locator("#paper-list")
+    # No inert, no pointer-events block, full opacity; aria-busy is on the list, not the whole section.
+    for sel in ("#paper-list", "#notes"):
+        assert page.locator(sel).get_attribute("inert") is None
+        assert page.locator(sel).evaluate("e => getComputedStyle(e).opacity") == "1"
+    assert listing.evaluate("e => getComputedStyle(e).pointerEvents") != "none"
+    expect(listing).to_have_attribute("aria-busy", "true")
+    expect(page.locator("section.results")).not_to_have_attribute("aria-busy", "true")
+
+    first = page.locator("#paper-list li.paper").first
+    # Expand the critique.
+    disclosure = first.locator("details.disclosure")
+    expect(disclosure).not_to_have_attribute("open", "")
+    disclosure.locator("summary").click()
+    expect(disclosure).to_have_attribute("open", "")
+    # Links are real and reachable (a trial click checks that nothing covers them).
+    link = first.locator("a.ext-link").first
+    expect(link).to_have_attribute("href", re.compile(r"^https://arxiv\.org/"))
+    link.click(trial=True)
+    # Save toggle works on the old row.
+    first.locator("button.save").click()
+    expect(first.locator("button.save")).to_have_attribute("aria-pressed", "true")
+    assert [c for c in stub.calls if c[0] == "POST" and c[1] == "/api/library"]
+    # Chat keeps answering on the old scope while the search runs.
+    with page.expect_request(lambda r: r.url.endswith("/api/chat")) as info:
+        turn = ask(page, "What is the capital of France?")
+    assert info.value.post_data_json["paper_ids"] == old_ids
+    assert turn.inner_text().strip()
+    expect(page.locator("#working")).to_be_visible()
+
+    # Keyboard focus inside the old rows survives the run.
+    link.focus()
+    expect(link).to_be_focused()
+    assert held, "the held triage request was sent exactly once"
+    assert len(held) == 1
+
+    # The new results replace the old only when they land; the chat resets to the new scope.
+    held[0].continue_()
+    expect(page.locator("#paper-list li.paper")).to_have_count(1, timeout=15_000)
+    expect(page.locator("#submit")).to_be_enabled()
+    expect(page.locator("#working")).to_be_hidden()
+    expect(listing).not_to_have_attribute("aria-busy", "true")
+    assert _ids(page) == ["2401.00001"]
+    expect(page.locator("#chat-log li.turn")).to_have_count(0)
+    expect(page.locator("#chat-note")).to_contain_text("Chat now covers 1 paper.")
+    # Focus was inside the replaced rows: it moved to the results heading, not to the page body.
+    expect(page.locator("#results-heading")).to_be_focused()
+
+
+def test_failed_new_search_keeps_the_old_results_usable(home):
+    page = home
+    search(page, TOPIC, 10)
+    old_ids = _ids(page)
+    held = _hold_triage(page)
+    page.fill("#query", "2401.00001")
+    page.click("#submit")
+    expect(page.locator("#working")).to_be_visible(timeout=3_000)
+    held[0].fulfill(status=502, content_type="application/json", body='{"detail": "upstream down"}')
+    expect(page.locator("#alert")).to_be_visible(timeout=5_000)
+    expect(page.locator("#submit")).to_be_enabled()
+    assert _ids(page) == old_ids
+    assert page.locator("#paper-list").get_attribute("aria-busy") is None
+    assert page.locator("#paper-list").get_attribute("inert") is None
+    first = page.locator("#paper-list li.paper").first
+    first.locator("details.disclosure summary").click()
+    expect(first.locator("details.disclosure")).to_have_attribute("open", "")
