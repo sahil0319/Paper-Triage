@@ -1139,3 +1139,22 @@ def test_preview_back_button_is_a_ghost_with_a_chevron(pv):
     back.hover()
     expect(back).to_have_css("background-color", "rgb(232, 232, 232)")
     expect(back).to_have_css("color", "rgb(0, 67, 206)")
+
+
+def test_directory_form_submit_and_save_note_are_primary_32px_buttons(offline_page, live_server):
+    from test_e2e_library import hl_tab
+
+    page = offline_page
+    _library(page, live_server, 1440)
+    page.click("#dir-new")
+    create = page.locator("#dir-new-slot form button[type=submit]")
+    expect(create).to_be_visible()
+    assert create.evaluate("e => getComputedStyle(e).backgroundColor") == PRIMARY
+    assert abs(create.bounding_box()["height"] - 32) < 1
+    _open_preview(page, 1440)
+    hl_tab(page)
+    page.click("#pv-note-add")
+    save = page.get_by_role("button", name="Save note")
+    expect(save).to_be_visible()
+    assert save.evaluate("e => getComputedStyle(e).backgroundColor") == PRIMARY
+    assert abs(save.bounding_box()["height"] - 32) < 1

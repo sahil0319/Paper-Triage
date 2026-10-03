@@ -649,7 +649,7 @@ export function initAnnotations(V) {
       if (opts.onInput) opts.onInput(ta.value);
       paint();
     });
-    const save = h("button", { type: "button", class: "btn btn--secondary btn--small" }, opts.saveText || "Save note");
+    const save = h("button", { type: "button", class: "btn btn--primary btn--small" }, opts.saveText || "Save note");
     const cancel = h("button", { type: "button", class: "text-btn" }, "Cancel");
     save.addEventListener("click", () => opts.save(ta.value));
     cancel.addEventListener("click", () => opts.cancel());

@@ -456,7 +456,7 @@
     var input = h("input", { type: "text", id: "dir-name-" + n, maxlength: "40", autocomplete: "off",
       spellcheck: "false", placeholder: "e.g. final year thesis", value: o.value || "" });
     var err = h("p", { class: "field-error", id: "dir-err-" + n, hidden: "" });
-    var go = h("button", { type: "submit", class: "btn btn--secondary btn--small" }, o.submitText);
+    var go = h("button", { type: "submit", class: "btn btn--primary btn--small" }, o.submitText);
     var cancel = h("button", { type: "button", class: "text-btn" }, "Cancel");
     var form = h("form", { class: "dir-form", novalidate: "" },
       h("label", { class: "sr-only", for: "dir-name-" + n }, "Directory name"),
