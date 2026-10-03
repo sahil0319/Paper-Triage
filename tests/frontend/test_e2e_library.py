@@ -2358,3 +2358,125 @@ def test_audit_tag_note_only_when_library_has_no_tags(app):
     page.reload()
     expect(rows(page)).to_have_count(1)
     expect(page.locator("#lib-tags-none")).to_be_hidden()
+
+
+# ---- v3 audit fixes: Preview ----
+
+
+def vp(page, w, h=900):
+    page.set_viewport_size({"width": w, "height": h})
+
+
+def test_audit_mobile_toolbar_is_compact_with_two_line_title(app):
+    page = app
+    preview(
+        page,
+        [lib_item(1, title="Progressive Distillation for Fast Sampling of Diffusion Models")],
+    )
+    vp(page, 390, 844)
+    expect(page.locator(".pdf-page")).to_have_count(3)
+    h = page.locator(".pv-toolbar").evaluate("e => e.getBoundingClientRect().height")
+    assert h < 260, h
+    title = page.locator("#preview-heading").bounding_box()
+    assert title["width"] > 180 and title["height"] > 30  # two lines, not 9 characters
+    expect(page.locator("#pv-zoom-in")).to_be_hidden()
+    expect(page.locator("#pv-zoom-out")).to_be_hidden()
+    expect(page.locator("#pv-zoom")).to_be_visible()
+    assert page.evaluate("document.documentElement.scrollWidth") <= 390
+    # Rows: back + title, page nav, highlight + sheet button, links.
+    ys = {
+        n: page.locator(sel).bounding_box()["y"]
+        for n, sel in {
+            "back": "#pv-back",
+            "pager": "#pv-prev",
+            "hl": "#pv-hl-btn",
+            "export": "#pv-export",
+        }.items()
+    }
+    assert ys["back"] < ys["pager"] < ys["hl"] < ys["export"]
+
+
+def test_audit_tablet_title_keeps_room_and_sheet_button_joins_controls(app):
+    page = app
+    preview(
+        page, [lib_item(1, title="Progressive Distillation for Fast Sampling of Diffusion Models")]
+    )
+    vp(page, 820, 1100)
+    expect(page.locator(".pdf-page")).to_have_count(3)
+    title = page.locator("#preview-heading").bounding_box()
+    assert title["width"] > 380, title
+    sheet = page.locator("#pv-sheet-open").bounding_box()
+    find = page.locator("#pv-find-btn").bounding_box()
+    assert abs(sheet["y"] - find["y"]) < 20  # same row as the controls
+    assert sheet["x"] > find["x"]
+
+
+def test_audit_toolbar_controls_share_one_height_and_highlight_is_split(app):
+    page = app
+    hl_preview(page)
+    for sel in (
+        "#pv-prev",
+        "#pv-page-input",
+        "#pv-zoom",
+        "#pv-zoom-in",
+        "#pv-find-btn",
+        "#pv-hl-btn",
+        "#pv-hl-color",
+    ):
+        b = page.locator(sel).bounding_box()
+        assert abs(b["height"] - 40) < 1, (sel, b)
+    btn = page.locator("#pv-hl-btn").bounding_box()
+    sel = page.locator("#pv-hl-color").bounding_box()
+    assert abs((btn["x"] + btn["width"]) - sel["x"]) <= 1.5  # shared edge, no gap
+
+
+def test_audit_disabled_text_button_looks_disabled(app):
+    page = app
+    hl_preview(page)
+    muted = page.locator("#pv-export").evaluate("e => getComputedStyle(e).color")
+    live = page.locator("#pv-note-add").evaluate("e => getComputedStyle(e).color")
+    assert muted != live
+    assert muted == "rgb(65, 69, 77)"
+
+
+def test_audit_popover_never_covers_the_toolbar(app):
+    page = app
+    hl_preview(page)
+    drag_select(page, "Sample Paper")  # first line: nearest the well's top edge
+    pop = page.locator("#pv-popover")
+    expect(pop).to_be_visible()
+    well = page.locator("#pv-pages").bounding_box()
+    assert pop.bounding_box()["y"] >= well["y"] - 0.5
+
+
+def test_audit_new_paper_opens_on_highlights_tab(app):
+    page = app
+    LibraryStub(page, [lib_item(1), lib_item(2)])
+    page.set_viewport_size({"width": 1280, "height": 900})
+    page.goto("/#/library/paper/2401.00001")
+    expect(page.locator(".pdf-page")).to_have_count(3)
+    ask_tab(page)
+    expect(page.locator("#pv-tab-chat")).to_have_attribute("aria-selected", "true")
+    page.goto("/#/library/paper/2401.00002")
+    expect(page.locator("#pv-tab-hl")).to_have_attribute("aria-selected", "true")
+    expect(page.locator("#pv-tabpanel-hl")).to_be_visible()
+    expect(page.locator("#pv-tabpanel-chat")).to_be_hidden()
+
+
+def test_audit_sheet_header_is_one_row_on_canvas(app):
+    page = app
+    vp(page, 800, 900)
+    preview(page, [lib_item(1)])
+    vp(page, 800, 900)
+    expect(page.locator(".pdf-page")).to_have_count(3)
+    page.click("#pv-sheet-open")
+    sheet = page.locator("#pv-sheet")
+    expect(sheet).to_be_visible()
+    tabs = sheet.locator("#pv-tab-hl").bounding_box()
+    close = sheet.locator("#pv-sheet-close").bounding_box()
+    assert abs((tabs["y"] + tabs["height"] / 2) - (close["y"] + close["height"] / 2)) < 12
+    assert abs(close["height"] - 40) < 1
+    assert sheet.evaluate("e => getComputedStyle(e).backgroundColor") == "rgb(255, 255, 255)"
+    page.keyboard.press("Escape")
+    expect(sheet.locator("#pv-sheet-close")).to_have_count(0)
+    expect(page.locator("#pv-sheet-close")).to_be_hidden()

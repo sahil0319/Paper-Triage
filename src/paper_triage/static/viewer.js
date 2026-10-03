@@ -128,6 +128,7 @@ function open(item, force) {
   const keepZoom = sameKey ? cur.mode : null;
   close();
   const status = (item.pdf && item.pdf.status) || "none";
+  if (!sameKey) selectTab("highlights"); // a new paper opens on Highlights, never on the last Ask tab
   cur = { id: item.paper_id, item, key: statusKey(item), token, mode: keepZoom || "fit-width", pages: [], status };
   el.panel.hidden = false;
   el.sheetOpen.hidden = false;

@@ -445,8 +445,10 @@ export function initAnnotations(V) {
     const a = info.anchor;
     const ph = ui.popover.offsetHeight;
     const pw = ui.popover.offsetWidth;
+    const wellTop = el.well.getBoundingClientRect().top;
     let top = a.top - ph - 8;
-    if (top < 8) top = a.bottom + 8;
+    if (top < wellTop + 8) top = a.bottom + 8; // never over the toolbar
+    top = Math.max(wellTop + 8, Math.min(window.innerHeight - ph - 8, top));
     let left = a.left + a.width / 2 - pw / 2;
     left = Math.max(8, Math.min(window.innerWidth - pw - 8, left));
     ui.popover.style.top = `${Math.round(top)}px`;
