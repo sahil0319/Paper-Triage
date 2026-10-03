@@ -1098,3 +1098,31 @@ def test_rail_count_meets_aa_on_current_and_hovered_items(offline_page, live_ser
     if hover:
         page.locator("#dir-rail .rail__item:not([aria-current='true'])").first.hover()
         _assert_contrast(page, [("#dir-rail .rail__item:hover .rail__count", 4.5)])
+
+
+def test_forced_colours_underline_only_the_current_nav_link_and_tab(offline_page, live_server):
+    page = offline_page
+    live_server.set_triage_delay(0)
+    page.emulate_media(forced_colors="active")
+    _triage(page, live_server, 1440)
+
+    def edge(selector):
+        return page.locator(selector).first.evaluate(
+            "e => [getComputedStyle(e).borderBottomColor, getComputedStyle(e.parentElement).backgroundColor]"
+        )
+
+    other, _ = edge(".views a:not([aria-current])")
+    current, _ = edge(".views a[aria-current='page']")
+    canvas = page.evaluate("getComputedStyle(document.body).backgroundColor")
+    assert other == canvas, (other, canvas)
+    assert current != canvas, (current, canvas)
+    _open_preview(page, 1440)
+    other = page.locator('.pv-tab[aria-selected="false"]').first.evaluate(
+        "e => getComputedStyle(e).borderBottomColor"
+    )
+    current = page.locator('.pv-tab[aria-selected="true"]').first.evaluate(
+        "e => getComputedStyle(e).borderBottomColor"
+    )
+    canvas = page.evaluate("getComputedStyle(document.body).backgroundColor")
+    assert other == canvas, (other, canvas)
+    assert current != canvas, (current, canvas)

@@ -1041,6 +1041,9 @@ button.cite:active { background: var(--color-cite-surface-active); }
   .pdf-page__notext, .dir-manage, .pv-panel { border: 1px solid CanvasText; }
   input[type="search"], input[type="text"], textarea { border: 1px solid ButtonText; }
   .rail__item[aria-current="true"] { border-left: 3px solid Highlight; }
+  /* The transparent 2px underline is painted as a system colour: hide it except on the current item. */
+  .views a, .pv-tab { border-bottom-color: Canvas; }
+  .views a[aria-current="page"], .pv-tab[aria-selected="true"] { border-bottom-color: Highlight; }
   .swatch.is-last { outline: 2px solid Highlight; outline-offset: 2px; }
   .hl-layer { forced-color-adjust: none; }
   .btn--on-dark, .icon-btn, .tag, .flag, .cite { border: 1px solid ButtonText; }
