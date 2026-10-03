@@ -5,7 +5,9 @@ Every case runs through `offline_page`: any non-local request fails the test.
 """
 
 import json
+import os
 import re
+import time
 from pathlib import Path
 from urllib.parse import quote
 
@@ -2481,3 +2483,188 @@ def test_audit_sheet_header_is_one_row_on_canvas(app):
     page.keyboard.press("Escape")
     expect(sheet.locator("#pv-sheet-close")).to_have_count(0)
     expect(page.locator("#pv-sheet-close")).to_be_hidden()
+
+
+# ---- T064: v3 end-to-end on the real harness (SC-011 .. SC-016) ----
+
+
+def _triage_ui(page, query, rows_expected):
+    page.fill("#query", query)
+    page.click("#submit")
+    expect(page.locator("#paper-list li.paper")).to_have_count(rows_expected, timeout=15_000)
+    expect(page.locator("#submit")).to_be_enabled()
+
+
+def test_e2e_card_to_pdf_in_three_actions_with_time_budgets(app, real_library):
+    """SC-011 (first page within 2 s), SC-016 (card to PDF in 3 actions), PDF ready within 5 s."""
+    page = app
+    reqs = chat_requests(page)
+    page.goto("/")
+    _triage_ui(page, "2401.00001", 1)
+    # Action 1: Save on the card.
+    save_btn(page, 1).click()
+    expect(save_btn(page, 1)).to_have_text("Saved", timeout=10_000)
+    # Action 2: open the Library; the row reaches "PDF ready" within 5 s.
+    t0 = time.monotonic()
+    page.click('nav.views a[data-view="library"]')
+    status = rows(page).first.locator("[data-pdf-status]")
+    expect(status).to_have_text("PDF ready", timeout=5_000)
+    assert time.monotonic() - t0 < 5.0
+    # Action 3: Open preview; page 1 renders within 2 s.
+    t1 = time.monotonic()
+    rows(page).first.locator("button.open-preview").click()
+    expect(page.locator('.pdf-page[data-page="1"].is-drawn')).to_have_count(1, timeout=2_000)
+    assert time.monotonic() - t1 < 2.0
+    expect(page.locator('.pdf-page[data-page="1"] .textLayer')).to_contain_text(
+        "Distillation", timeout=5_000
+    )
+    # SC-014: opening the preview made no paper-chat request.
+    assert reqs == []
+
+
+def test_e2e_chat_cites_page_refuses_and_is_lazy(app, real_library):
+    """SC-014: nothing before the first question; Quartzite cites p. 2 and jumps; France refused."""
+    page = _real_preview(app, real_library)
+    reqs = chat_requests(page)
+    ask_tab(page)
+    expect(page.locator("#pv-chat-idle")).to_be_visible()
+    page.wait_for_timeout(500)
+    assert reqs == []
+    ask(page, "Where is Quartzite discussed?")
+    cite = chat_turns(page).first.locator('button.cite[data-page="2"]').first
+    expect(cite).to_have_text("p. 2", timeout=20_000)
+    assert len(reqs) == 1
+    cite.click()
+    expect(page.locator("#pv-page-input")).to_have_value("2")
+    expect(page.locator('.pdf-page[data-page="2"]')).to_have_class(re.compile("is-flash"))
+    ask(page, "What is the capital of France?")
+    refused = chat_turns(page).nth(1).locator(".turn__a--refused")
+    expect(refused).to_be_visible(timeout=20_000)
+    expect(refused.locator(".turn__refused-title")).to_have_text("Not in this paper")
+    expect(chat_turns(page).nth(1).locator("button.cite")).to_have_count(0)
+    assert reqs[1]["history"] and reqs[1]["history"][0]["question"].startswith("Where is Quartzite")
+
+
+def test_e2e_unsave_from_the_card_confirms_and_removes_everything(app, real_library):
+    """SC-015: unsave with confirm removes the row, the PDF and the annotations."""
+    page, base = app, real_library
+    page.goto("/")
+    _triage_ui(page, "2401.00001", 1)
+    save_btn(page, 1).click()
+    expect(save_btn(page, 1)).to_have_text("Saved", timeout=10_000)
+    expect(page.locator(".views__count")).to_have_text("1")
+    # A highlight exists, so the confirm names it.
+    page.request.post(
+        f"{base}/api/annotations",
+        data={
+            "paper_id": "2401.00001",
+            "page": 1,
+            "kind": "note",
+            "note": "n",
+            "rects": [],
+            "quote": "",
+        },
+    )
+    expect(page.locator(".views__count")).to_have_text("1")
+    pdf_before = page.request.get(f"{base}/api/library/pdf?paper_id=2401.00001")
+    assert pdf_before.status == 200
+    save_btn(page, 1).click()
+    group = page.locator('[data-confirm="unsave"]')
+    expect(group).to_be_visible()
+    page.get_by_role("button", name="Remove", exact=True).click()
+    expect(save_btn(page, 1)).to_have_text("Save", timeout=10_000)
+    expect(page.locator(".views__count")).to_be_hidden()
+    page.click('nav.views a[data-view="library"]')
+    expect(page.locator("#library-empty-all .empty__title")).to_have_text("Nothing saved yet.")
+    assert page.request.get(f"{base}/api/library/pdf?paper_id=2401.00001").status == 404
+    assert page.request.get(f"{base}/api/annotations?paper_id=2401.00001").status == 404
+
+
+def test_e2e_unavailable_pdf_shows_status_and_disabled_chat(app, real_library):
+    page = app
+    page.goto("/")
+    _triage_ui(page, "2401.00005", 1)
+    save_btn(page, 5).click()
+    expect(save_btn(page, 5)).to_have_text("Saved", timeout=10_000)
+    page.click('nav.views a[data-view="library"]')
+    expect(rows(page).first.locator("[data-pdf-status]")).to_contain_text(
+        "PDF unavailable", timeout=5_000
+    )
+    rows(page).first.locator("button.open-preview").click()
+    expect(page.locator("#pv-stage .alert")).to_contain_text("This PDF could not be downloaded.")
+    ask_tab(page)
+    expect(page.locator("#pv-chat-nopdf")).to_have_text(
+        "Chat needs the PDF text, and this PDF is unavailable."
+    )
+    expect(page.locator("#pv-chat-question")).to_be_disabled()
+    expect(page.locator("#pv-chat-ask")).to_be_disabled()
+
+
+def test_e2e_highlight_and_note_survive_a_server_restart(offline_page, tmp_path, monkeypatch):
+    """SC-013: stored highlight and note are back after the server restarts on the same data."""
+    import tempfile
+
+    from e2e_harness import LiveServer
+
+    page = offline_page
+    port = int(os.environ.get("E2E_PORT", "8766")) + 30
+    db = str(tmp_path / "restart.db")
+    data = tmp_path / "data"
+    data.mkdir()
+
+    def boot():
+        srv = LiveServer(db, port=port)
+        monkeypatch.setattr(tempfile, "mkdtemp", lambda **kw: str(data))
+        srv.start()
+        monkeypatch.undo()
+        return srv
+
+    srv = boot()
+    try:
+        base = srv.url
+        topic = page.request.post(f"{base}/api/triage", data={"query": "2401.00001"}).json()[
+            "topic"
+        ]
+        assert page.request.post(
+            f"{base}/api/library", data={"paper_id": "2401.00001", "topic": topic}
+        ).ok
+        page.set_viewport_size({"width": 1280, "height": 900})
+        page.goto(f"{base}/#/library/paper/2401.00001")
+        expect(page.locator(".pdf-page")).to_have_count(3, timeout=20_000)
+        expect(page.locator('.pdf-page[data-page="1"].has-text')).to_have_count(1, timeout=10_000)
+        line(page, "Abstract").select_text()
+        page.click("#pv-hl-btn")
+        expect(hls(page).first).to_have_attribute("data-annotation-id", re.compile(r"^\d+$"))
+        items(page).first.get_by_role("button", name="Add note").first.click()
+        items(page).first.locator("textarea").fill("survives restart")
+        items(page).first.locator("textarea").press("Control+Enter")
+        expect(items(page).first.locator(".hl-item__note")).to_have_text("survives restart")
+    finally:
+        srv.data_dir = None  # keep the saved PDF for the second boot
+        srv.stop()
+    srv2 = boot()
+    try:
+        page.goto(f"{srv2.url}/#/library/paper/2401.00001")
+        page.reload()
+        expect(page.locator(".pdf-page")).to_have_count(3, timeout=20_000)
+        expect(items(page)).to_have_count(1, timeout=10_000)
+        expect(items(page).first.locator(".hl-item__note")).to_have_text("survives restart")
+        expect(hls(page).first).to_be_attached()
+    finally:
+        srv2.data_dir = None
+        srv2.stop()
+
+
+def test_e2e_every_v3_view_makes_only_local_requests(app, real_library):
+    """Zero non-local requests across triage, Library and Preview (offline_page asserts it)."""
+    page = app
+    page.goto("/")
+    _triage_ui(page, "2401.00001", 1)
+    save_btn(page, 1).click()
+    expect(save_btn(page, 1)).to_have_text("Saved", timeout=10_000)
+    page.click('nav.views a[data-view="library"]')
+    rows(page).first.locator("button.open-preview").click()
+    expect(page.locator(".pdf-page")).to_have_count(3, timeout=20_000)
+    page.click("#pv-find-btn")
+    find(page, "Quartzite")
+    expect(page.locator("#pv-find-results .find-hit").first).to_be_visible()

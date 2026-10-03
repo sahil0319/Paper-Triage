@@ -526,7 +526,7 @@ hooks. Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest 
 
 ### Wave H — final
 
-- [ ] T064 [FE] Browser e2e v3 on the real harness `tests/frontend/test_e2e_library.py`
+- [x] T064 [FE] Browser e2e v3 on the real harness `tests/frontend/test_e2e_library.py`
   (`e2e`, port 8765 for FE runs): save from results -> Library row reaches "PDF ready" within
   5 s -> preview renders page 1 within 2 s of opening (SC-011) ->
   highlight + note survive server restart (SC-013) -> paper chat question with "Quartzite"
