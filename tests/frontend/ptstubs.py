@@ -197,3 +197,47 @@ class LibraryStub:
                 self.items.remove(it)
                 return _json(route, {"deleted": True, "annotations": it["highlight_count"]})
         return _json(route, {"detail": "not saved"}, 404)
+
+
+COLUMN_LEFT = [
+    "Left column line one about sampling",
+    "Left column line two about distillation",
+    "Left column line three about students",
+    "Left column line four about teachers",
+]
+COLUMN_RIGHT = [
+    "Right column line one about latents",
+    "Right column line two about filters",
+    "Right column line three about stages",
+    "Right column line four about schedules",
+]
+
+
+def two_column_pdf():
+    """A 1-page, two-column PDF (stdlib, raw objects): 4 short lines per column, a wide gutter."""
+
+    def col(x, lines):
+        body = f"BT /F1 11 Tf 14 TL {x} 700 Td\n"
+        body += "".join(f"({t}) Tj T*\n" for t in lines)
+        return body + "ET\n"
+
+    content = (col(50, COLUMN_LEFT) + col(330, COLUMN_RIGHT)).encode("latin-1")
+    objs = {
+        1: b"<< /Type /Catalog /Pages 2 0 R >>",
+        2: b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        3: b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R "
+        b"/Resources << /Font << /F1 5 0 R >> >> >>",
+        4: b"<< /Length %d >>\nstream\n%s\nendstream" % (len(content), content),
+        5: b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    }
+    out = bytearray(b"%PDF-1.4\n")
+    offsets = {}
+    for num in sorted(objs):
+        offsets[num] = len(out)
+        out += b"%d 0 obj\n%s\nendobj\n" % (num, objs[num])
+    xref = len(out)
+    out += b"xref\n0 6\n0000000000 65535 f \n"
+    for num in range(1, 6):
+        out += b"%010d 00000 n \n" % offsets[num]
+    out += b"trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % xref
+    return bytes(out)

@@ -878,15 +878,29 @@ button.cite:active { background: var(--color-hairline); }
 @media (max-width: 1023px) { .pv-sheet-open:not([hidden]) { display: inline-flex; } }
 @media (forced-colors: active) { .pv-sheet { border: 1px solid CanvasText; } }
 
-/* Text layer: transparent, selectable text positioned over the canvas by pdf.js. */
+/* Text layer: transparent, selectable text positioned over the canvas by pdf.js.
+   Mirrors the pdf.js 6 text-layer rules the API needs (the viewer stylesheet is not vendored):
+   span size and width follow --total-scale-factor / --font-height / --scale-x, so the invisible
+   text matches the canvas glyphs; .endOfContent keeps a drag from jumping when it leaves the spans.
+   --scale-round-x/-y stay undefined on purpose: pdf.js then leaves its inline width/height invalid and the
+   layer fills the page box (inset: 0). A rounded explicit size overflowed the bordered page and broke drags. */
 .textLayer {
   position: absolute; inset: 0; overflow: clip; line-height: 1; text-align: initial; text-size-adjust: none;
   forced-color-adjust: none; transform-origin: 0 0; caret-color: CanvasText; z-index: 1; user-select: text;
+  --min-font-size: 1; --min-font-size-inv: calc(1 / var(--min-font-size));
 }
-.textLayer :is(span, br) { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0 0; }
-.textLayer span.markedContent { top: 0; height: 0; }
+.textLayer :is(span, br) { color: transparent; position: absolute; white-space: pre; cursor: text; margin: 0; transform-origin: 0 0; }
+.textLayer > :not(.markedContent, .endOfContent), .textLayer .markedContent span:not(.markedContent) {
+  z-index: 1; --font-height: 0; --scale-x: 1; --rotate: 0deg;
+  font-size: calc(var(--total-scale-factor) * var(--font-height));
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+.textLayer .markedContent { display: contents; }
+.textLayer span[role="img"] { user-select: none; cursor: default; }
 .textLayer ::selection { background: color-mix(in srgb, var(--color-info-border) 30%, transparent); color: transparent; }
 .textLayer br::selection { background: transparent; }
+.textLayer .endOfContent { display: block; position: absolute; inset: 100% 0 0; z-index: 0; cursor: default; user-select: none; }
+.textLayer.selecting .endOfContent { top: 0; }
 .hl-layer { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: multiply; z-index: 2; }
 
 @media (max-width: 767px) {

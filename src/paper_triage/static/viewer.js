@@ -303,8 +303,11 @@ function relayout() {
     p.scale = pageScale(p, c.mode);
     p.sec.style.width = `${Math.round(p.w * p.scale)}px`;
     p.sec.style.height = `${Math.round(p.h * p.scale)}px`;
-    p.text.style.setProperty("--total-scale-factor", String(p.scale));
-    p.text.style.setProperty("--scale-factor", String(p.scale));
+    // The text layer fills the page's content box (inside the 1px border), the same box the canvas is
+    // stretched to, so its font scale comes from that box rather than from the nominal page scale.
+    const k = (p.sec.clientWidth || p.w * p.scale) / p.w;
+    p.text.style.setProperty("--total-scale-factor", String(k));
+    p.text.style.setProperty("--scale-factor", String(k));
   });
   restoreAnchor(anchor);
   c.pages.forEach((p) => {
@@ -406,6 +409,96 @@ async function drawPage(p) {
   if (!p.textDone) drawText(p, t);
 }
 
+// ---- text selection: the pdf.js endOfContent guard (F-016) ----
+// The text layer is a scatter of absolutely positioned spans. Without a guard, a drag that leaves the spans
+// (the gap between lines, a gutter, the margin) makes the browser jump the selection focus to the end of
+// the layer. Each layer gets an empty .endOfContent block; while a pointer drag is running it is moved to
+// sit right after the selection focus, and the layer gets .selecting so the block covers the page and
+// catches the pointer. It goes back to the end of the layer on pointer release. Same technique as the
+// pdf.js viewer's TextLayerBuilder, which the plain TextLayer API does not include.
+const textEnds = new Map(); // .textLayer element -> its .endOfContent block
+let pointerDown = false;
+let prevRange = null;
+
+function attachEndOfContent(layer) {
+  const end = h("div", { class: "endOfContent" });
+  layer.append(end);
+  textEnds.set(layer, end);
+}
+
+function resetEnd(end, layer) {
+  layer.append(end);
+  end.style.width = "";
+  end.style.height = "";
+  end.style.userSelect = "";
+  layer.classList.remove("selecting");
+}
+
+function resetAllEnds() {
+  prevRange = null;
+  textEnds.forEach((end, layer) => {
+    if (layer.isConnected) resetEnd(end, layer);
+    else textEnds.delete(layer);
+  });
+}
+
+function onSelectionChange() {
+  if (!pointerDown || !textEnds.size) return;
+  const sel = document.getSelection();
+  if (!sel || sel.rangeCount === 0) {
+    resetAllEnds();
+    return;
+  }
+  const active = new Set();
+  for (let i = 0; i < sel.rangeCount; i++) {
+    const range = sel.getRangeAt(i);
+    textEnds.forEach((end, layer) => {
+      if (layer.isConnected && !active.has(layer) && range.intersectsNode(layer)) active.add(layer);
+    });
+  }
+  textEnds.forEach((end, layer) => {
+    if (!layer.isConnected) textEnds.delete(layer);
+    else if (active.has(layer)) layer.classList.add("selecting");
+    else resetEnd(end, layer);
+  });
+  // Place the block next to whichever end of the range the drag is moving.
+  const range = sel.getRangeAt(0);
+  const modifyStart =
+    prevRange &&
+    (range.compareBoundaryPoints(Range.END_TO_END, prevRange) === 0 ||
+      range.compareBoundaryPoints(Range.START_TO_END, prevRange) === 0);
+  let anchor = modifyStart ? range.startContainer : range.endContainer;
+  if (anchor.nodeType === Node.TEXT_NODE) anchor = anchor.parentNode;
+  if (!modifyStart && range.endOffset === 0) {
+    do {
+      while (anchor && !anchor.previousSibling) anchor = anchor.parentNode;
+      anchor = anchor && anchor.previousSibling;
+    } while (anchor && !anchor.childNodes.length);
+  }
+  const layer = anchor && anchor.parentElement && anchor.parentElement.closest(".textLayer");
+  const end = layer && textEnds.get(layer);
+  if (end && anchor.parentElement) {
+    end.style.width = layer.style.width;
+    end.style.height = layer.style.height;
+    end.style.userSelect = "text";
+    anchor.parentElement.insertBefore(end, modifyStart ? anchor : anchor.nextSibling);
+  }
+  prevRange = range.cloneRange();
+}
+
+el.well.addEventListener("pointerdown", () => {
+  pointerDown = true;
+});
+document.addEventListener("pointerup", () => {
+  pointerDown = false;
+  resetAllEnds();
+});
+window.addEventListener("blur", () => {
+  pointerDown = false;
+  resetAllEnds();
+});
+document.addEventListener("selectionchange", onSelectionChange);
+
 async function drawText(p, t) {
   p.textDone = true;
   try {
@@ -418,6 +511,7 @@ async function drawText(p, t) {
     });
     await layer.render();
     if (!stale(t)) {
+      attachEndOfContent(p.text);
       p.sec.classList.add("has-text");
       emit("text", p);
     }
@@ -436,6 +530,8 @@ function releasePage(p) {
   const empty = h("canvas", { "aria-hidden": "true" });
   p.sec.replaceChild(empty, p.canvas);
   p.canvas = empty;
+  textEnds.delete(p.text);
+  p.text.classList.remove("selecting");
   PT.clear(p.text);
   p.sec.classList.remove("is-drawn", "has-text");
   emit("release", p);

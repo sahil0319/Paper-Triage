@@ -13,7 +13,7 @@ from urllib.parse import quote
 
 import pytest
 from playwright.sync_api import expect
-from ptstubs import LibraryStub, lib_item
+from ptstubs import COLUMN_LEFT, LibraryStub, lib_item, two_column_pdf
 
 pytestmark = pytest.mark.e2e
 
@@ -2743,3 +2743,132 @@ def test_audit_sheet_button_stays_available_when_controls_are_hidden(app, status
     expect(page.locator("#pv-hl-msg")).to_have_text(
         "Highlights are available once the PDF is ready."
     )
+
+
+# ---- F-016: drag-selecting lines in the text layer ----
+
+
+def drag_path(page, points):
+    """Press at the first point, sweep through the rest, release at the last."""
+    page.mouse.move(*points[0])
+    page.mouse.down()
+    for x, y in points[1:]:
+        page.mouse.move(x, y, steps=6)
+    page.mouse.up()
+
+
+def box_of(page, text, n=1):
+    return line(page, text, n).bounding_box()
+
+
+def page_box(page, n=1):
+    """Content box of a page (inside its border): the box highlight fractions are relative to."""
+    return page.locator(f'.pdf-page[data-page="{n}"]').evaluate(
+        """e => { const r = e.getBoundingClientRect();
+          return { left: r.left + e.clientLeft, top: r.top + e.clientTop, w: e.clientWidth, h: e.clientHeight }; }"""
+    )
+
+
+def two_col_preview(page):
+    page.add_init_script("window.__PT_UNDO_MS = 800")
+    stub = LibraryStub(page, [lib_item(1, pdf={"status": "ready", "error": None, "pages": 1})], pdf=two_column_pdf())
+    page.set_viewport_size({"width": 1280, "height": 800})
+    page.goto("/#/library/paper/2401.00001")
+    expect(page.locator('.pdf-page[data-page="1"].has-text')).to_have_count(1, timeout=10_000)
+    return stub
+
+
+def test_drag_across_two_lines_gives_exact_quote_and_line_rects(app):
+    page = app
+    stub = hl_preview(page)
+    first = box_of(page, "Abstract.")
+    second = box_of(page, "Our method")
+    mid1 = first["y"] + first["height"] / 2
+    mid2 = second["y"] + second["height"] / 2
+    # Down through the gap between the lines, then past the end of line two (into the margin).
+    drag_path(
+        page,
+        [
+            (first["x"] + 1, mid1),
+            (first["x"] + 60, (first["y"] + first["height"] + second["y"]) / 2),
+            (second["x"] + second["width"] + 80, mid2),
+        ],
+    )
+    expect(page.locator("#pv-popover")).to_be_visible()
+    page.locator("#pv-popover button.swatch").first.click()
+    assert len(stub.annotations) == 1
+    ann = stub.annotations[0]
+    assert ann["quote"] == (
+        "Abstract. We study distillation of diffusion models into few-step generators. "
+        "Our method reduces sampling cost by a factor of eight while keeping image quality."
+    )
+    pb = page_box(page)
+    assert len(ann["rects"]) == 2
+    for rect, box in zip(ann["rects"], (first, second), strict=True):
+        x, y, w, h = rect
+        assert abs(x - (box["x"] - pb["left"]) / pb["w"]) < 0.006
+        assert abs(x + w - (box["x"] + box["width"] - pb["left"]) / pb["w"]) < 0.006
+        assert abs(y + h / 2 - (box["y"] + box["height"] / 2 - pb["top"]) / pb["h"]) < 0.008
+    assert ann["rects"][0][1] < ann["rects"][1][1]
+
+
+def test_drag_in_one_column_stops_at_the_column_and_never_jumps(app):
+    page = app
+    stub = two_col_preview(page)
+    first = box_of(page, "Left column line one")
+    third = box_of(page, "Left column line three")
+    # Overshoot line three into the gutter: the selection ends with line three, not at the end of the page.
+    drag_path(
+        page,
+        [
+            (first["x"] + 1, first["y"] + first["height"] / 2),
+            (first["x"] + 90, third["y"] - 2),
+            (third["x"] + third["width"] + 60, third["y"] + third["height"] / 2),
+        ],
+    )
+    expect(page.locator("#pv-popover")).to_be_visible()
+    page.locator("#pv-popover button.swatch").first.click()
+    ann = stub.annotations[0]
+    assert ann["quote"] == " ".join(COLUMN_LEFT[:3])
+    assert len(ann["rects"]) == 3
+    assert all(x + w < 0.62 for x, y, w, h in ann["rects"]), ann["rects"]
+
+
+def test_drag_below_the_last_line_selects_to_the_end_of_that_line_only(app):
+    page = app
+    stub = two_col_preview(page)
+    second = box_of(page, "Left column line two")
+    fourth = box_of(page, "Left column line four")
+    drag_path(
+        page,
+        [
+            (second["x"] + 100, second["y"] + second["height"] / 2),
+            (fourth["x"] + 40, fourth["y"] + fourth["height"] / 2),
+            (fourth["x"] + 40, fourth["y"] + fourth["height"] + 120),
+        ],
+    )
+    expect(page.locator("#pv-popover")).to_be_visible()
+    page.locator("#pv-popover button.swatch").first.click()
+    quote = stub.annotations[0]["quote"]
+    assert quote.endswith(COLUMN_LEFT[3]), quote
+    assert "Right column" not in quote
+    assert COLUMN_LEFT[2] in quote
+
+
+def test_text_layer_matches_canvas_scale_and_rests_clean_after_a_drag(app):
+    page = app
+    two_col_preview(page)
+    pb = page_box(page)
+    span = page.locator(".textLayer span").first
+    size = float(span.evaluate("e => parseFloat(getComputedStyle(e).fontSize)"))
+    # The PDF text is 11pt; the layer must scale it with the page (not inherit the app's 14px).
+    assert abs(size - 11 * pb["w"] / 612) < 0.05, size
+    first = box_of(page, "Left column line one")
+    drag_path(
+        page,
+        [(first["x"] + 1, first["y"] + 7), (first["x"] + 120, first["y"] + 40), (first["x"] + 160, first["y"] + 7)],
+    )
+    layer = page.locator('.pdf-page[data-page="1"] .textLayer')
+    expect(layer).not_to_have_class(re.compile("selecting"))
+    assert layer.evaluate("e => e.lastElementChild.className") == "endOfContent"
+    assert layer.evaluate("e => e.lastElementChild.getBoundingClientRect().height") < 1

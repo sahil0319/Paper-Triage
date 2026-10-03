@@ -267,6 +267,13 @@ export function initAnnotations(V) {
 
   const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
+  // The text of a range with a space where pdf.js puts a line break (<br>), so words on two lines never glue.
+  function rangeText(range) {
+    const frag = range.cloneContents();
+    frag.querySelectorAll("br").forEach((b) => b.replaceWith(" "));
+    return (frag.textContent || "").replace(/\s+/g, " ");
+  }
+
   // Reads the current selection. Only the part on the page where it started is used.
   function readSelection() {
     const sel = window.getSelection();
@@ -285,7 +292,7 @@ export function initAnnotations(V) {
       r.setEnd(layer, layer.childNodes.length);
       partial = true;
     }
-    const quote = r.toString().replace(/\s+/g, " ").trim().slice(0, QUOTE_MAX);
+    const quote = rangeText(r).trim().slice(0, QUOTE_MAX);
     if (!quote) return null;
     const box = sec.getBoundingClientRect();
     const left0 = box.left + sec.clientLeft;
@@ -309,8 +316,8 @@ export function initAnnotations(V) {
     const post = document.createRange();
     post.selectNodeContents(layer);
     post.setStart(r.endContainer, r.endOffset);
-    const prefix = pre.toString().replace(/\s+/g, " ").slice(-CONTEXT);
-    const suffix = post.toString().replace(/\s+/g, " ").slice(0, CONTEXT);
+    const prefix = rangeText(pre).slice(-CONTEXT);
+    const suffix = rangeText(post).slice(0, CONTEXT);
     return { page, rects, quote, prefix, suffix, partial, anchor: r.getBoundingClientRect() };
   }
 
