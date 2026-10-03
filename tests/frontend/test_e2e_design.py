@@ -499,3 +499,210 @@ def test_no_pdf_note_is_an_info_notification(offline_page, live_server):
     assert note.evaluate("e => getComputedStyle(e).borderLeftWidth") == "3px"
     assert note.evaluate("e => getComputedStyle(e).borderLeftColor") == PRIMARY
     assert note.evaluate("e => getComputedStyle(e).borderTopLeftRadius") == "0px"
+
+
+# ---- T074: states (working card, notes, alert, empty), previous results, flashes ----
+
+
+def test_previous_results_stay_at_full_opacity_and_clickable_during_a_second_search(
+    offline_page, live_server
+):
+    from ptstubs import LibraryStub
+
+    LibraryStub(offline_page, [])
+    page = offline_page
+    live_server.set_triage_delay(0)
+    page.set_viewport_size({"width": 1440, "height": 900})
+    page.goto("/")
+    _search(page)
+    held = []
+    page.route("**/api/triage", lambda route: held.append(route))
+    page.fill("#query", "2401.00001")
+    page.click("#submit")
+    expect(page.locator("#working")).to_be_visible(timeout=3_000)
+    rows = page.locator("#paper-list li.paper")
+    assert rows.count() == 10
+    for i in range(rows.count()):
+        assert rows.nth(i).evaluate("e => getComputedStyle(e).opacity") == "1"
+    first = rows.first
+    first.locator('a[data-link="abs"]').click(trial=True)
+    first.locator("button.save").click()
+    expect(first.locator("button.save")).to_have_attribute("aria-pressed", "true")
+    # Release so the server-side request completes cleanly.
+    held[0].continue_()
+    expect(page.locator("#paper-list li.paper")).to_have_count(1, timeout=15_000)
+
+
+def test_working_card_is_a_square_grey_layer_in_normal_flow(offline_page, live_server):
+    page = offline_page
+    live_server.set_triage_delay(1.5)
+    try:
+        page.set_viewport_size({"width": 1440, "height": 900})
+        page.goto("/")
+        page.fill("#query", TOPIC)
+        page.click("#submit")
+        expect(page.locator("#working")).to_be_visible(timeout=3_000)
+        assert _css(page, "#working", "backgroundColor") == "rgb(244, 244, 244)"
+        assert _css(page, "#working", "borderTopLeftRadius") == "0px"
+        assert _css(page, "#working", "paddingTop") == "24px"
+        assert _css(page, "#working", "position") == "static"
+        assert _css(page, "#working .working__verb", "fontWeight") == "600"
+        expect(page.locator("#working")).to_be_hidden(timeout=10_000)
+    finally:
+        live_server.set_triage_delay(0)
+
+
+def test_a_failed_load_shows_a_light_error_notification(desktop):
+    page = desktop
+    page.route(
+        "**/api/triage",
+        lambda route: route.fulfill(
+            status=502, content_type="application/json", body='{"detail": "upstream down"}'
+        ),
+    )
+    page.fill("#query", TOPIC)
+    page.click("#submit")
+    alert = page.locator("#alert")
+    expect(alert).to_be_visible(timeout=5_000)
+    assert _css(page, "#alert", "backgroundColor") == "rgb(255, 241, 241)"
+    assert _css(page, "#alert", "borderLeftColor") == "rgb(218, 30, 40)"
+    assert _css(page, "#alert", "borderLeftWidth") == "3px"
+    assert _css(page, "#alert .alert__title", "color") == "rgb(22, 22, 22)"
+    retry = alert.locator("button.btn")
+    expect(retry).to_be_visible()
+    assert _css(page, "#alert button.btn", "backgroundColor") == "rgb(57, 57, 57)"
+    for link in alert.locator(".ext-link").all():
+        assert link.evaluate("e => getComputedStyle(e).backgroundColor") == "rgba(0, 0, 0, 0)"
+        assert link.evaluate("e => getComputedStyle(e).color") == PRIMARY
+
+
+def test_empty_state_title_body_and_chips(offline_page, live_server):
+    page = offline_page
+    live_server.set_triage_delay(0)
+    # The shared server may hold papers from earlier tests: serve an empty store for this page.
+    page.route(
+        "**/api/papers",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json", body='{"results": [], "notes": []}'
+        ),
+    )
+    page.set_viewport_size({"width": 1440, "height": 900})
+    page.goto("/")
+    expect(page.locator("#empty")).to_be_visible()
+    assert _css(page, ".empty__title", "fontWeight") == "600"
+    assert _css(page, ".empty__title", "fontSize") == "16px"
+    assert _css(page, ".empty__body", "color") == "rgb(82, 82, 82)"
+    assert _css(page, ".empty__body", "fontSize") == "16px"
+    chip = page.locator("#empty .chips button").first
+    assert abs(chip.bounding_box()["height"] - 32) < 0.5
+    assert chip.evaluate("e => getComputedStyle(e).borderTopColor") == BORDER_STRONG
+
+
+def _cite_and_load_more(page):
+    """Cite click -> .paper--cited, then Load 5 more -> .paper--new rows."""
+    _search(page)
+    turn = _ask(page, "Which paper is about diffusion?")
+    cite = turn.locator("a.cite:not(.cite--off), button.cite:not(.cite--off)").first
+    expect(cite).to_be_visible()
+    cite.click()
+    expect(page.locator("#paper-list li.paper.paper--cited")).to_have_count(1)
+    page.click("#load-more")
+    expect(page.locator("#paper-list li.paper.paper--new").first).to_be_visible(timeout=15_000)
+
+
+def test_cited_and_new_rows_fade_info_surface_over_the_flash_token(desktop):
+    page = desktop
+    _cite_and_load_more(page)
+    cited = page.locator("#paper-list li.paper--cited").first
+    new = page.locator("#paper-list li.paper--new").first
+    for row, name in ((cited, "cited-flash"), (new, "new-flash")):
+        assert row.evaluate("e => getComputedStyle(e).animationName") == name
+        assert row.evaluate("e => getComputedStyle(e).animationDuration") == "1.6s"
+
+
+def test_reduced_motion_replaces_flashes_with_static_markers(offline_page, live_server):
+    page = offline_page
+    live_server.set_triage_delay(0)
+    page.emulate_media(reduced_motion="reduce")
+    page.set_viewport_size({"width": 1440, "height": 900})
+    page.goto("/")
+    _cite_and_load_more(page)
+    cited = page.locator("#paper-list li.paper--cited").first
+    new = page.locator("#paper-list li.paper--new").first
+    assert cited.evaluate("e => getComputedStyle(e).animationName") == "none"
+    assert cited.evaluate("e => getComputedStyle(e).outlineStyle") == "solid"
+    assert cited.evaluate("e => getComputedStyle(e).outlineWidth") == "2px"
+    assert cited.evaluate("e => getComputedStyle(e).outlineColor") == PRIMARY
+    assert new.evaluate("e => getComputedStyle(e).animationName") == "none"
+    assert new.evaluate("e => getComputedStyle(e).backgroundColor") == "rgb(237, 245, 255)"
+    # No running animation anywhere in the results list.
+    assert page.evaluate(
+        "document.querySelector('#paper-list').getAnimations({subtree: true}).length"
+    ) == 0
+    # Chevron does not rotate over time: disclosure open has no transition.
+    chev = page.locator("#paper-list summary .chev").first
+    assert chev.evaluate("e => getComputedStyle(e).transitionDuration") in ("0s", "0s, 0s")
+
+
+def test_reduced_motion_working_glyph_is_static_with_full_opacity_rays(offline_page, live_server):
+    page = offline_page
+    live_server.set_triage_delay(1.5)
+    try:
+        page.emulate_media(reduced_motion="reduce")
+        page.set_viewport_size({"width": 1440, "height": 900})
+        page.goto("/")
+        page.fill("#query", TOPIC)
+        page.click("#submit")
+        expect(page.locator("#working")).to_be_visible(timeout=3_000)
+        assert page.evaluate("document.querySelector('#working').getAnimations({subtree: true}).length") == 0
+        assert _css(page, "#working .ray >> nth=0", "opacity") == "1"
+        expect(page.locator("#working")).to_be_hidden(timeout=10_000)
+    finally:
+        live_server.set_triage_delay(0)
+
+
+def test_forced_colours_keep_borders_on_controls_notifications_and_chips(offline_page, live_server):
+    page = offline_page
+    live_server.set_triage_delay(0)
+    page.emulate_media(forced_colors="active")
+    page.set_viewport_size({"width": 1440, "height": 900})
+    page.goto("/")
+    assert _css(page, "#submit", "borderTopStyle") == "solid"
+    assert _css(page, "#submit", "borderTopWidth") == "1px"
+    assert _css(page, "#query", "borderTopStyle") == "solid"
+    _search(page)
+    turn = _ask(page, "Which paper is about diffusion?")
+    cite = turn.locator(".cite").first
+    assert cite.evaluate("e => getComputedStyle(e).borderTopStyle") == "solid"
+    assert cite.evaluate("e => getComputedStyle(e).borderTopWidth") == "1px"
+    meter = page.locator(".rank__meter span").first
+    assert meter.evaluate("e => getComputedStyle(e).backgroundColor") != "rgba(0, 0, 0, 0)"
+    refused = _ask(page, "What is the capital of France?")
+    note = page.locator(".turn__a--refused").first
+    expect(note).to_be_visible()
+    assert note.evaluate("e => getComputedStyle(e).borderTopStyle") == "solid"
+    assert refused
+
+
+def test_reduced_motion_sheet_opens_without_sliding(offline_page, live_server):
+    live_server.set_triage_delay(0)
+    page = offline_page
+    page.emulate_media(reduced_motion="reduce")
+    _open_preview(page, 390, 844)
+    page.click("#pv-sheet-open")
+    sheet = page.locator("#pv-sheet")
+    expect(sheet).to_be_visible()
+    assert sheet.evaluate("e => getComputedStyle(e).animationName") == "none"
+    assert sheet.evaluate("e => e.getAnimations().length") == 0
+
+
+def test_forced_colours_sheet_popover_and_highlights_keep_edges(offline_page, live_server):
+    live_server.set_triage_delay(0)
+    page = offline_page
+    page.emulate_media(forced_colors="active")
+    _open_preview(page, 390, 844)
+    page.click("#pv-sheet-open")
+    sheet = page.locator("#pv-sheet")
+    expect(sheet).to_be_visible()
+    assert sheet.evaluate("e => getComputedStyle(e).borderTopStyle") == "solid"
+    assert sheet.evaluate("e => getComputedStyle(e).borderTopWidth") == "1px"

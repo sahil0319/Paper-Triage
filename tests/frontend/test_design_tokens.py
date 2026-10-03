@@ -282,3 +282,142 @@ def test_reduced_motion_and_forced_colors_blocks_remain():
     assert "forced-colors: active" in css
     reduced = next(s for s, _, _ in _rules() if any("prefers-reduced-motion" in x for x in s))
     assert reduced
+
+
+# ---- T074: states, motion and forced-colours sweep ----
+
+
+def _outside_root_and_forced():
+    """CSS text without :root blocks and without @media (forced-colors: active) blocks."""
+    css = _strip_comments(_css())
+    css = re.sub(r":root\s*\{[^}]*\}", "", css)
+    out = []
+    i = 0
+    while i < len(css):
+        m = re.compile(r"@media[^{]*forced-colors[^{]*\{").search(css, i)
+        if not m:
+            out.append(css[i:])
+            break
+        out.append(css[i : m.start()])
+        depth = 1
+        j = m.end()
+        while j < len(css) and depth:
+            depth += {"{": 1, "}": -1}.get(css[j], 0)
+            j += 1
+        i = j
+    return "".join(out)
+
+
+def test_no_literal_colour_functions_outside_root_and_forced_colors():
+    text = _outside_root_and_forced()
+    # data: URIs (the select chevron) are allowed.
+    text = re.sub(r"url\(\s*[\"']?data:[^)]*\)", "url()", text)
+    assert not re.findall(r"\brgba?\s*\(", text)
+    assert not re.findall(r"\bhsla?\s*\(", text)
+
+
+def test_no_declared_but_unused_token():
+    css = _strip_comments(_css())
+    declared = set(_root_decls())
+    used = set(re.findall(r"var\(\s*(--[\w-]+)", css))
+    unused = sorted(declared - used)
+    assert not unused, unused
+
+
+def test_only_font_weights_400_600_normal():
+    css = _strip_comments(_css())
+    weights = set(re.findall(r"font-weight\s*:\s*([\w.]+)", css))
+    assert weights <= {"400", "600", "normal"}, weights
+    # `font` shorthand tokens carry their weight too.
+    for name, value in _root_decls().items():
+        if name.startswith("--type-"):
+            assert re.match(r"(400|600)\s", value), (name, value)
+    assert not re.search(r"\bbold(er)?\b|\blighter\b", re.sub(r":root\s*\{[^}]*\}", "", css))
+
+
+def test_every_transition_and_animation_is_disabled_under_reduced_motion():
+    rules = _rules()
+    reduced = [(p, b) for s, p, b in rules if any("prefers-reduced-motion: reduce" in x for x in s)]
+    assert reduced
+    # Transitions: one universal kill switch.
+    assert any(
+        re.search(r"transition\s*:\s*none\s*!important", b)
+        and {"*", "*::before", "*::after"} <= {x.strip() for x in p.split(",")}
+        for p, b in reduced
+    )
+    # Animations: every selector that sets one has an `animation: none` twin in the reduced block.
+    killed = set()
+    for p, b in reduced:
+        if re.search(r"animation\s*:\s*none", b):
+            killed |= {x.strip() for x in p.split(",")}
+    animated = set()
+    for stack, p, b in rules:
+        if any("prefers-reduced-motion" in x for x in stack):
+            continue
+        if re.search(r"(?<![\w-])animation\s*:\s*(?!none)", b):
+            animated |= {x.strip() for x in p.split(",")}
+    assert animated, "expected animated selectors"
+    assert animated <= killed, sorted(animated - killed)
+
+
+def test_reduced_motion_keeps_meaning_without_motion():
+    rules = _rules()
+    reduced = {p: b for s, p, b in rules if any("prefers-reduced-motion: reduce" in x for x in s)}
+    cited = reduced[".paper--cited"]
+    assert "outline: 2px solid var(--color-focus)" in cited
+    new = reduced[".paper--new"]
+    assert "background-color: var(--color-info-surface)" in new
+    assert re.search(r"opacity\s*:\s*1", reduced[".ray"])
+    assert re.search(r"animation\s*:\s*none", reduced[".pv-sheet[open]"])
+    assert re.search(r"transition\s*:\s*none", reduced[".chev"])
+    assert re.search(r"transition\s*:\s*none", reduced[".lib-row.is-collapsing"])
+
+
+def test_forced_colors_covers_controls_notifications_chips_panels_sheet_meter_highlights():
+    forced = " ".join(b for s, _, b in _rules() if any("forced-colors" in x for x in s))
+    forced_sel = " ".join(p for s, p, _ in _rules() if any("forced-colors" in x for x in s))
+    for sel in (
+        ".btn--primary",
+        ".btn--secondary",
+        ".icon-btn",
+        ".tag",
+        ".select",
+        ".alert",
+        ".turn__a--refused",
+        ".pv-chat__nopdf",
+        ".pdf-page__notext",
+        ".cite",
+        ".chat",
+        ".notes",
+        ".critique",
+        ".pv-panel",
+        ".pv-popover",
+        ".pv-sheet",
+        ".rank__meter",
+        ".hl",
+        ".working",
+        "field",
+    ):
+        if sel == "field":
+            assert "input" in forced_sel or ".field" in forced_sel, "text fields need a forced-colours edge"
+            continue
+        assert sel in forced_sel, sel
+    assert "Highlight" in forced and "CanvasText" in forced and "ButtonText" in forced
+
+
+def test_error_notification_has_no_coral_fill_or_white_text():
+    rules = _rules()
+    alert = next(b for s, p, b in rules if p == ".alert" and not s)
+    assert "var(--color-error-surface)" in alert
+    assert "border-left: 3px solid var(--color-error)" in alert
+    assert "var(--color-ink-inverse)" not in alert
+    on_dark = [b for s, p, b in rules if p.strip() == ".ext-link--on-dark" and not s]
+    for b in on_dark:
+        assert "inverse" not in b and "#fff" not in b
+
+
+def test_stale_state_never_dims_or_blocks():
+    css = _strip_comments(_css())
+    for m in re.finditer(r"([^{}]*\.is-stale[^{}]*)\{([^}]*)\}", css):
+        assert "opacity" not in m.group(2), m.group(0)
+        assert "pointer-events" not in m.group(2), m.group(0)

@@ -1031,7 +1031,12 @@ button.cite:active { background: var(--color-cite-surface-active); }
 /* ---- forced colors ---- */
 
 @media (forced-colors: active) {
-  .badge, .alert, .notes, .chat, .btn--secondary, .critique, .turn__a--refused, .pv-chat__nopdf { border: 1px solid CanvasText; }
+  .badge, .alert, .notes, .chat, .btn--secondary, .critique, .turn__a--refused, .pv-chat__nopdf,
+  .pdf-page__notext, .dir-manage, .pv-panel { border: 1px solid CanvasText; }
+  input[type="search"], input[type="text"], textarea { border: 1px solid ButtonText; }
+  .rail__item[aria-current="true"] { border-left: 3px solid Highlight; }
+  .swatch.is-last { outline: 2px solid Highlight; outline-offset: 2px; }
+  .hl-layer { forced-color-adjust: none; }
   .btn--on-dark, .icon-btn, .tag, .flag, .cite { border: 1px solid ButtonText; }
   .select { border: 1px solid ButtonText; background-image: none; appearance: auto; }
   .rank__meter, .working { border: 1px solid CanvasText; }

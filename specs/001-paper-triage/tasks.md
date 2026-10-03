@@ -702,7 +702,7 @@ runs use `E2E_PORT=8765`.
   requests before the first question; at 390 the sheet opens on `Ask this paper`, has
   border-radius `0px` and a non-empty box-shadow; `2401.00005` shows `.pv-chat__nopdf` with
   background `rgb(237, 245, 255)`. Files `pt/static/app.css`, `tests/frontend/test_e2e_design.py`.
-- [ ] T074 [FE] [US1] States, motion and forced-colours sweep (FR-030a, FR-030c, FR-030e,
+- [x] T074 [FE] [US1] States, motion and forced-colours sweep (FR-030a, FR-030c, FR-030e,
   FR-030f; brief items 12, 13, 14, 17; D6, D7, D8.4 previous results, D8.5, D9). Keep F-017:
   `.is-stale` keeps opacity 1 and gets no `pointer-events`, overlay or `inert` (the class hook
   stays). `app.css`: `.working` in normal flow above the list, `surface-1`, square, padding 24
