@@ -5,6 +5,7 @@ which fails the test on any non-local request.
 """
 
 import os
+import re
 from pathlib import Path
 
 import pytest
@@ -362,8 +363,10 @@ def test_highlights_are_opaque_fills_with_multiply(pv, color):
     page = pv
     drag_select(page, "Abstract")
     page.locator(f'#pv-popover button.swatch[aria-label="Highlight {color}"]').click()
+    # The optimistic node (tmp-N) is swapped for the persisted one: wait for the saved id, then
+    # measure that node (F-012, F-023).
+    expect(hls(page).first).to_have_attribute("data-annotation-id", re.compile(r"^\d+$"))
     hl = hls(page).first
-    expect(hl).to_be_attached()
     expect(hl).to_have_css("background-color", HL_FILLS[color])
     assert hl.evaluate("e => getComputedStyle(e).borderTopLeftRadius") == "2px"
     layer = page.locator('.pdf-page[data-page="1"] .hl-layer')
@@ -1049,3 +1052,36 @@ def test_screenshots_of_triage_library_and_preview(
         page.screenshot(path=str(shots_dir / f"preview-{width}.png"))
     shot = shots_dir / f"{view}-{width}.png"
     assert shot.exists() and shot.stat().st_size > 5_000
+
+
+def test_sheet_notes_field_is_a_surface_1_field(offline_page, live_server):
+    from test_e2e_library import drag_select
+
+    live_server.set_triage_delay(0)
+    page = offline_page
+    _open_preview(page, 800, 900)
+    expect(page.locator('.pdf-page[data-page="1"].has-text')).to_have_count(1, timeout=10_000)
+    drag_select(page, "Abstract")
+    page.locator("#pv-popover").get_by_role("button", name="Add note").click()
+    area = page.locator("#pv-sheet textarea")
+    expect(area).to_be_focused()
+    assert area.evaluate("e => getComputedStyle(e).backgroundColor") == "rgb(244, 244, 244)"
+    assert area.evaluate("e => getComputedStyle(e).borderTopLeftRadius") == "0px"
+    assert area.evaluate("e => getComputedStyle(e).borderBottomColor") == BORDER_STRONG
+
+
+def test_no_text_page_note_is_an_info_notification(offline_page, live_server):
+    from ptstubs import lib_item
+    from test_e2e_library import _blank_pdf, preview
+
+    live_server.set_triage_delay(0)
+    page = offline_page
+    preview(
+        page, [lib_item(1, pdf={"status": "ready", "error": None, "pages": 1})], pdf=_blank_pdf()
+    )
+    note = page.locator(".pdf-page__notext")
+    expect(note).to_contain_text("No selectable text on this page.", timeout=10_000)
+    assert note.evaluate("e => getComputedStyle(e).backgroundColor") == "rgb(237, 245, 255)"
+    assert note.evaluate("e => getComputedStyle(e).borderLeftColor") == PRIMARY
+    assert note.evaluate("e => getComputedStyle(e).borderLeftWidth") == "3px"
+    assert note.evaluate("e => getComputedStyle(e).borderTopLeftRadius") == "0px"
