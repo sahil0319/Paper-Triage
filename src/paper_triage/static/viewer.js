@@ -128,7 +128,10 @@ function open(item, force) {
   const keepZoom = sameKey ? cur.mode : null;
   close();
   const status = (item.pdf && item.pdf.status) || "none";
-  if (!sameKey) selectTab("highlights"); // a new paper opens on Highlights, never on the last Ask tab
+  // A new paper opens on "Ask this paper" (F-019), never on whichever tab the last paper was left on.
+  // Showing the panel loads nothing: the chat stays idle until the first question. Below 1024px the sheet
+  // stays closed (the toolbar button opens it) and already has this tab selected.
+  if (!sameKey) selectTab("chat");
   cur = { id: item.paper_id, item, key: statusKey(item), token, mode: keepZoom || "fit-width", pages: [], status };
   el.panel.hidden = false;
   el.sheetOpen.hidden = false;

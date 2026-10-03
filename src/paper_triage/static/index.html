@@ -214,12 +214,12 @@
         <div id="pv-panel-body" class="pv-panel__body">
           <div class="pv-tabbar">
           <div id="pv-tabs" class="pv-tabs" role="tablist" aria-label="Preview panel">
-            <button id="pv-tab-hl" type="button" role="tab" class="pv-tab" aria-selected="true" aria-controls="pv-tabpanel-hl">Highlights <span id="pv-hl-count" class="pv-tab__count">0</span></button>
-            <button id="pv-tab-chat" type="button" role="tab" class="pv-tab" aria-selected="false" aria-controls="pv-tabpanel-chat" tabindex="-1">Ask this paper</button>
+            <button id="pv-tab-hl" type="button" role="tab" class="pv-tab" aria-selected="false" aria-controls="pv-tabpanel-hl" tabindex="-1">Highlights <span id="pv-hl-count" class="pv-tab__count">0</span></button>
+            <button id="pv-tab-chat" type="button" role="tab" class="pv-tab" aria-selected="true" aria-controls="pv-tabpanel-chat">Ask this paper</button>
           </div>
           <button id="pv-sheet-close" type="button" class="icon-btn pv-sheet-close" aria-label="Close"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m4 4 8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
           </div>
-          <div id="pv-tabpanel-hl" class="pv-tabpanel" role="tabpanel" aria-labelledby="pv-tab-hl">
+          <div id="pv-tabpanel-hl" class="pv-tabpanel" role="tabpanel" aria-labelledby="pv-tab-hl" hidden>
             <p id="pv-hl-msg" class="lib-note" hidden></p>
             <div id="pv-hl-tools" class="pv-hl-tools"><button id="pv-note-add" type="button" class="text-btn">Add note for this page</button></div>
             <div id="pv-hl-empty" class="pv-empty" hidden>
@@ -228,7 +228,7 @@
             </div>
             <ol id="pv-hl-list" class="hl-list" aria-label="Highlights"></ol>
           </div>
-          <div id="pv-tabpanel-chat" class="pv-tabpanel pv-chat" role="tabpanel" aria-labelledby="pv-tab-chat" hidden>
+          <div id="pv-tabpanel-chat" class="pv-tabpanel pv-chat" role="tabpanel" aria-labelledby="pv-tab-chat">
             <p id="pv-chat-scope" class="chat__scope">Answers use only this paper. Citations point to pages. Not saved: closing or reloading clears this chat.</p>
             <p id="pv-chat-nopdf" class="pv-chat__nopdf" hidden></p>
             <div id="pv-chat-idle" class="pv-chat__idle">

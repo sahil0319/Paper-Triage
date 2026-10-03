@@ -1432,7 +1432,14 @@ def hl_preview(page, items=None, hash_=None, **kw):
     expect(page.locator(".pdf-page")).to_have_count(3)
     expect(page.locator('.pdf-page[data-page="1"].has-text')).to_have_count(1, timeout=10_000)
     expect(page.locator("#pv-panel")).to_be_visible()
+    hl_tab(page)
     return stub
+
+
+def hl_tab(page):
+    """Previews open on "Ask this paper" (F-019); the highlight specs switch to the Highlights tab first."""
+    page.click("#pv-tab-hl")
+    expect(page.locator("#pv-tabpanel-hl")).to_be_visible()
 
 
 def line(page, text, n=1):
@@ -1729,6 +1736,7 @@ def test_scanned_page_shows_message_and_still_takes_page_notes(app):
         page, [lib_item(1, pdf={"status": "ready", "error": None, "pages": 1})], pdf=_blank_pdf()
     )
     expect(page.locator(".pdf-page")).to_have_count(1)
+    hl_tab(page)
     msg = page.locator(".pdf-page__notext")
     expect(msg).to_contain_text("No selectable text on this page.", timeout=10_000)
     page.click("#pv-note-add")
@@ -1772,6 +1780,7 @@ def _real_preview(app, base):
     page.goto("/#/library/paper/2401.00001")
     expect(page.locator(".pdf-page")).to_have_count(3, timeout=20_000)
     expect(page.locator('.pdf-page[data-page="1"].has-text')).to_have_count(1, timeout=10_000)
+    hl_tab(page)
     return page
 
 
@@ -1904,6 +1913,47 @@ def test_chat_is_lazy_no_request_until_first_question(app):
     page.click("#pv-tab-chat")
     page.wait_for_timeout(300)
     assert reqs == [], "chat must not call the server before the first question"
+
+
+def test_preview_opens_on_the_chat_panel_without_calling_the_api(app):
+    """F-019: the paper chat is what a preview shows first; it still loads nothing until asked."""
+    page = app
+    reqs = chat_requests(page)
+    preview(page, [lib_item(1)])
+    expect(page.locator(".pdf-page")).to_have_count(3)
+    expect(page.locator("#pv-panel")).to_be_visible()
+    expect(page.locator("#pv-tab-chat")).to_have_attribute("aria-selected", "true")
+    expect(page.locator("#pv-tab-hl")).to_have_attribute("aria-selected", "false")
+    expect(page.locator("#pv-tabpanel-chat")).to_be_visible()
+    expect(page.locator("#pv-tabpanel-hl")).to_be_hidden()
+    expect(page.locator("#pv-chat-idle")).to_be_visible()
+    expect(page.locator("#pv-chat-starters button")).to_have_count(3)
+    page.wait_for_timeout(400)
+    assert reqs == [], "showing the chat panel must not call the server"
+    # Highlights stay one click away, in the same panel.
+    page.click("#pv-tab-hl")
+    expect(page.locator("#pv-hl-empty")).to_be_visible()
+    assert reqs == []
+
+
+def test_narrow_preview_keeps_the_sheet_closed_with_the_chat_tab_selected(app):
+    page = app
+    reqs = chat_requests(page)
+    page.add_init_script("window.__PT_UNDO_MS = 800")
+    preview(page, [lib_item(1)])
+    page.set_viewport_size({"width": 800, "height": 900})
+    expect(page.locator(".pdf-page")).to_have_count(3)
+    sheet = page.locator("#pv-sheet")
+    expect(sheet).not_to_have_attribute("open", "")
+    expect(page.locator("#pv-panel")).to_be_hidden()
+    expect(page.locator("#pv-tab-chat")).to_have_attribute("aria-selected", "true")
+    page.click("#pv-sheet-open")
+    expect(sheet).to_be_visible()
+    expect(sheet.locator("#pv-tab-chat")).to_have_attribute("aria-selected", "true")
+    expect(sheet.locator("#pv-tabpanel-chat")).to_be_visible()
+    expect(sheet.locator("#pv-tabpanel-hl")).to_be_hidden()
+    page.wait_for_timeout(300)
+    assert reqs == []
 
 
 def test_chat_starter_sends_first_question(app):
@@ -2452,18 +2502,21 @@ def test_audit_popover_never_covers_the_toolbar(app):
     assert pop.bounding_box()["y"] >= well["y"] - 0.5
 
 
-def test_audit_new_paper_opens_on_highlights_tab(app):
+def test_new_paper_opens_on_the_ask_tab_and_resets_after_a_tab_change(app):
     page = app
     LibraryStub(page, [lib_item(1), lib_item(2)])
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto("/#/library/paper/2401.00001")
     expect(page.locator(".pdf-page")).to_have_count(3)
-    ask_tab(page)
     expect(page.locator("#pv-tab-chat")).to_have_attribute("aria-selected", "true")
-    page.goto("/#/library/paper/2401.00002")
+    expect(page.locator("#pv-tab-hl")).to_have_attribute("aria-selected", "false")
+    hl_tab(page)
     expect(page.locator("#pv-tab-hl")).to_have_attribute("aria-selected", "true")
-    expect(page.locator("#pv-tabpanel-hl")).to_be_visible()
-    expect(page.locator("#pv-tabpanel-chat")).to_be_hidden()
+    # Another paper starts on Ask again, not on the tab the last one was left on.
+    page.goto("/#/library/paper/2401.00002")
+    expect(page.locator("#pv-tab-chat")).to_have_attribute("aria-selected", "true")
+    expect(page.locator("#pv-tabpanel-chat")).to_be_visible()
+    expect(page.locator("#pv-tabpanel-hl")).to_be_hidden()
 
 
 def test_audit_sheet_header_is_one_row_on_canvas(app):
@@ -2632,6 +2685,7 @@ def test_e2e_highlight_and_note_survive_a_server_restart(offline_page, tmp_path,
         page.goto(f"{base}/#/library/paper/2401.00001")
         expect(page.locator(".pdf-page")).to_have_count(3, timeout=20_000)
         expect(page.locator('.pdf-page[data-page="1"].has-text')).to_have_count(1, timeout=10_000)
+        hl_tab(page)
         line(page, "Abstract").select_text()
         page.click("#pv-hl-btn")
         expect(hls(page).first).to_have_attribute("data-annotation-id", re.compile(r"^\d+$"))
