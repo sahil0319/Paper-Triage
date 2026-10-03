@@ -735,7 +735,7 @@ runs use `E2E_PORT=8765`.
 
 ### Wave R3 — FE lane (final)
 
-- [ ] T076 [FE] Design e2e sweep + screenshots (SC-017..SC-022; R20). Extend
+- [x] T076 [FE] Design e2e sweep + screenshots (SC-017..SC-022; R20). Extend
   `tests/frontend/test_e2e_design.py` (`e2e`, real harness, port 8765 for FE runs), each case
   at viewport widths 390, 820 and 1440: zero non-local requests on Triage, Library and Preview,
   and every woff2 response from `/vendor/fonts/` has `content-type: font/woff2`;

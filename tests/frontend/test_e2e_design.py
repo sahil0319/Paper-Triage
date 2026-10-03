@@ -4,6 +4,9 @@ Computed-style assertions against the live mock server; every case runs through 
 which fails the test on any non-local request.
 """
 
+import os
+from pathlib import Path
+
 import pytest
 from playwright.sync_api import expect
 
@@ -643,9 +646,10 @@ def test_reduced_motion_replaces_flashes_with_static_markers(offline_page, live_
     assert new.evaluate("e => getComputedStyle(e).animationName") == "none"
     assert new.evaluate("e => getComputedStyle(e).backgroundColor") == "rgb(237, 245, 255)"
     # No running animation anywhere in the results list.
-    assert page.evaluate(
-        "document.querySelector('#paper-list').getAnimations({subtree: true}).length"
-    ) == 0
+    assert (
+        page.evaluate("document.querySelector('#paper-list').getAnimations({subtree: true}).length")
+        == 0
+    )
     # Chevron does not rotate over time: disclosure open has no transition.
     chev = page.locator("#paper-list summary .chev").first
     assert chev.evaluate("e => getComputedStyle(e).transitionDuration") in ("0s", "0s, 0s")
@@ -661,7 +665,12 @@ def test_reduced_motion_working_glyph_is_static_with_full_opacity_rays(offline_p
         page.fill("#query", TOPIC)
         page.click("#submit")
         expect(page.locator("#working")).to_be_visible(timeout=3_000)
-        assert page.evaluate("document.querySelector('#working').getAnimations({subtree: true}).length") == 0
+        assert (
+            page.evaluate(
+                "document.querySelector('#working').getAnimations({subtree: true}).length"
+            )
+            == 0
+        )
         assert _css(page, "#working .ray >> nth=0", "opacity") == "1"
         expect(page.locator("#working")).to_be_hidden(timeout=10_000)
     finally:
@@ -713,3 +722,330 @@ def test_forced_colours_sheet_popover_and_highlights_keep_edges(offline_page, li
     expect(sheet).to_be_visible()
     assert sheet.evaluate("e => getComputedStyle(e).borderTopStyle") == "solid"
     assert sheet.evaluate("e => getComputedStyle(e).borderTopWidth") == "1px"
+
+
+# ---- T076: design sweep at 390, 820 and 1440 (SC-017..SC-022) ----
+#
+# F-016 (drag selection keeps popover and the new .hl covers the selected words) is covered by the
+# "F-016" block in test_e2e_library.py, F-017 by test_old_results_stay_interactive_during_a_new_search
+# (test_e2e_browser.py) and the previous-results test above, F-019 by the selected-tab and sheet
+# tests above. `pytest -m e2e` runs them together with this sweep.
+
+WIDTHS = (390, 820, 1440)
+HEIGHTS = {390: 844, 820: 1100, 1440: 900}
+
+
+@pytest.fixture(scope="session")
+def shots_dir(tmp_path_factory):
+    env = os.environ.get("V4_SHOTS_DIR")
+    path = Path(env) if env else tmp_path_factory.mktemp("v4-shots")
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _size(page, width):
+    page.set_viewport_size({"width": width, "height": HEIGHTS[width]})
+
+
+def _triage(page, live_server, width):
+    from ptstubs import LibraryStub, lib_item
+
+    live_server.set_triage_delay(0)
+    LibraryStub(page, [lib_item(1), lib_item(2)])
+    _size(page, width)
+    page.goto("/")
+    expect(page.locator("#submit")).to_be_visible()
+
+
+def _triage_with_chat(page, live_server, width):
+    _triage(page, live_server, width)
+    _search(page)
+    _ask(page, "Which paper is about diffusion?")
+    _ask(page, "What is the capital of France?")
+    expect(page.locator(".turn__a--refused")).to_have_count(1)
+
+
+def _library(page, live_server, width):
+    from ptstubs import LibraryStub, lib_item
+
+    live_server.set_triage_delay(0)
+    LibraryStub(page, [lib_item(1), lib_item(2)])
+    _size(page, width)
+    page.goto("/#/library")
+    expect(page.locator(".lib-row")).to_have_count(2)
+
+
+def _preview_open(page, live_server, width):
+    live_server.set_triage_delay(0)
+    _open_preview(page, width, HEIGHTS[width])
+    if width < 1024:
+        page.click("#pv-sheet-open")
+        sheet = page.locator("#pv-sheet")
+        expect(sheet).to_be_visible()
+        sheet.evaluate("e => Promise.all(e.getAnimations().map(a => a.finished))")
+
+
+def _all_fonts_ready(page, spec='12px "IBM Plex Mono"'):
+    page.wait_for_function(
+        "spec => document.fonts.ready.then(() => document.fonts.check(spec))", arg=spec
+    )
+
+
+CONTRAST_JS = """
+({selector, kind}) => {
+  const parse = (c) => {
+    let m = c.match(/^rgba?\\(([^)]+)\\)/);
+    if (m) {
+      const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number);
+      return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1];
+    }
+    m = c.match(/^color\\(srgb ([^)]+)\\)/);
+    if (m) {
+      const p = m[1].split(/[ /]+/).filter(Boolean).map(Number);
+      return [p[0] * 255, p[1] * 255, p[2] * 255, p.length > 3 ? p[3] : 1];
+    }
+    return [0, 0, 0, 0];
+  };
+  const over = (top, bottom) => {
+    const a = top[3];
+    return [0, 1, 2].map((i) => top[i] * a + bottom[i] * (1 - a)).concat([1]);
+  };
+  const backdrop = (el) => {
+    const layers = [];
+    for (let n = el; n; n = n.parentElement) {
+      const c = parse(getComputedStyle(n).backgroundColor);
+      if (c[3] > 0) layers.push(c);
+      if (c[3] >= 1) break;
+    }
+    let acc = [255, 255, 255, 1];
+    for (let i = layers.length - 1; i >= 0; i--) acc = over(layers[i], acc);
+    return acc;
+  };
+  const lum = (c) => {
+    const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+    return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]);
+  };
+  const ratio = (a, b) => {
+    const l1 = lum(a), l2 = lum(b);
+    return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+  };
+  const out = [];
+  for (const el of document.querySelectorAll(selector)) {
+    if (!el.getClientRects().length) continue;
+    const cs = getComputedStyle(el);
+    if (cs.visibility === 'hidden') continue;
+    if (kind === 'text') {
+      const bg = backdrop(el);
+      out.push(ratio(over(parse(cs.color), bg), bg));
+    } else {
+      const bg = backdrop(el.parentElement);
+      const edge = parse(kind === 'edge-bottom' ? cs.borderBottomColor : cs.borderTopColor);
+      out.push(ratio(over(edge, bg), bg));
+    }
+  }
+  return out;
+}
+"""
+
+
+def _contrast(page, selector, kind="text"):
+    return page.evaluate(CONTRAST_JS, {"selector": selector, "kind": kind})
+
+
+def _assert_contrast(page, checks):
+    """checks: (selector, minimum[, kind]). Every visible match must meet the minimum, and one must exist."""
+    for check in checks:
+        selector, minimum, *rest = check
+        ratios = _contrast(page, selector, rest[0] if rest else "text")
+        assert ratios, f"no visible element for {selector}"
+        assert min(ratios) >= minimum, (selector, minimum, sorted(ratios)[:3])
+
+
+@pytest.mark.parametrize("width", WIDTHS)
+@pytest.mark.parametrize("view", ["triage", "library", "preview"])
+def test_views_make_no_remote_requests_and_serve_woff2(offline_page, live_server, view, width):
+    page = offline_page
+    fonts = []
+    page.on(
+        "response",
+        lambda r: (
+            fonts.append((r.url, r.headers.get("content-type", "")))
+            if "/vendor/fonts/" in r.url and r.url.endswith(".woff2")
+            else None
+        ),
+    )
+    if view == "triage":
+        _triage(page, live_server, width)
+        _search(page)
+        expect(page.locator(".paper__id").first).to_be_visible()
+    elif view == "library":
+        _library(page, live_server, width)
+    else:
+        _preview_open(page, live_server, width)
+    _all_fonts_ready(page)
+    assert page.evaluate("document.fonts.check('16px \"IBM Plex Sans\"')") is True
+    assert fonts, "expected at least one vendored woff2 response"
+    for url, ctype in fonts:
+        assert ctype == "font/woff2", (url, ctype)
+    # offline_page itself fails the test on any non-local request.
+
+
+@pytest.mark.parametrize("width", WIDTHS)
+def test_triage_text_contrast_and_control_edges(offline_page, live_server, width):
+    page = offline_page
+    _triage_with_chat(page, live_server, width)
+    _assert_contrast(
+        page,
+        [
+            (".paper__title", 4.5),
+            (".paper__reason", 4.5),
+            (".paper__authors", 4.5),
+            (".rank__of", 4.5),
+            (".paper__id", 4.5),
+            ("a[data-link]", 4.5),
+            (".views a[aria-current='page']", 4.5),
+            (".views a:not([aria-current])", 4.5),
+            (".turn__a", 4.5),
+            (".turn__a--refused", 4.5),
+            ("a.cite", 4.5),
+            (".views__count", 4.5),
+            (".rank__n", 3),
+            ("#query", 3, "edge-bottom"),
+            ("button.save", 3, "edge"),
+        ],
+    )
+
+
+@pytest.mark.parametrize("width", WIDTHS)
+def test_error_notification_text_contrast(offline_page, live_server, width):
+    page = offline_page
+    _triage(page, live_server, width)
+    page.route(
+        "**/api/triage",
+        lambda route: route.fulfill(
+            status=502, content_type="application/json", body='{"detail": "upstream down"}'
+        ),
+    )
+    page.fill("#query", TOPIC)
+    page.click("#submit")
+    expect(page.locator("#alert")).to_be_visible(timeout=5_000)
+    _assert_contrast(page, [(".alert", 4.5), (".alert__title", 4.5), (".alert__detail", 4.5)])
+
+
+@pytest.mark.parametrize("width", WIDTHS)
+def test_library_text_contrast_and_tag_edge(offline_page, live_server, width):
+    page = offline_page
+    _library(page, live_server, width)
+    _assert_contrast(
+        page,
+        [
+            (".lib-saved", 4.5),
+            (".views__count", 4.5),
+            (".views a[aria-current='page']", 4.5),
+            (".tag", 4.5),
+            (".tag", 3, "edge"),
+        ],
+    )
+
+
+@pytest.mark.parametrize("width", WIDTHS)
+def test_preview_tabs_contrast(offline_page, live_server, width):
+    page = offline_page
+    _preview_open(page, live_server, width)
+    _assert_contrast(page, [(".pv-tab", 4.5)])
+    # Selected and unselected tabs are both measured.
+    assert page.locator('.pv-tab[aria-selected="true"]:visible').count() == 1
+    assert page.locator('.pv-tab[aria-selected="false"]:visible').count() >= 1
+
+
+@pytest.mark.parametrize("width", WIDTHS)
+def test_tab_to_submit_shows_a_2px_blue_focus_ring(offline_page, live_server, width):
+    page = offline_page
+    _triage(page, live_server, width)
+    page.focus("#query")
+    page.keyboard.press("Tab")
+    expect(page.locator("#submit")).to_be_focused()
+    assert _css(page, "#submit", "outlineWidth") == "2px"
+    assert _css(page, "#submit", "outlineStyle") == "solid"
+    assert _css(page, "#submit", "outlineColor") == PRIMARY
+
+
+ANIMATED_JS = """
+sel => document.getAnimations().filter(a => {
+  const t = a.effect && a.effect.target;
+  return t && t.closest && t.closest(sel);
+}).length
+"""
+MOTION_TARGETS = ".paper--cited, .paper--new, #paper-list details.disclosure, #pv-sheet"
+
+
+@pytest.mark.parametrize("width", WIDTHS)
+def test_reduced_motion_leaves_no_animations_and_keeps_static_markers(
+    offline_page, live_server, width
+):
+    page = offline_page
+    live_server.set_triage_delay(0)
+    page.emulate_media(reduced_motion="reduce")
+    _size(page, width)
+    page.goto("/")
+    _cite_and_load_more(page)
+    first = page.locator("#paper-list li.paper").first
+    first.locator("details.disclosure summary").click()
+    expect(first.locator("details.disclosure")).to_have_attribute("open", "")
+    assert page.evaluate(ANIMATED_JS, MOTION_TARGETS) == 0
+    cited = page.locator("#paper-list li.paper--cited").first
+    new = page.locator("#paper-list li.paper--new").first
+    assert cited.evaluate("e => getComputedStyle(e).outlineWidth") == "2px"
+    assert cited.evaluate("e => getComputedStyle(e).outlineColor") == PRIMARY
+    assert new.evaluate("e => getComputedStyle(e).backgroundColor") == "rgb(237, 245, 255)"
+
+
+@pytest.mark.parametrize("width", (390, 820))
+def test_reduced_motion_sheet_has_no_animations(offline_page, live_server, width):
+    page = offline_page
+    live_server.set_triage_delay(0)
+    page.emulate_media(reduced_motion="reduce")
+    _open_preview(page, width, HEIGHTS[width])
+    page.click("#pv-sheet-open")
+    expect(page.locator("#pv-sheet")).to_be_visible()
+    assert page.evaluate(ANIMATED_JS, MOTION_TARGETS) == 0
+
+
+@pytest.mark.parametrize("width", WIDTHS)
+def test_forced_colours_show_borders_on_submit_and_cites(offline_page, live_server, width):
+    page = offline_page
+    live_server.set_triage_delay(0)
+    page.emulate_media(forced_colors="active")
+    _triage(page, live_server, width)
+    _search(page)
+    _ask(page, "Which paper is about diffusion?")
+    for sel in ("#submit", ".cite"):
+        style = page.locator(sel).first.evaluate(
+            "e => { const s = getComputedStyle(e); return [s.borderTopColor, s.borderTopWidth, s.borderTopStyle]; }"
+        )
+        assert style[0] != "rgba(0, 0, 0, 0)", (sel, style)
+        assert style[1] != "0px" and style[2] != "none", (sel, style)
+
+
+@pytest.mark.parametrize("width", WIDTHS)
+@pytest.mark.parametrize("view", ["triage", "library", "preview"])
+def test_screenshots_of_triage_library_and_preview(
+    offline_page, live_server, shots_dir, view, width
+):
+    page = offline_page
+    if view == "triage":
+        _triage(page, live_server, width)
+        _search(page)
+        _ask(page, "Which paper is about diffusion?")
+        _all_fonts_ready(page)
+        page.screenshot(path=str(shots_dir / f"triage-{width}.png"), full_page=True)
+    elif view == "library":
+        _library(page, live_server, width)
+        _all_fonts_ready(page, '16px "IBM Plex Sans"')
+        page.screenshot(path=str(shots_dir / f"library-{width}.png"), full_page=True)
+    else:
+        _preview_open(page, live_server, width)  # panel at 1440, bottom sheet below 1024
+        _all_fonts_ready(page, '16px "IBM Plex Sans"')
+        page.screenshot(path=str(shots_dir / f"preview-{width}.png"))
+    shot = shots_dir / f"{view}-{width}.png"
+    assert shot.exists() and shot.stat().st_size > 5_000
