@@ -2528,6 +2528,8 @@ def test_audit_sheet_header_is_one_row_on_canvas(app):
     page.click("#pv-sheet-open")
     sheet = page.locator("#pv-sheet")
     expect(sheet).to_be_visible()
+    # The sheet slides up over --dur-moderate; measure only once the slide has finished.
+    sheet.evaluate("e => Promise.all(e.getAnimations().map(a => a.finished))")
     tabs = sheet.locator("#pv-tab-hl").bounding_box()
     close = sheet.locator("#pv-sheet-close").bounding_box()
     assert abs((tabs["y"] + tabs["height"] / 2) - (close["y"] + close["height"] / 2)) < 12
@@ -2825,7 +2827,11 @@ def page_box(page, n=1):
 
 def two_col_preview(page):
     page.add_init_script("window.__PT_UNDO_MS = 800")
-    stub = LibraryStub(page, [lib_item(1, pdf={"status": "ready", "error": None, "pages": 1})], pdf=two_column_pdf())
+    stub = LibraryStub(
+        page,
+        [lib_item(1, pdf={"status": "ready", "error": None, "pages": 1})],
+        pdf=two_column_pdf(),
+    )
     page.set_viewport_size({"width": 1280, "height": 800})
     page.goto("/#/library/paper/2401.00001")
     expect(page.locator('.pdf-page[data-page="1"].has-text')).to_have_count(1, timeout=10_000)
@@ -2920,7 +2926,11 @@ def test_text_layer_matches_canvas_scale_and_rests_clean_after_a_drag(app):
     first = box_of(page, "Left column line one")
     drag_path(
         page,
-        [(first["x"] + 1, first["y"] + 7), (first["x"] + 120, first["y"] + 40), (first["x"] + 160, first["y"] + 7)],
+        [
+            (first["x"] + 1, first["y"] + 7),
+            (first["x"] + 120, first["y"] + 40),
+            (first["x"] + 160, first["y"] + 7),
+        ],
     )
     layer = page.locator('.pdf-page[data-page="1"] .textLayer')
     expect(layer).not_to_have_class(re.compile("selecting"))
