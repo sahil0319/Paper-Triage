@@ -1,5 +1,5 @@
 {
-  "phase": "v3 final verification (paused)",
+  "phase": "done (v3)",
   "tasks": {
     "T001": "done",
     "T002": "done",
@@ -67,10 +67,10 @@
     "T064": "done",
     "T065": "done"
   },
-  "last_checkpoint_ts": 1728138600,
-  "context_pct": 73.6,
+  "last_checkpoint_ts": 1728057603,
+  "context_pct": 78.3,
   "last_warn_level": 1,
   "last_warn_ts": 1791010076.409174,
-  "DONE": false,
+  "DONE": true,
   "last_precompact_ts": 1790846263.5785239
 }
