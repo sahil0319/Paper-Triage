@@ -1,56 +1,70 @@
-# Checkpoint: v4 Build In Progress
+# Checkpoint: v4 Build (T074-T076, Tester Final Pass)
 
-**Phase**: v4 build (Carbon redesign, FR-030)
+**Phase**: v4 build (Carbon redesign, FR-030). Wave R2 CSS implementation (T068-T073 done).
 
-**Status**: Wave R1 complete (MIME type + fonts + token layer). T066-T067 done. T075 (README) landed. T068-T074 started (FE strict sequence). Tester verified F-016..F-019 + T066-T067: pytest 532 x2, ruff clean, docs/qa/v4-fixes.md green.
+**Status**: T068-T073 committed and ticked (token layer, nav, rows, library, preview, panel). T075 README done. Tester verified T068 and T069+T070+F-020; currently verifying T071+T072; T073 not yet tested. T074 (states, motion, forced-colours) and T076 (design e2e sweep, screenshots) remain.
 
 ## Summary
 
-### Completed (v4 wave R1)
+### Completed
+- **T068**: Token layer, global type, focus, hover, motion (app.css + test_design_tokens.py)
+- **T069**: Shell, nav, buttons, query (brief items 5-8)
+- **T070**: Result rows and results chat (brief items 9-11, 15-16)
+- **T071**: Library view (brief items 18-22)
+- **T072**: Preview toolbar, find, highlights, popover (brief items 23-27)
+- **T073**: Preview side panel, notes, Ask this paper, bottom sheet (brief items 28-31)
+- **T075**: README + SETUP_LOG v4 design note
+- **fix(F-020)**: Sheet animation timing (test wait for animation end)
 
-- **T066**: woff2 MIME type registration (BE)
-- **T067**: IBM Plex fonts vendored (FE; 8 woff2 files, 125 KB, OFL 1.1)
-- **T075**: README + SETUP_LOG v4 design note (BE; Carbon, font fetch, design e2e command)
-- **F-016, F-017, F-019 fix commits**: previous results stay interactive during search, highlight selection, preview opens on Ask tab (landed d323ef9, 57a8e71, 6a1912c)
+### In Progress
+- **Tester**: Verifying T071+T072 snapshot method (port 8766); T073 not yet tested
+- **Next FE**: T074 (states, motion, forced-colours sweep)
 
-### In Progress (FE strict sequence)
+### Not Started
+- **T074**: States, motion, forced-colours sweep (test_design_tokens.py + test_e2e_design.py additions + app.css)
+- **T076**: Design e2e sweep + screenshots (SC-017..SC-022)
 
-- **T068**: Token layer + global type, focus, hover, motion (started)
-- T069-T074: Shell, nav, buttons, query → Library → Preview toolbar → Panel, notes, paper chat → States, motion, forced colours
-- T076: Design e2e sweep + screenshots (needs T068-T074, T066 font GET)
-
-### Tests Status
-
-- **v3 final**: pytest 532 pass, ruff clean (42fbfc3)
-- **v4 in-flight fixes**: F-016 highlight selection, F-017 previous results opacity, F-019 preview tab
-- **Tester gate** (docs/qa/v4-fixes.md): all fixes PASS, ready for v4 build
+## Test Status
+- T068: PASS (test_design_tokens solo x3, e2e x3, no hex/rgb outside :root)
+- T069+T070+F-020: PASS (test_e2e_design x3, 15 assertions)
+- T071+T072: VERIFYING (snapshot method on port 8766)
+- T073: NOT YET TESTED
+- T074: NOT STARTED
+- T076: NOT STARTED
 
 ## Files Touched (Last Wave)
-
-- `pt/app.py` (T066: mimetypes, T050)
-- `pt/static/vendor/fonts/**` (T067: woff2 files, plex.css, README)
-- `pt/static/index.html` (T067: font CSS link)
-- `tests/frontend/test_static_assets.py` (T067: font validation)
-- `README.md`, `SETUP_LOG.md` (T075: v4 design note, build-time font fetch)
-- `.claude/state/` (this checkpoint)
+- `pt/static/app.css` (T068-T074: token layer, component styles, states, motion)
+- `tests/frontend/test_design_tokens.py` (T068, T074: token validation)
+- `tests/frontend/test_e2e_design.py` (T069-T074: design assertions, motion, colours)
+- `README.md`, `SETUP_LOG.md` (T075: v4 design note)
 
 ## Known Open Items
-
-1. **T068-T074**: FE tasks edit `app.css` sequentially; no parallelism. Each task:
-   - Test first (parse tokens, visual assertions)
-   - Update CSS (global tokens, per-component styles)
-   - Keep all v2/v3 UI hooks + e2e checks
-   - One commit with `app.css` + tests only
-2. **T076**: Screenshot proof at 390/820/1440 px, contrast checks, animation assertions
-3. **Post-T076**: tester full pytest + ruff + e2e sweep; designer re-audit on screenshots; any fixes become T077+
+1. **T071+T072 verification**: Tester currently running snapshot method; results pending
+2. **T073 verification**: Not yet run; queue after T071+T072 pass
+3. **T074 sequence**: Strict FE sequence; blocks T076
+4. **T076 final sweep**: Design e2e + screenshots at 390/820/1440 px, contrast, animation
+5. **Worktree cleanup**: Stale `.claude/worktrees/agent-a4628e381b8ec6bcc` and branch `worktree-agent-a4628e381b8ec6bcc` (user to remove; sandbox blocked agent)
+6. **Uncommitted state**: docs/qa/* from tester (leave uncommitted; user-owned decision), .claude/agents/* edits (cache reloads next session)
 
 ## Exact Next Command
+1. Tester finishes T071+T072 verification; if green, test T073
+2. If T073 green, frontend-builder starts T074:
+   - Read DESIGN.md + PRODUCT.md
+   - Test first: add to test_design_tokens.py (no hex/rgb outside :root) and test_e2e_design.py (F-017 keep, opacity, states, motion, forced-colours)
+   - Update app.css: working card, notes, alert, empty, cited/new fades, reduced motion, forced colours
+   - One commit with app.css + tests
+3. After T074 green, frontend-builder: T076 design e2e sweep + screenshots
+4. After T076 green, tester runs final pytest + ruff + e2e sweep full project
+5. If all green, set DONE=true, report complete
 
-FE continues at T068: read DESIGN.md + PRODUCT.md, implement token layer + global type styles, test design tokens parse, commit. Loop until T074 done, then T076 design e2e sweep, then tester final pass.
+## Task/Commit Verification
+- T001-T067: 67 tasks, all ticked, all committed ✓
+- T068-T073: 6 tasks, all ticked (94ed09e, f6275a5, fb34554, 3f6cc23, d08cf70, 59debeb), all committed ✓
+- T074: NOT ticked, NOT committed (waiting for FE)
+- T075: 1 task, ticked, committed (40b7ac1) ✓
+- T076: NOT ticked, NOT committed (waiting for FE after T074)
+- fix(F-020): committed (c41d740), not a task ✓
 
----
-
-**Task Count**: T001-T067, T075 done (68 total); T068-T074, T076 in progress (8 remaining).
-**DONE flag**: false.
-**Blocker**: None. FE on task.
-**Next agent**: frontend-builder (T068).
+**DONE flag**: false (T074, T076, tester final pass remain)
+**Blocker**: None. Tester verifying T071+T072; when complete, FE proceeds T074.
+**Next agent**: tester (finish T071+T072 verify, queue T073) → frontend-builder (T074) → frontend-builder (T076) → tester (final pass).

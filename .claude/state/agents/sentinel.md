@@ -181,3 +181,43 @@ When FE Wave F done → tester FE Wave F (verify T052-T055, smoke T056) → FE W
 ### Next
 Frontend-builder continues at T068. Loop until T074, then T076 design e2e, then tester final pass.
 
+
+## Checkpoint: v4 Build (T074-T076, Tester Verification In-Flight) (2026-10-04)
+
+**Task**: Update checkpoint after T068-T073 complete and tester verifying
+**Status**: DONE
+**Findings**: T068-T073 all ticked and committed (94ed09e..59debeb). T075 done. Tester verified T068 and T069+T070+F-020 (F-020 test fix). Tester currently verifying T071+T072 (snapshot method). T073 not yet tested. T074 and T076 remain. No task/commit mismatches.
+
+### Actions taken
+- Verified tasks.md: T068-T073 and T075 ticked; T074 and T076 unticked
+- Verified git commits: T068-T073 present (94ed09e, f6275a5, fb34554, 3f6cc23, d08cf70, 59debeb) with fix(F-020) c41d740
+- Updated progress.json: T068-T073→done, T074→waiting, T075→done, T076→waiting, phase="v4 build", DONE=false
+- Wrote checkpoint.md: phase, task status, tester in-flight state, exact next command
+- Appended sentinel.md (this file)
+
+### Verified
+- v4 wave R2 CSS complete: T068 token layer, T069 nav, T070 rows, T071 library, T072 preview toolbar, T073 preview panel all committed
+- Tester progress: T068 PASS (12 x3), T069+T070+F-020 PASS (15 x3), T071+T072 VERIFYING (snapshot method on port 8766), T073 NOT YET TESTED
+- No task/commit mismatches: 67 done tasks T001-T067 + T075, 6 done CSS tasks T068-T073, 2 waiting T074-T076
+
+### Tester state
+- Verifying: T071+T072 snapshot method
+- Next queue: T073, then tester wait on T074/T076 FE completion, then full final pass
+
+### FE lane next
+- T074: states, motion, forced-colours sweep (strict sequence)
+- T076: design e2e sweep + screenshots (final before tester)
+
+### Open items
+- T071+T072 verification result (pending)
+- T073 verification (queued)
+- Worktree cleanup: stale .claude/worktrees/agent-a4628e381b8ec6bcc (user to remove)
+- Uncommitted: docs/qa/* from tester (leave as-is; user-owned decision), .claude/agents/* edits (cache per-session)
+
+### Next
+1. Tester finishes T071+T072 verify (snapshot method)
+2. Tester queues T073 verify
+3. Frontend-builder starts T074 when T073 complete
+4. After T074 green: T076 design e2e sweep
+5. After T076 green: tester full final pass (pytest + ruff + e2e)
+6. If all green: set DONE=true
