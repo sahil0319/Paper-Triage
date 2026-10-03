@@ -1777,7 +1777,8 @@ def test_real_highlight_persists_and_scales_with_zoom(app, real_library):
     page = _real_preview(app, real_library)
     line(page, "Abstract").select_text()
     page.click("#pv-hl-btn")
-    expect(hls(page).first).to_be_attached()
+    # The optimistic node (tmp-N) is replaced by the persisted one: wait for the saved id (F-012).
+    expect(hls(page).first).to_have_attribute("data-annotation-id", re.compile(r"^\d+$"))
     ratio_fit = hls(page).first.evaluate(
         "e => e.getBoundingClientRect().width / e.closest('.pdf-page').clientWidth"
     )
