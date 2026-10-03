@@ -300,3 +300,109 @@ def test_library_filter_field_is_carbon(library):
     assert abs(field.bounding_box()["height"] - 40) < 0.5
     assert field.evaluate("e => getComputedStyle(e).borderTopWidth") == "0px"
     assert field.evaluate("e => getComputedStyle(e).borderBottomColor") == BORDER_STRONG
+
+
+# ---- T072: Preview toolbar, well, highlights and popover ----
+
+HL_FILLS = {
+    "yellow": "rgb(255, 222, 102)",
+    "mint": "rgb(159, 224, 192)",
+    "peach": "rgb(255, 194, 158)",
+}
+
+
+@pytest.fixture
+def pv(offline_page, live_server):
+    from test_e2e_library import hl_preview
+
+    live_server.set_triage_delay(0)
+    hl_preview(offline_page)
+    return offline_page
+
+
+def test_toolbar_controls_are_40px_and_square(pv):
+    page = pv
+    controls = page.locator("#pv-controls button, #pv-controls select, #pv-controls input")
+    seen = 0
+    for i in range(controls.count()):
+        c = controls.nth(i)
+        if not c.is_visible():
+            continue
+        seen += 1
+        assert abs(c.bounding_box()["height"] - 40) < 1, c.get_attribute("id")
+        assert c.evaluate("e => getComputedStyle(e).borderTopLeftRadius") == "0px"
+    assert seen >= 8
+    title = page.locator("#preview-heading")
+    assert title.evaluate("e => getComputedStyle(e).fontWeight") == "600"
+    assert title.evaluate("e => getComputedStyle(e).fontSize") == "16px"
+
+
+def test_highlight_button_and_color_select_share_one_edge(pv):
+    page = pv
+    btn = page.locator("#pv-hl-btn").bounding_box()
+    sel = page.locator("#pv-hl-color").bounding_box()
+    assert abs((btn["x"] + btn["width"]) - sel["x"]) <= 1.5
+    assert page.locator("#pv-hl-color").evaluate("e => getComputedStyle(e).appearance") == "none"
+
+
+@pytest.mark.parametrize("color", ["yellow", "mint", "peach"])
+def test_highlights_are_opaque_fills_with_multiply(pv, color):
+    from test_e2e_library import drag_select, hls
+
+    page = pv
+    drag_select(page, "Abstract")
+    page.locator(f'#pv-popover button.swatch[aria-label="Highlight {color}"]').click()
+    hl = hls(page).first
+    expect(hl).to_be_attached()
+    expect(hl).to_have_css("background-color", HL_FILLS[color])
+    assert hl.evaluate("e => getComputedStyle(e).borderTopLeftRadius") == "2px"
+    layer = page.locator('.pdf-page[data-page="1"] .hl-layer')
+    assert layer.evaluate("e => getComputedStyle(e).mixBlendMode") == "multiply"
+    item = page.locator("#pv-hl-list li.hl-item[data-annotation-id]").first
+    expect(item.locator(".hl-item__kind")).to_have_text(color.capitalize())  # SC-019: named
+    assert (
+        item.locator(".hl-item__quote").evaluate("e => getComputedStyle(e).borderLeftWidth")
+        == "3px"
+    )
+    assert (
+        item.locator(".hl-item__quote").evaluate("e => getComputedStyle(e).borderLeftColor")
+        == HL_FILLS[color]
+    )
+    dot = item.locator(".dot")
+    assert dot.evaluate("e => getComputedStyle(e).borderTopLeftRadius") == "50%"
+
+
+def test_pdf_pages_have_a_page_edge_and_no_shadow(pv):
+    page = pv
+    p1 = page.locator("section.pdf-page").first
+    for side in ("Top", "Right", "Bottom", "Left"):
+        assert p1.evaluate(f"e => getComputedStyle(e).border{side}Width") == "1px"
+        assert p1.evaluate(f"e => getComputedStyle(e).border{side}Color") == "rgb(198, 198, 198)"
+    assert p1.evaluate("e => getComputedStyle(e).boxShadow") == "none"
+    assert page.locator("#pv-pages").evaluate("e => getComputedStyle(e).backgroundColor") == (
+        "rgb(224, 224, 224)"
+    )
+
+
+def test_popover_is_a_square_overlay_with_round_swatches(pv):
+    from test_e2e_library import drag_select
+
+    page = pv
+    drag_select(page, "Abstract")
+    pop = page.locator("#pv-popover")
+    expect(pop).to_be_visible()
+    assert pop.evaluate("e => getComputedStyle(e).borderTopLeftRadius") == "0px"
+    assert pop.evaluate("e => getComputedStyle(e).boxShadow") != "none"
+    assert pop.evaluate("e => getComputedStyle(e).backgroundColor") == "rgb(255, 255, 255)"
+    for sw in pop.locator("button.swatch").all():
+        assert sw.evaluate("e => getComputedStyle(e).borderTopLeftRadius") == "50%"
+
+
+def test_find_field_is_carbon_and_hover_fill_is_surface_hover(pv):
+    page = pv
+    page.click("#pv-find-btn")
+    field = page.locator("#pv-find-input")
+    expect(field).to_be_visible()
+    assert abs(field.bounding_box()["height"] - 40) < 1
+    assert field.evaluate("e => getComputedStyle(e).borderTopWidth") == "0px"
+    assert field.evaluate("e => getComputedStyle(e).backgroundColor") == "rgb(244, 244, 244)"

@@ -666,7 +666,7 @@ runs use `E2E_PORT=8765`.
   `.lib-row select[data-act="move"]` height 32 and `appearance` none; the computed
   `transition-property` of `.lib-row` does not contain `height`. Files `pt/static/app.css`,
   `tests/frontend/test_e2e_design.py`.
-- [ ] T072 [FE] [US5] [US8] Preview toolbar, find, well, highlights and popover (FR-030a-d;
+- [x] T072 [FE] [US5] [US8] Preview toolbar, find, well, highlights and popover (FR-030a-d;
   brief items 23-27; D2.4, D8.8). Keep F-016: change only visuals (`.textLayer ::selection` uses
   `color-mix(in srgb, var(--color-primary) 25%, transparent)`), never the selection or
   highlight code paths; the F-016 e2e check passes unchanged. `app.css`: `.pv-toolbar` controls
