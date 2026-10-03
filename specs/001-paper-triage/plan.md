@@ -251,6 +251,93 @@ and `button[data-act="keep"]`; `#library`, `#lib-filter`, `#lib-tags button.tag[
 `#pv-chat-question`, `#pv-chat-ask`, `#pv-chat-log li.turn`, `.cite[data-page]`,
 `.turn__a--refused`.
 
+## v4 Amendment (2026-10-03): Carbon visual redesign
+
+Sources: spec.md FR-030 (and FR-012 pointer), SC-017..SC-022, Clarifications "Session
+2026-10-03 (v4)"; root DESIGN.md v2.0 (Paper-Triage-Carbon, commit 0da87be; section refs D2..D9
+below); work list `docs/design/redesign-brief.md` items 1-34; font facts
+`docs/research/ibm-verify.md`; research R19-R21. Visual only: no API, data-model, contract or
+copy change; contracts/api.md and data-model.md are unchanged (stored highlight colour names
+`yellow`/`mint`/`peach` stay).
+
+**Technical context deltas**: no new Python or JS dependency, no build step. New vendored
+static assets: 8 woff2 files (IBM Plex Sans 400/600 Latin, Latin-ext, Greek; Plex Mono 400
+Latin, Latin-ext; 125,228 bytes), `plex.css`, `LICENSE-IBM-Plex.txt` (OFL 1.1), `README`
+(packages + versions) under `static/vendor/fonts/` (R19). One approved build-time fetch; no
+runtime network. Browsers unchanged (evergreen Chrome, Firefox, Safari).
+
+### v4 Constitution Check (2.0.0)
+
+| Principle | Check | Status |
+|---|---|---|
+| I Small | No new dependency; fonts vendored same-origin under `static/vendor/fonts/` with OFL licence and pinned versions (Fontsource 5.3.0, `@ibm/plex-sans` 1.1.0), justified here and in R19; no CDN, no framework, no build step; CSS stays vanilla | PASS |
+| II Offline | Font files committed; tests need no network; e2e harness still aborts non-local requests and the design e2e asserts zero external requests (SC-017); screenshots written locally | PASS |
+| III Grounded | No chat change; refusal keeps its own deliberate (info) look | PASS |
+| IV Scope | 9 stories / 32 FRs (cap 9 / 32); still one page, same hash routes | PASS |
+| V Honest critique | Abstract-only flag and basis line keep their place and gain AA contrast | PASS |
+
+### Files (v4 touch map)
+
+[BE]:
+
+- `pt/app.py`: `mimetypes.add_type("font/woff2", ".woff2")` next to the `.mjs` registration
+  (brief item 32).
+- `tests/test_api.py`: `GET
+  /vendor/fonts/plex-sans-latin-400.woff2` -> 200, `content-type: font/woff2`; skip with reason
+  while the file is absent (FE T067 not landed), as T059 did for pdf.js.
+- `README.md`, `SETUP_LOG.md`: design note (Carbon-based DESIGN.md, vendored Plex fonts with
+  licence and versions, the one-time font fetch, light theme only).
+
+[FE]:
+
+- `static/vendor/fonts/{plex-sans-latin-400,plex-sans-latin-600,plex-sans-latin-ext-400,
+  plex-sans-latin-ext-600,plex-sans-greek-400,plex-sans-greek-600,plex-mono-latin-400,
+  plex-mono-latin-ext-400}.woff2`, `plex.css`, `LICENSE-IBM-Plex.txt`, `README`.
+- `static/index.html`: one `<link rel="stylesheet" href="vendor/fonts/plex.css">` before
+  `app.css`. No other markup change (D9).
+- `static/app.css`: `:root` token layer (D9), global type/focus/hover/motion (D3, D6, D7), then
+  per-view restyles (D8). Class names unchanged.
+- `static/app.js`, `library.js`, `viewer.js`, `paperchat.js`: no change expected. If a style
+  hook is missing, add only a class toggle; never change behaviour (FR-030f).
+- `tests/frontend/test_static_assets.py` (font files, licence, relative `url()`, link present),
+  new `tests/frontend/test_design_tokens.py` (static CSS rules), new
+  `tests/frontend/test_e2e_design.py` (rendered-style, contrast, reduced motion, forced
+  colours, screenshots); existing e2e files only where they assert old visual values.
+
+### Key design notes (v4)
+
+- **Order**: fonts (T067) -> token layer with a mechanical old-to-new token remap of every
+  `var()` use (T068, brief item 3 table), so each commit renders coherently -> per-view
+  restyles in `app.css`, one region per task -> states, motion and forced colours sweep plus the
+  no-literal-hex rule -> design e2e and screenshots. All FE v4 tasks touch `app.css`, so they
+  run in sequence in one lane (R21).
+- **In-flight fixes gate**: F-016 (`viewer.js`/`app.css` highlight selection), F-017
+  (`app.js`/`app.css` previous results interactive) and F-019 (`viewer.js`/`paperchat.js`
+  default tab) share files with v4 FE work. The FE lane starts v4 only after those fix commits
+  land. F-018 is BE-only (landed d323ef9). v4 tasks keep them: brief B-a = F-019, B-b = F-017;
+  T070/T074 keep `.is-stale` at full opacity with no `pointer-events`/`inert`; T072 keeps the
+  F-016 selection behaviour (text-layer `::selection` restyle only); T073 keeps `Ask this paper`
+  as the default tab.
+- **Old visual assertions**: an existing e2e that asserts an old value (0.4 opacity, radius,
+  Airtable colour) is updated to the DESIGN.md value in the same task; the commit message says
+  so (brief scope note).
+- **Visual regression** (R20): rendered-style assertions at 390/820/1440 px plus screenshots
+  (Triage results, Library, Preview with panel or sheet) to `$V4_SHOTS_DIR` (default: pytest
+  temp dir; the tester sets `docs/qa/screenshots/v4/` for the designer re-audit). No pixel
+  diff.
+- **Contrast check**: in the page, compute WCAG relative luminance from computed `color` and
+  the first opaque ancestor `background-color` for a fixed selector list (D2 pairs); assert
+  >= 4.5 (text), >= 3 (numerals, control edges, meter).
+- **Highlights**: `.hl--*` computed background equals the `--hl-*` value with alpha 1; the
+  layer has `mix-blend-mode: multiply`.
+
+### UI test hooks (v4)
+
+Unchanged from v2/v3. New assertions use existing selectors only (`.paper`, `.rank__n`,
+`.rank__meter`, `.btn--primary`, `.cite`, `.turn__a--refused`, `.alert`, `.working`,
+`.is-stale`, `.rail__item`, `.tag`, `.hl`, `.pv-tab`, `.pv-sheet`, `.global-nav`).
+
 ## Complexity Tracking
 
-None. No constitution violations (v3 scope covered by constitution 2.0.0).
+None. No constitution violations (v3 scope covered by constitution 2.0.0; v4 adds one FR to
+reach the 32-FR cap and no story).

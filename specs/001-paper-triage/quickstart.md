@@ -62,6 +62,24 @@ v3 Library (mock mode, offline; PDFs land in `PAPER_TRIAGE_DATA_DIR`, default
 19. Unsave from the card: a confirmation appears; confirm: the Library entry, its PDF file and
     its highlights are gone.
 
+v4 Carbon redesign (mock mode, offline; visual reference: DESIGN.md):
+
+20. Browser devtools Network panel: every request goes to 127.0.0.1; the Plex woff2 files load
+    from `/vendor/fonts/` with type `font/woff2`. Text is IBM Plex Sans; paper ids and cite
+    chips are Plex Mono.
+21. Triage: white canvas, square controls, one blue primary button, rank numeral plus a 4px
+    meter. Start a second search: the previous results stay at full opacity and stay clickable
+    until the new results replace them (F-017).
+22. Preview: opens on the "Ask this paper" tab with no chat request (F-019). Select text: the
+    selection is visible and stable (F-016); Yellow, Mint and Peach highlights read clearly on
+    the white page with black text legible.
+23. With the OS "reduce motion" setting on: no flashes, slides or chevron rotation; cited and
+    new rows still show a static marker.
+
+```sh
+MOCK_LLM=1 V4_SHOTS_DIR=docs/qa/screenshots/v4 uv run pytest -q -m e2e tests/frontend/test_e2e_design.py
+```
+
 Live mode: copy `.env.example` to `.env`, set `ANTHROPIC_API_KEY` (optional
 `ANTHROPIC_MODEL`), run without `MOCK_LLM`. Expect ~3 s per arXiv request (rate limit).
 

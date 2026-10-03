@@ -538,6 +538,226 @@ hooks. Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest 
   annotations, paper chat; `PAPER_TRIAGE_DATA_DIR`; vendored pdf.js (version, license, source);
   note that stored arXiv PDFs are for personal use only (do not deploy publicly). Needs T059.
 
+## Phase 9: v4 amendment (Carbon visual redesign)
+
+**Sources**: spec.md FR-030 (clauses a-f), FR-012, SC-017..SC-022, Clarifications "Session
+2026-10-03 (v4)"; plan.md "v4 Amendment" (touch map, design notes, in-flight fixes gate);
+research R19-R21; root DESIGN.md v2.0 (section refs D2..D10); `docs/design/redesign-brief.md`
+items 1-34 (scope note B-a, B-b); `docs/research/ibm-verify.md` (font packages and sizes).
+`pt/` = `src/paper_triage/`. Visual only: no API, data, copy, DOM order, id, ARIA, hash-route or
+keyboard change. Class names stay; restyle existing selectors. Every FE task: re-read DESIGN.md
+and PRODUCT.md first; keep all v2/v3 UI test hooks; if an existing e2e asserts an old visual
+value (0.4 opacity, radius, Airtable colour), update it to the DESIGN.md value in the same task
+and say so in the commit message. Keep the in-flight fixes: F-016 (highlight selection), F-017
+(previous results stay at full opacity and interactive during a new search; brief B-b), F-018
+(long multi-keyword search; BE, landed d323ef9), F-019 (preview opens on `Ask this paper`,
+chat lazy; brief B-a). Every task: tests first where cheap; ends with `MOCK_LLM=1 uv run pytest
+-q` and `uv run ruff check .` green; one commit with only its own paths plus `tasks.md`. FE e2e
+runs use `E2E_PORT=8765`.
+
+### Wave R1 — BE lane
+
+- [ ] T066 [P] [BE] woff2 MIME type (FR-030b, SC-017; brief item 32). Test first in
+  `tests/test_api.py`: after `create_app()`, `mimetypes.guess_type("a.woff2")[0] ==
+  "font/woff2"`; `GET /vendor/fonts/plex-sans-latin-400.woff2` -> 200 with `content-type:
+  font/woff2` (`pytest.skip` with reason "fonts not vendored yet (T067)" while the file is
+  absent). Then `pt/app.py`: `mimetypes.add_type("font/woff2", ".woff2")` next to the existing
+  `.mjs` registration. Files `pt/app.py`, `tests/test_api.py`.
+
+### Wave R1 — FE lane (starts after the F-016, F-017 and F-019 fix commits land)
+
+- [ ] T067 [FE] Vendor IBM Plex fonts + static guard (FR-030b, SC-017; brief items 1, 2; D3.1,
+  D3.2; R19). Test first `tests/frontend/test_static_assets.py`: the 8 files
+  `pt/static/vendor/fonts/{plex-sans-latin-400,plex-sans-latin-600,plex-sans-latin-ext-400,
+  plex-sans-latin-ext-600,plex-sans-greek-400,plex-sans-greek-600,plex-mono-latin-400,
+  plex-mono-latin-ext-400}.woff2` exist, are non-empty, start with the `wOF2` signature and total
+  <= 250,000 bytes; `LICENSE-IBM-Plex.txt` contains "SIL Open Font License"; `README` names
+  `@fontsource/ibm-plex-sans@5.3.0`, `@fontsource/ibm-plex-mono@5.3.0` and `@ibm/plex-sans@1.1.0`;
+  `plex.css` has one `@font-face` per file, each with `font-display: swap` and a
+  `unicode-range` (Greek faces `U+0370-03FF`), plus the "IBM Plex Sans Fallback" face using
+  only `local()`; every `url()` in `plex.css` is relative (no scheme, no `//`, no leading `/`);
+  `index.html` links `vendor/fonts/plex.css` with a relative href before `app.css`; the
+  existing "no `@font-face` in own CSS" and no-external-URL rules still pass. Then do the one
+  approved build-time fetch into the session scratch dir (`npm pack` of the three pinned
+  packages, or `curl` of the same registry tarballs if npm is absent; install nothing, commit no
+  tarball), copy and rename the files per the DESIGN.md section 3.1 table (Greek: the official
+  split `fonts/split/woff2/` Regular and SemiBold Greek files; list the tarball for exact
+  names), copy the `unicode-range` values verbatim from the Fontsource `latin`/`latin-ext` CSS of
+  the same version, copy the OFL text, and write `plex.css` (pattern D3.2) and `README` (sources,
+  versions, file mapping, sha256 per file). Files `pt/static/vendor/fonts/**`,
+  `pt/static/index.html` (the one `<link>`), `tests/frontend/test_static_assets.py`.
+- [ ] T068 [FE] Token layer + global type, focus, hover and motion (FR-030a, FR-030c, FR-030e;
+  brief items 3, 4; D2, D3.2, D3.3, D4, D5, D6, D7, D9; R21). Test first new
+  `tests/frontend/test_design_tokens.py` (static parse of `pt/static/app.css`): `:root` declares
+  `--color-*` per D2 (exact hex for `primary #0f62fe`, `ink #161616`, `ink-muted #525252`,
+  `ink-subtle #6f6f6f`, `surface-1 #f4f4f4`, `border-strong #8d8d8d`, `error #da1e28`,
+  `info-surface #edf5ff`), `--hl-yellow #ffde66`, `--hl-mint #9fe0c0`, `--hl-peach #ffc29e`,
+  `--type-*` roles of D3.3, `--space-*`, `--radius-*`, `--control-sm/md/lg`, `--dur-fast 110ms`,
+  `--dur-moderate 240ms`, `--dur-flash 1600ms`, `--ease-standard/entrance/exit`,
+  `--shadow-overlay`, layout sizes, `--font-sans` starting with `"IBM Plex Sans"` and
+  `--font-mono` starting with `"IBM Plex Mono"`; none of the old tokens remain (`--color-body`,
+  `--color-muted`, `--color-hairline`, `--color-edge-input`, `--color-surface-soft`,
+  `--color-surface-strong`, `--color-coral`, `--color-cream`, `--color-info-border`,
+  `--color-yellow`, `--color-mint`, `--color-peach`, `--type-title-sm`, `--type-reason`,
+  `--type-caption`, `--type-chip`, `--type-body-md`, `--type-display-md`); every `var(--…)` used
+  in `app.css` is declared; `color-scheme: light`; `font-synthesis: none` on `html`;
+  `font-variant-numeric: tabular-nums` on `body`; every `:hover` rule sits inside `@media
+  (hover: hover)`; `@keyframes ray` and `breathe` and the `prefers-reduced-motion` and
+  `forced-colors` blocks remain (`test_css_has_reduced_motion_rules` still passes). Then
+  `app.css`: replace the whole `:root` block (header comment "Carbon-based, see DESIGN.md"),
+  remap every `var()` use with the brief item 3 table in the same commit so the page renders
+  coherently, set the font stacks on `html`/`body`, implement the one focus system of D7
+  (inset `-2px` for fields, selects, icon buttons, tabs, rail items, outline and ghost buttons;
+  inset white ring for filled buttons; no ring on `tabindex="-1"` targets), wrap hovers in
+  `@media (hover: hover)`, switch transitions to the D6 tokens and update the reduced-motion and
+  forced-colors blocks. Files `pt/static/app.css`, `tests/frontend/test_design_tokens.py`,
+  existing `tests/frontend/test_e2e_*.py` only for old visual values.
+
+### Wave R2 — FE lane (sequential: every task edits `app.css`)
+
+- [ ] T069 [FE] [US1] Shell, nav, buttons and query (FR-030a-c; brief items 5-8; D8.1, D8.2,
+  D8.3, D8.4 intro band). `app.css`: `.global-nav` 48px with `border-subtle` bottom rule; view
+  links 48px `ink-muted`, current link `ink`, weight 600, 2px `primary` bottom rule; brand
+  `body-emphasis`; mock badge pill with 1px `info` border and `info` `label` text;
+  `.mock-label__more` / `.model` per D8.3; skip links; buttons mapped per brief item 7 table
+  (primary 40px / 48px in `.triage-form`, secondary charcoal for `#load-more` and notification
+  `Try again`, outline, `.btn--small` 32px, danger outline `.btn--remove`, `.btn--on-dark`
+  retired to secondary, ghost `.text-btn`/`.ext-link`, square 40px `.icon-btn`); Carbon text
+  field (D8.2) for `#query`; intro title `heading-md` / `heading-lg` (>= 768), lead `prose`
+  `ink-muted`, help line `label` `ink-subtle`. Test first new `tests/frontend/test_e2e_design.py`
+  (`e2e`, real harness): at 1440 px `body` computed font-family starts with "IBM Plex Sans" and
+  `document.fonts.check('16px "IBM Plex Sans"')` is true after `document.fonts.ready`; nav
+  height 48; `nav a[data-view="triage"][aria-current="page"]` has font-weight 600 and a 2px
+  `rgb(15, 98, 254)` bottom border; `#submit` background `rgb(15, 98, 254)`, border-radius
+  `0px`, height 48 at 1440 and full width at 390; `#query` height 48 with a 1px bottom border
+  `rgb(141, 141, 141)`. Files `pt/static/app.css`, `tests/frontend/test_e2e_design.py`.
+- [ ] T070 [FE] [US1] [US2] Result rows and results chat (FR-030a-c; brief items 9, 10, 11, 15,
+  16; D8.4 rows, critique, save, confirm; D8.6). `app.css`: `.paper` rank column 56 / 72px,
+  padding-block 16 / 24, 1px `border-subtle` top rule except the first; `.rank__n`
+  `numeral-md` / `numeral-lg`, `.rank__of` `label` `ink-subtle`, `.rank__meter` 4px square bar
+  (`rank-track` / `rank-fill`, 48px, 32px mobile); `.paper__title` `heading-xs`;
+  `.paper__reason` `prose` `ink` max 72ch; `.paper__id` `mono`; `.flag` square `surface-2` tag,
+  `.flag--failed` `error` text and border; `.disclosure` / `.critique` square `surface-1`,
+  heads `body-emphasis`, chevron over `dur-moderate`; `.save` outline 32px with min-width kept,
+  `.is-saved` `surface-2` no border; `.confirm` danger outline + outline `Keep`; `.chat` square
+  `surface-1` no border, `h2` `heading-sm`, `.turn__q` `body-emphasis`, `.turn__a` `body`,
+  `.turn__a--refused` info notification (`info-surface`, 3px `info` left rule); `.cite` `mono`
+  on `cite-surface`, radius 2px, hover and active `cite-surface-active`, `.cite--off` dashed
+  `border-strong` with `ink-muted` text; chat fields canvas on the panel. Test first, add to
+  `tests/frontend/test_e2e_design.py`: after a mock search, `.rank__n` font-size 32px at 1440
+  and 24px at 390; `.rank__meter` height 4px and radius `0px`; `.paper__id` and `a.cite`
+  font-family start with "IBM Plex Mono"; `a.cite` background `rgb(224, 224, 224)` and radius
+  `2px`; a refusal `.turn__a--refused` has background `rgb(237, 245, 255)` and a 3px left border
+  `rgb(15, 98, 254)`; a saved row's `button.save[aria-pressed="true"]` background `rgb(224,
+  224, 224)`. Files `pt/static/app.css`, `tests/frontend/test_e2e_design.py`.
+- [ ] T071 [FE] [US5] [US6] [US7] Library view (FR-030a-c; brief items 18-22; D8.7). `app.css`:
+  `.rail` items 32px (40 on `pointer: coarse`), `.rail__item[aria-current="true"]`
+  `surface-selected` fill, weight 600, `box-shadow: inset 3px 0 0 var(--color-primary)`, hover
+  `surface-hover`, counts `label` `ink-subtle`; `.tag` pill 32px, 1px `border-strong`, `label`,
+  `[aria-pressed="true"]` `surface-inverse` with white text and the check glyph kept, filled
+  focus ring; `.lib-filter input`, `.select`, `.lib-dir__select`, `.dir-form input` Carbon field
+  with an inline SVG data-URI chevron (row select 32px); library rows as T070 plus `.lib-pdf`
+  `label`, `.lib-pdf--failed` `error`, `.lib-saved` / `.lib-hl` `ink-subtle`, `.dir-manage`
+  square `surface-1`; `.lib-row.is-collapsing` opacity plus `grid-template-rows` collapse with
+  `ease-exit` at `dur-moderate` (no `height` transition). Test first, add to
+  `tests/frontend/test_e2e_design.py` (real harness, two saved papers): the current rail item
+  font-weight 600 and box-shadow contains `inset 3px 0px 0px` with `rgb(15, 98, 254)`; a pressed
+  `#lib-tags button.tag` background `rgb(22, 22, 22)` and color `rgb(255, 255, 255)`;
+  `.lib-row select[data-act="move"]` height 32 and `appearance` none; the computed
+  `transition-property` of `.lib-row` does not contain `height`. Files `pt/static/app.css`,
+  `tests/frontend/test_e2e_design.py`.
+- [ ] T072 [FE] [US5] [US8] Preview toolbar, find, well, highlights and popover (FR-030a-d;
+  brief items 23-27; D2.4, D8.8). Keep F-016: change only visuals (`.textLayer ::selection` uses
+  `color-mix(in srgb, var(--color-primary) 25%, transparent)`), never the selection or
+  highlight code paths; the F-016 e2e check passes unchanged. `app.css`: `.pv-toolbar` controls
+  40px square, title `heading-xs`, pager/zoom/find as icon or ghost buttons, `.pv-hlctl` joined
+  outline button + select (`margin-left: -1px`, focused part `z-index: 1`), `.pv-sheet-open`
+  outline, wrap and order rules below 1024 unchanged; `.pv-find` Carbon field, `label` count,
+  `.find-hit` hover `surface-hover`, `.find-match` `body-emphasis`; `.pv-well` `well` fill,
+  `.pdf-page` canvas with 1px `border-page` edge and no shadow, page flash 2px `focus` outline;
+  `.hl--yellow/mint/peach` opaque fills from `--hl-*` (no alpha, no `color-mix`), radius 2px,
+  `mix-blend-mode: multiply` kept on `.hl-layer`, failed-save highlight 1px dashed `error`
+  outline; swatches and `.dot` circles with a 1px `border-strong` edge; `.hl-item__quote` 3px
+  left rule in the highlight colour; `.pv-popover` square canvas, `shadow-overlay`, 1px
+  `border-subtle`, `.swatch.is-last` 2px `ink` ring offset 2px. Test first, add to
+  `tests/frontend/test_e2e_design.py` (real harness, saved mock paper): every toolbar control in
+  `#pv-controls` is 40px tall; a created yellow `.hl` has background `rgb(255, 222, 102)` with
+  alpha 1 and its layer `mix-blend-mode: multiply`, same check for mint `rgb(159, 224, 192)` and
+  peach `rgb(255, 194, 158)`; `section.pdf-page` border `1px solid rgb(198, 198, 198)`; the
+  popover border-radius `0px` and non-empty box-shadow; swatches border-radius `50%`; the
+  highlight list prints the colour name (SC-019). Files `pt/static/app.css`,
+  `tests/frontend/test_e2e_design.py`.
+- [ ] T073 [FE] [US8] [US9] Preview side panel, notes, Ask this paper and bottom sheet (FR-030a-c,
+  FR-030f; brief items 28-31; D8.6, D8.8). Keep F-019: `Ask this paper` is the selected tab on
+  every preview open (panel and sheet) and no paper-chat request happens before the first
+  question. `app.css`: `.pv-panel` `surface-1` with a 1px `border-page` left edge; `.pv-tab`
+  40px, selected tab 2px `primary` underline and weight 600, count `label`; `.note-editor
+  textarea` canvas field on the panel, `.note-counter.is-max` `error`; `.pv-chat__nopdf` info
+  notification; `.pv-chat__form` sticky on `surface-1` (canvas inside the sheet); `button.cite`
+  same chip as T070; `.pv-sheet` square, canvas, `shadow-overlay`, `overlay` backdrop, tabs and
+  Close in one header row, slide in with `ease-entrance` at `dur-moderate`, no slide under
+  reduced motion; `.pdf-page__notext` info notification look. Test first, add to
+  `tests/frontend/test_e2e_design.py`: at 1440 the selected `.pv-tab` is `Ask this paper` with
+  font-weight 600 and a 2px `rgb(15, 98, 254)` bottom border, and zero `/api/paper-chat`
+  requests before the first question; at 390 the sheet opens on `Ask this paper`, has
+  border-radius `0px` and a non-empty box-shadow; `2401.00005` shows `.pv-chat__nopdf` with
+  background `rgb(237, 245, 255)`. Files `pt/static/app.css`, `tests/frontend/test_e2e_design.py`.
+- [ ] T074 [FE] [US1] States, motion and forced-colours sweep (FR-030a, FR-030c, FR-030e,
+  FR-030f; brief items 12, 13, 14, 17; D6, D7, D8.4 previous results, D8.5, D9). Keep F-017:
+  `.is-stale` keeps opacity 1 and gets no `pointer-events`, overlay or `inert` (the class hook
+  stays). `app.css`: `.working` in normal flow above the list, `surface-1`, square, padding 24
+  (`.working--compact` 12/16); `.notes` `surface-1`; `.alert` error notification
+  (`error-surface`, 3px `error` left rule, ink text, secondary `Try again`, coral fill and white
+  text removed, `.ext-link--on-dark` a normal ghost link); `.empty` title `heading-xs`, body
+  `prose` `ink-muted`, example chips 32px outline; `.paper--cited` / `.paper--new` fade
+  `info-surface` over `dur-flash`; reduced motion per D6 (static 2px `focus` outline on the cited
+  row, static `info-surface` on new rows, static working glyph with rays at full opacity, no
+  sheet slide, no chevron rotation, no row-collapse animation); forced colours per D7 for
+  controls, notifications, chips, panels, sheet, meter and highlights. Test first: add to
+  `tests/frontend/test_design_tokens.py` no literal hex or `rgb(`/`rgba(` outside `:root`
+  (allowed: system colours inside `@media (forced-colors: active)` and `data:` URIs), no
+  declared-but-unused token, only font-weight 400, 600 or `normal` (no `bold`, 300, 500,
+  700), every transition and animation
+  disabled inside `prefers-reduced-motion: reduce`; add to `tests/frontend/test_e2e_design.py`
+  (harness triage delay): during a second search the previous `li.paper` rows have computed
+  opacity 1 and their `button.save` and `a[data-link="abs"]` are clickable while `#working` is
+  visible (F-017); a failed load shows `.alert` with background `rgb(255, 241, 241)`. Files
+  `pt/static/app.css`, `tests/frontend/test_design_tokens.py`,
+  `tests/frontend/test_e2e_design.py`.
+
+### Wave R2 — BE lane
+
+- [ ] T075 [P] [BE] `README.md` + `SETUP_LOG.md` v4 design note: Carbon-based DESIGN.md (light
+  theme only), vendored IBM Plex Sans/Mono (8 woff2 files, about 125 KB, OFL 1.1, packages and
+  versions from `pt/static/vendor/fonts/README`), the one-time build-time font fetch (no runtime
+  network), and the design e2e command with `V4_SHOTS_DIR`. Needs T067. Files `README.md`,
+  `SETUP_LOG.md`.
+
+### Wave R3 — FE lane (final)
+
+- [ ] T076 [FE] Design e2e sweep + screenshots (SC-017..SC-022; R20). Extend
+  `tests/frontend/test_e2e_design.py` (`e2e`, real harness, port 8765 for FE runs), each case
+  at viewport widths 390, 820 and 1440: zero non-local requests on Triage, Library and Preview,
+  and every woff2 response from `/vendor/fonts/` has `content-type: font/woff2`;
+  `document.fonts.check('12px "IBM Plex Mono"')` and `document.fonts.check('16px "IBM Plex
+  Sans"')` are true once a paper id is on screen; WCAG contrast
+  computed in the page from computed `color` and the first opaque ancestor `background-color`
+  for this selector list, each >= 4.5: `.paper__title`, `.paper__reason`, authors, `.rank__of`,
+  `.paper__id`, `a[data-link]`, nav links (current and not), `.pv-tab`, `.turn__a`,
+  `.turn__a--refused`, `.alert`, `a.cite`, `.lib-saved`, `.views__count`; `.rank__n` >= 3; edge
+  colour of `#query`, `button.save` and `.tag` against their background >= 3; Tab to `#submit`
+  shows a 2px `rgb(15, 98, 254)` outline; with `reduced_motion="reduce"`, after a cite click and
+  a load-more, `document.getAnimations()` on `.paper--cited`, `.paper--new`, the critique
+  disclosure and the sheet is empty while the cited and new rows still show their static marker
+  (SC-020); with `forced_colors="active"`, `#submit` and `.cite` show a non-transparent border;
+  screenshots of Triage results, Library and Preview (panel at 1440, sheet at 390 and 820)
+  written to `$V4_SHOTS_DIR` (default: a pytest temp dir) as `<view>-<width>.png` (SC-022). Then
+  run the full `MOCK_LLM=1 uv run pytest -q -m e2e` green, including the F-016, F-017 and F-019
+  checks (SC-021). If a fix commit for F-016, F-017 or F-019 shipped without a browser check,
+  add it here: F-016 = after selecting text on page 1 and releasing, the selection and the
+  popover stay until a swatch is chosen and the new `.hl` covers the selected words; F-017 = as
+  in T074; F-019 = as in T073. Needs T066, T068-T074. Files `tests/frontend/test_e2e_design.py`.
+
 ## Lanes (parallel build)
 [BE] = backend-builder; [FE] = frontend-builder. Disjoint files: FE owns `src/paper_triage/static/**` + `tests/frontend/**`; BE owns the rest. T021 is split: BE commits the API test half first as "T021 (api): ...", FE then does the UI half and ticks the box as "T021 (ui): ...".
 Waves: A (parallel) BE T018 -> T019 -> T021(api) -> T022 || FE T017 -> T021(ui). B: FE T020 (needs T019 landed) -> T023. C: BE T024 (README) last. Tester runs after each wave on both lanes.
@@ -572,6 +792,24 @@ v3 waves (spawn both lanes in one message; tester after each wave; failures go b
 - API handoff as in v2: contracts/api.md is the source of truth; BE records landed facts in
   `.claude/state/agents/backend-builder.md` "API facts"; FE gaps go back as `NEEDS-BE:`.
 
+v4 waves (Carbon redesign; spawn both lanes in one message; tester after each wave; failures go
+back tagged):
+
+| Wave | BE lane | FE lane | Cross-lane needs |
+|---|---|---|---|
+| R1 | T066 | T067 -> T068 | FE starts only after the F-016, F-017 and F-019 fix commits land (same files: `index.html`, `app.css`, `app.js`, `viewer.js`, `paperchat.js`). T066's font GET test skips until T067 lands; the tester re-runs it after both. |
+| R2 | T075 | T069 -> T070 -> T071 -> T072 -> T073 -> T074 | T075 needs T067. All FE tasks edit `app.css`: strict sequence, no FE parallelism. |
+| R3 | none | T076 | T076 needs T066 (real-server `font/woff2`) and T068-T074. |
+
+- After R3: tester runs brief item 33 (full pytest + ruff, e2e at 390/820/1440, contrast spot
+  check of DESIGN.md section 2 pairs, F-017/F-019 = B-b/B-a still hold) with
+  `V4_SHOTS_DIR=docs/qa/screenshots/v4`; then the designer re-audit (brief item 34) on those
+  screenshots, one ordered fix list, at most one confirm pass. Fix items become new tasks
+  (T077+) re-checked with speckit-analyze.
+- Shared files: none across lanes. BE never edits `pt/static/**` or `tests/frontend/**`; FE
+  never edits `pt/app.py`, `README.md` or `SETUP_LOG.md`. The README design note is BE (README
+  owner) although its content comes from FE's T067.
+
 ## Dependencies
 
 T001 -> T002 -> {T003, T005, T006, T007, T008} ; T004 after T002+T003.
@@ -588,6 +826,9 @@ T050 needs T047+T049; T051 needs T046+T050; T057 needs T044; T058 needs T050+T05
 T050, T051, T058; T065 needs T059. v3 FE: T052 -> T053 -> T054 -> T055 (needs T052) -> T056;
 T060 needs T053+T047+T050; T061 needs T060+T048; T062 needs T055+T051; T063 needs T055 (+T058
 for real API); T064 needs T059-T063.
+v4 (FE lane gated on the F-016, F-017, F-019 fix commits): BE T066 independent; T075 needs
+T067. FE T067 -> T068 -> T069 -> T070 -> T071 -> T072 -> T073 -> T074 -> T076; T076 also needs
+T066.
 
 ## Parallel Examples
 
@@ -609,3 +850,9 @@ cross-cutting T052, T059, T064, T065. Increment order: Wave F = storage + full L
 check: save a paper and read its PDF in-page = US4 + US5); Wave G = paper chat API + harness
 || Library, directories, highlights and chat UI on the real API; Wave H = full browser proof
 and docs.
+v4 (11 tasks, T066-T076; BE 2, FE 9; no new story, all FR-030): foundations T066-T068 (MIME,
+fonts, tokens: the page already reads in Plex with Carbon colours after R1), per-view restyle
+T069 (shell/nav/query), T070 (results + chat), T071 (Library), T072 (Preview toolbar, well,
+highlights), T073 (panel, paper chat, sheet), T074 (states, motion, forced colours), proof
+T076, docs T075. Stop-and-validate point: after T068 every view uses the new tokens and fonts
+with behaviour unchanged.

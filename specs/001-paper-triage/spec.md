@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-01
 
-**Status**: Draft (v3 amendment 2026-10-03; v2 amendment 2026-10-01)
+**Status**: Draft (v4 amendment 2026-10-03; v3 amendment 2026-10-03; v2 amendment 2026-10-01)
 
 **Input**: User description: "Paper Triage Assistant. Input topic/keywords or arXiv IDs / PDF URLs.
 Fetcher -> Summarizer -> Critic -> Ranker (0-10 + reason), then grounded chat over stored papers
@@ -22,6 +22,14 @@ multi-select; user-created directories to file saved papers into; viewer highlig
 and small reading aids; a side-by-side chat grounded only on the open paper's own text, started
 lazily on the first message. Single local user, no auth. Also: the results chat clears and
 re-scopes whenever the visible result set changes (bug F-006).
+
+**v4 input** (2026-10-03): visual redesign to the new Carbon-based DESIGN.md (commit 0da87be;
+work list `docs/design/redesign-brief.md` items 1-34; rationale
+`docs/design/redesign-recommendation.md`; font sources `docs/research/ibm-verify.md`). Visual
+only: no new user stories, no copy, DOM, id, ARIA, route, keyboard or API change. The user
+delegated all design decisions to the agents. In-flight fixes that the redesign must keep:
+F-016 (highlight selection glitch), F-017 (old results stay interactive during a new search),
+F-018 (long multi-keyword search fails; backend) and F-019 (preview opens on the paper chat tab).
 
 ## Clarifications
 
@@ -138,6 +146,40 @@ Design reconciliations (brief `docs/design/v3-library-brief.md` Rev 2; designer 
   the confirmation says it deletes the saved PDF and any highlights and notes.
 - Q: Is find-in-paper served by the API? → A: No. The page searches the PDF text it already
   loads (brief B8 dropped).
+
+### Session 2026-10-03 (v4)
+
+Non-interactive; the user delegated design decisions. Planner defaults:
+
+- Q: Which design system applies? → A: The Carbon-based root DESIGN.md (v2.0,
+  Paper-Triage-Carbon) is the single visual source of truth. It supersedes the Airtable-based
+  v2 DESIGN.md (kept in `docs/design/DESIGN.airtable.md`) and the visual parts of
+  `docs/design/brief-v2-redesign.md` and `docs/design/v3-library-brief.md`. Light theme only;
+  dark mode is out of scope.
+- Q: How many font files ship? → A: Eight woff2 files, about 125 KB, as listed in DESIGN.md
+  section 3.1: Plex Sans 400 and 600 in Latin, Latin-extended and Greek, plus Plex Mono 400 in
+  Latin and Latin-extended. The brief's "7 files" is a miscount; DESIGN.md wins. Greek in Mono
+  falls back to the system monospace font. Total stays under the 250 KB cap.
+- Q: How are the fonts obtained? → A: One build-time network fetch of the pinned packages
+  (Fontsource 5.3.0 for Latin and Latin-extended, official IBM Plex Sans 1.1.0 for Greek),
+  approved by the orchestrator. The files, the OFL licence and a source/version note are
+  committed with the app. No package manager dependency is added and nothing is fetched at
+  runtime.
+- Q: How is "behaviour unchanged" verified? → A: The existing unit, API and browser suites keep
+  passing. Only assertions on old visual values (for example the 0.4 dimming of previous
+  results, old radii or old colours) change, to the DESIGN.md values, in the same task that
+  changes the style, and the commit says so.
+- Q: What is visual regression here? → A: Browser tests assert rendered style values (font
+  family, radius, key colours, focus ring, highlight fill, contrast computed from rendered
+  colours) at 390, 820 and 1440 px, and save screenshots of Triage, Library and Preview at
+  those widths for the designer's re-audit. Screenshots are not pixel-compared: font
+  rasterising differs between machines and an image-diff library would be a new dependency.
+- Q: How do the in-flight fixes interact with the restyle? → A: F-016, F-017 and F-019 touch the
+  same front-end files; front-end restyle work starts after their fix commits land, and the
+  redesign keeps their behaviour (F-017 also matches DESIGN.md: previous results keep full
+  opacity). F-018 is backend-only and already landed (d323ef9).
+- Q: Does the redesign change class names or markup? → A: No. Existing selectors are restyled.
+  The only markup addition is the link to the vendored font stylesheet.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -394,6 +436,14 @@ ask an in-paper question (answer cites valid page numbers) and an outside questi
 - (v3) Tag search text matches no tag: a plain "no tags match" line; paper list unchanged.
 - (v3) PDF still pending or failed: the paper chat input is disabled with the reason; a direct
   API call refuses without a model call.
+- (v4) A font file fails to load: text renders in the metric-matched system fallback and the
+  layout stays usable; no request goes to another host.
+- (v4) A title or author name contains Latin-extended (Dvořák, Łukasz) or Greek (α, β)
+  characters: they render in Plex Sans; Greek inside paper ids uses the system monospace font.
+- (v4) Forced-colours mode: controls, notifications, chips, panels and the sheet keep a visible
+  system-colour border, focus uses the system highlight colour, and highlights show as outlines.
+- (v4) Two highlights overlap on a page: the multiplied fills darken where they overlap; both
+  stay visible and the text stays legible.
 
 ## Requirements *(mandatory)*
 
@@ -425,8 +475,8 @@ ask an in-paper question (answer cites valid page numbers) and an outside questi
   paper in the set), and MUST refuse without a model call when the set is empty or none of its
   papers is stored.
 - **FR-011**: A mock mode MUST run the full flow with no network and no model key.
-- **FR-012** (v2): The UI MUST follow DESIGN.md (system-font fallback; layout per
-  `docs/design/brief-v2-redesign.md`) and PRODUCT.md, show rank and reason at a glance,
+- **FR-012** (v2; visual source updated in v4, see FR-030): The UI MUST follow DESIGN.md and
+  PRODUCT.md, show rank and reason at a glance,
   critique one click away, citations as links to the cited paper, a visible mock-mode label,
   and a visible animated "searching" status (announced politely to assistive tech, static under
   reduced motion) while a triage or load-more request runs (appearing within 300 ms of the
@@ -503,6 +553,31 @@ ask an in-paper question (answer cites valid page numbers) and an outside questi
   keyboard operable. Unsave and directory delete need explicit confirmation; deleting a
   highlight or note offers Undo for 8 seconds instead.
 
+#### v4: Visual redesign
+
+- **FR-030** (v4): The whole page (Triage, Library, Preview) MUST use the Carbon-based DESIGN.md
+  as its only visual system while its behaviour stays unchanged:
+  (a) every colour, type role, spacing, control size, radius, motion and shadow value comes
+  from the DESIGN.md design tokens; no token of the previous design remains, and no literal
+  colour is used outside the token layer (system colours in forced-colours mode excepted);
+  (b) text uses IBM Plex Sans (weights 400 and 600) and IBM Plex Mono (400) from font files
+  shipped with the app, together with their OFL licence and a source and version note; no font,
+  style or script loads from another host at runtime;
+  (c) text meets WCAG 2.1 AA contrast (at least 4.5:1, large rank numerals at least 3:1),
+  control edges and the rank meter meet 3:1, every interactive element shows a visible focus
+  indicator, and colour is never the only signal;
+  (d) the three highlight fills (yellow, mint, peach) are drawn opaque with multiply blending,
+  so they read at full strength on PDF pages and the glyphs beneath stay legible; stored colour
+  names do not change;
+  (e) when the user prefers reduced motion, no transition, keyframe flash or sheet slide runs,
+  and each motion has a static equivalent with the same meaning; in forced-colours mode,
+  controls, panels and highlights keep visible borders or outlines;
+  (f) copy, DOM order, element ids, ARIA, hash routes, keyboard paths, API calls and stored data
+  are unchanged, including the fixes F-016 (highlight selection), F-017 (previous results stay
+  at full opacity and interactive during a new search), F-018 (long multi-keyword topic
+  searches succeed) and F-019 (every preview opens on the "Ask this paper" tab; the paper chat
+  still loads nothing before the first question).
+
 ### Key Entities
 
 - **Paper**: id (arXiv id or derived id for other PDFs), source, title, authors, abstract,
@@ -562,6 +637,23 @@ ask an in-paper question (answer cites valid page numbers) and an outside questi
   paper; after a directory delete, zero saved papers are lost.
 - **SC-016** (v3): A user can go from a result card to reading its PDF in the Library in at most
   3 actions (save, open Library, open paper).
+- **SC-017** (v4): In every browser test run at 390, 820 and 1440 px, zero requests leave the
+  local app, the shipped Plex faces are loaded and used for body text and paper ids, and the
+  shipped font files total at most 250 KB.
+- **SC-018** (v4): 100% of the sampled text and background pairs in the rendered page (titles,
+  reasons, secondary and tertiary text, links, nav and tabs, error and refusal states, cite
+  chips) measure at least 4.5:1, and sampled control edges and the rank meter measure at least
+  3:1.
+- **SC-019** (v4): Each of the 3 highlight colours renders on a PDF page as an opaque fill equal
+  to its DESIGN.md value with multiply blending, and the highlight list prints its colour name.
+- **SC-020** (v4): With reduced motion requested, zero animations or transitions run on flashed
+  rows, the disclosure, the bottom sheet and row removal, while the cited-row, new-row and
+  working states stay visible.
+- **SC-021** (v4): The pre-redesign unit, API and browser suites pass, with only assertions on
+  old visual values updated, and the F-016, F-017 and F-019 browser checks pass on the
+  redesigned page.
+- **SC-022** (v4): Screenshots of Triage, Library and Preview at 390, 820 and 1440 px are produced
+  by the final browser run, and the designer's re-audit of them ends with zero blocking items.
 
 ## Assumptions
 
@@ -571,9 +663,9 @@ ask an in-paper question (answer cites valid page numbers) and an outside questi
 - Model chosen by env setting with a documented default; no model id hard-coded elsewhere.
 - Text extraction uses a permissive-license library behind one swap point (AGPL alternative not
   bundled).
-- Visual style follows DESIGN.md (v2: Airtable-style, user-supplied) and PRODUCT.md; the
-  DESIGN.md brand font (Haas Grotesk) is not licensed here, so a system-font stack chosen in
-  `docs/design/brief-v2-redesign.md` replaces it. No web fonts or external assets are loaded.
+- Visual style follows DESIGN.md and PRODUCT.md. (v2 used an Airtable-style DESIGN.md with a
+  system-font stack; superseded in v4 by the Carbon-based DESIGN.md with vendored, OFL-licensed
+  IBM Plex fonts.) No external assets are loaded.
 - The searching status is client-side only (cycling phase text plus elapsed time); it does not
   claim real per-paper progress, so no progress endpoint is needed.
 - The current result set lives in the page, not the server; a reload rebuilds it from the
@@ -589,3 +681,9 @@ ask an in-paper question (answer cites valid page numbers) and an outside questi
   PDF is stored (disk file vs database), and any extra small viewer aids (for example find in
   document, remember last page) are decided at plan time from `docs/research/v3-library-preview.md`.
 - (v3) Paper chat refuses with the same deliberate refusal state as the results chat.
+- (v4) Constitution 2.0.0 covers v4 unchanged: the redesign adds one requirement (FR-030;
+  this spec: 9 stories / 32 FRs, at the cap) and no user story. Vendored font files fall under
+  principle I's rule for vendored static assets (same origin, licence and pinned version kept,
+  no CDN). PRODUCT.md needs no change.
+- (v4) Current evergreen Chrome, Firefox and Safari support every style feature DESIGN.md
+  allows; no fallback for older browsers is planned.

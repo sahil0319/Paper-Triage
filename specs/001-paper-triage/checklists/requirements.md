@@ -46,3 +46,10 @@
   are deliberately left to plan. Scope (9 stories, 31 FRs) and the per-paper chat scope are
   covered by constitution 2.0.0 (amended 2026-10-03, user-approved). User decisions and brief
   Rev 2 reconciliations recorded under Clarifications; items still pass.
+- v4 re-validation (2026-10-03): all items pass on the first iteration. Visual-only amendment:
+  no new user story; FR-012 points to FR-030; FR-030 (one requirement with clauses a-f) and
+  SC-017..SC-022 added; 4 edge cases; Clarifications "Session 2026-10-03 (v4)" record planner
+  defaults (8 font files per DESIGN.md, one approved build-time fetch, screenshot audit instead
+  of pixel diff, behaviour-unchanged rule). Scope 9 stories / 32 FRs = constitution 2.0.0 cap.
+  Font family names, WCAG levels and the 250 KB cap are user-visible or compliance limits, kept
+  deliberately. Zero [NEEDS CLARIFICATION] markers.

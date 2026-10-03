@@ -206,3 +206,49 @@ differ (user decisions relayed 2026-10-03).
 - **Decision**: both client-only. Find uses `page.getTextContent()` per page (no server
   endpoint; brief B8 dropped); export builds Markdown from the loaded annotation list.
 - **Rationale**: no new API; the viewer already loads the document.
+
+## R19 v4: vendored IBM Plex fonts
+
+- **Decision**: 8 woff2 files, renamed per DESIGN.md section 3.1: Plex Sans 400/600 Latin and
+  Latin-ext from `@fontsource/ibm-plex-sans@5.3.0` (`files/ibm-plex-sans-{latin,latin-ext}-
+  {400,600}-normal.woff2`), Plex Sans Greek Regular/SemiBold from `@ibm/plex-sans@1.1.0`
+  (`fonts/split/woff2/`, list the tarball for exact names), Plex Mono 400 Latin and Latin-ext
+  from `@fontsource/ibm-plex-mono@5.3.0`. Total 125,228 bytes (cap 250 KB). `plex.css` holds
+  the `@font-face` rules (`font-display: swap`, `unicode-range` copied verbatim from Fontsource
+  `latin.css`/`latin-ext.css`, Greek `U+0370-03FF`) and the metric-matched "IBM Plex Sans
+  Fallback" face; linked before `app.css` so `app.css` stays free of `@font-face`. One
+  build-time fetch (`npm pack` of the three pinned packages into a scratch dir, or `curl` of the
+  same registry tarballs if npm is absent); nothing is installed in the project. OFL text as
+  `LICENSE-IBM-Plex.txt`; `README` records packages, versions and file mapping.
+- **Rationale**: Fontsource ships no Greek (verified in ibm-verify.md); the official split
+  package does. `unicode-range` keeps a typical page at the ~62 KB Latin set. Weights 300/500/
+  700 are not used (D3.1), and `font-synthesis: none` stops faked weights.
+- **Alternatives**: system stack (v2; loses the Carbon voice); Google Fonts CDN (breaks
+  principle II and the static guard); Plex Mono Greek (not checked; system mono fallback is
+  acceptable for rare Greek in ids).
+
+## R20 v4: visual verification without pixel diffs
+
+- **Decision**: `tests/frontend/test_e2e_design.py` asserts rendered values (font family and
+  `document.fonts.check`, radius 0 on controls, key token colours, focus ring, highlight fill
+  alpha 1 + multiply, `.is-stale` opacity 1) and computed WCAG contrast for a fixed selector
+  list at 390, 820 and 1440 px, emulates `reduced_motion="reduce"` and `forced_colors="active"`,
+  and saves screenshots of Triage, Library and Preview at each width to `$V4_SHOTS_DIR`.
+  Screenshots feed the designer re-audit (brief item 34); they are not compared pixel by pixel.
+- **Rationale**: pytest-playwright (Python) has no built-in screenshot assertion; an image-diff
+  library is a new dependency (principle I); font rasterising differs across machines, so
+  baselines would flake. Style and contrast assertions are deterministic and offline.
+- **Alternatives**: stored PNG baselines + Pillow diff (new dep, flaky); Node Playwright test
+  runner (second toolchain).
+
+## R21 v4: token migration order
+
+- **Decision**: one FE task swaps the whole `:root` block to DESIGN.md tokens and remaps every
+  `var()` use with the brief item 3 table in the same commit, so the page stays coherent; the
+  per-view tasks then refine components; the final sweep adds the "no literal hex outside
+  `:root`" test. All v4 FE tasks edit `app.css`, so they run sequentially in the FE lane; only
+  the BE MIME task and the BE docs task run in parallel.
+- **Rationale**: keeps every commit green and reviewable; avoids a half-migrated stylesheet with
+  undefined variables.
+- **Alternatives**: alias old tokens to new values during the migration (leaves dead names,
+  which D9 forbids); one big restyle commit (violates one-small-commit rule).
