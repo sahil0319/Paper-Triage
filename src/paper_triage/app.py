@@ -172,6 +172,7 @@ def create_app() -> FastAPI:
         app.state.http[0].close()
 
     mimetypes.add_type("text/javascript", ".mjs")  # module scripts (pdf.js) need a JS MIME type
+    mimetypes.add_type("font/woff2", ".woff2")  # older Pythons and OS mime tables lack it
     app = FastAPI(title="Paper Triage", lifespan=lifespan)
 
     @app.exception_handler(RequestValidationError)

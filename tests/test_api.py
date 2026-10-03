@@ -279,3 +279,25 @@ def test_triage_fetch_error_has_more_false(client):
     client.app.state.http = (bad, Throttle(0))
     body = client.post("/api/triage", json={"query": "diffusion"}).json()
     assert body["results"] == [] and body["has_more"] is False and body["next_offset"] is None
+
+
+# ---- T066: woff2 MIME type ----
+
+
+def test_woff2_mime_type_registered(client):
+    import mimetypes
+
+    assert mimetypes.guess_type("a.woff2")[0] == "font/woff2"
+
+
+def test_woff2_served_as_font_woff2(client):
+    from pathlib import Path
+
+    import paper_triage
+
+    font = Path(paper_triage.__file__).parent / "static/vendor/fonts/plex-sans-latin-400.woff2"
+    if not font.exists():
+        pytest.skip("fonts not vendored yet (T067)")
+    r = client.get("/vendor/fonts/plex-sans-latin-400.woff2")
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "font/woff2"

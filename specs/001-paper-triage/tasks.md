@@ -557,7 +557,7 @@ runs use `E2E_PORT=8765`.
 
 ### Wave R1 — BE lane
 
-- [ ] T066 [P] [BE] woff2 MIME type (FR-030b, SC-017; brief item 32). Test first in
+- [x] T066 [P] [BE] woff2 MIME type (FR-030b, SC-017; brief item 32). Test first in
   `tests/test_api.py`: after `create_app()`, `mimetypes.guess_type("a.woff2")[0] ==
   "font/woff2"`; `GET /vendor/fonts/plex-sans-latin-400.woff2` -> 200 with `content-type:
   font/woff2` (`pytest.skip` with reason "fonts not vendored yet (T067)" while the file is
