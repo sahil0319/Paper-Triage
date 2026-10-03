@@ -1236,7 +1236,7 @@
       return;
     }
     var it = libItem(id);
-    var title = it ? it.title : "Preview";
+    var title = it ? it.title : "Not in your Library"; // spec FR-030 (f): the one h1 copy exception
     previewHeading.textContent = title;
     previewHeading.setAttribute("title", title);
     document.title = (it ? title : "Preview") + " · " + BASE_TITLE;

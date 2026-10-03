@@ -743,6 +743,8 @@ a.btn--secondary { color: var(--color-ink); }
   padding: var(--space-md); background: var(--color-well);
 }
 .pv-stage { flex: 1; min-height: 0; overflow: auto; padding: var(--space-lg) var(--pad-x) var(--space-xxl); }
+.pv-stage > .empty { max-width: 640px; margin: var(--space-xl) auto 0; padding-inline: var(--pad-x); }
+.pv-stage > .empty .empty__title { font: var(--type-heading-sm); letter-spacing: 0; }
 .pv-card { max-width: 640px; margin: var(--space-lg) auto 0; }
 .pv-stage .disclosure { max-width: 640px; margin-inline: auto; margin-top: var(--space-lg); }
 .pv-opening { font: var(--type-label); letter-spacing: var(--tracking-label); color: var(--color-ink-muted); text-align: center; margin-top: var(--space-xxl); }

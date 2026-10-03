@@ -1180,3 +1180,28 @@ def test_mobile_row_buttons_and_unsave_confirm_do_not_crowd_the_authors(offline_
     confirm = row.locator(".confirm")
     expect(confirm).to_be_visible()
     assert confirm.evaluate("e => getComputedStyle(e).marginBottom") == "12px"
+
+
+@pytest.mark.parametrize("width", [390, 1440])
+def test_not_saved_preview_is_a_centred_640px_column_with_its_own_heading(
+    offline_page, live_server, width
+):
+    from ptstubs import lib_item
+    from test_e2e_library import preview
+
+    live_server.set_triage_delay(0)
+    page = offline_page
+    preview(page, [lib_item(1)], hash_="#/library/paper/9999.99999")
+    page.set_viewport_size({"width": width, "height": HEIGHTS[width]})
+    stage = page.locator("#pv-stage .empty")
+    expect(stage).to_contain_text("This paper is not in your Library.")
+    expect(page.locator("#preview-heading")).to_have_text("Not in your Library")
+    expect(page.locator("#preview-heading")).to_have_attribute("title", "Not in your Library")
+    assert page.title().startswith("Preview")
+    assert page.locator("h1:visible").count() == 1
+    title = page.locator("#pv-stage .empty__title")
+    assert title.evaluate("e => getComputedStyle(e).fontSize") == "20px"
+    box = stage.bounding_box()
+    assert box["width"] <= 640.5
+    if width == 1440:
+        assert abs(box["x"] + box["width"] / 2 - width / 2) < 2
