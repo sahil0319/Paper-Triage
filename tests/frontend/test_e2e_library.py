@@ -2386,7 +2386,7 @@ def test_audit_mobile_toolbar_is_compact_with_two_line_title(app):
     expect(page.locator("#pv-zoom-out")).to_be_hidden()
     expect(page.locator("#pv-zoom")).to_be_visible()
     assert page.evaluate("document.documentElement.scrollWidth") <= 390
-    # Rows: back + title, page nav, highlight + sheet button, links.
+    # Rows: back + title, links, page nav, highlight + sheet button (tab order = reading order).
     ys = {
         n: page.locator(sel).bounding_box()["y"]
         for n, sel in {
@@ -2396,7 +2396,7 @@ def test_audit_mobile_toolbar_is_compact_with_two_line_title(app):
             "export": "#pv-export",
         }.items()
     }
-    assert ys["back"] < ys["pager"] < ys["hl"] < ys["export"]
+    assert ys["back"] < ys["export"] < ys["pager"] < ys["hl"]
 
 
 def test_audit_tablet_title_keeps_room_and_sheet_button_joins_controls(app):
@@ -2668,3 +2668,78 @@ def test_e2e_every_v3_view_makes_only_local_requests(app, real_library):
     page.click("#pv-find-btn")
     find(page, "Quartzite")
     expect(page.locator("#pv-find-results .find-hit").first).to_be_visible()
+
+
+def _toolbar_focus_order_is_visual(page):
+    """DOM (tab) order of the visible toolbar controls must follow reading order: row, then x."""
+    return page.evaluate(
+        """() => {
+          const els = [...document.querySelectorAll('.pv-toolbar button, .pv-toolbar a[href], .pv-toolbar input, .pv-toolbar select')]
+            .filter(e => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden');
+          const bad = [];
+          for (let i = 1; i < els.length; i++) {
+            const a = els[i - 1].getBoundingClientRect(), b = els[i].getBoundingClientRect();
+            const sameRow = Math.abs((a.top + a.height / 2) - (b.top + b.height / 2)) < 16;
+            const ok = sameRow ? b.left >= a.left - 1 : b.top > a.top;
+            if (!ok) bad.push([els[i - 1].id || els[i - 1].className, els[i].id || els[i].className]);
+          }
+          return { count: els.length, bad };
+        }"""
+    )
+
+
+@pytest.mark.parametrize("width", [390, 820, 1280])
+def test_audit_toolbar_tab_order_matches_visual_order(app, width):
+    page = app
+    preview(
+        page, [lib_item(1, title="Progressive Distillation for Fast Sampling of Diffusion Models")]
+    )
+    vp(page, width, 900)
+    expect(page.locator(".pdf-page")).to_have_count(3)
+    res = _toolbar_focus_order_is_visual(page)
+    assert res["count"] >= 9, res
+    assert res["bad"] == [], res
+    if width < 1024:
+        sheet = page.locator("#pv-sheet-open")
+        ids = page.evaluate(
+            "() => [...document.querySelectorAll('.pv-toolbar button, .pv-toolbar a[href], .pv-toolbar input, .pv-toolbar select')]"
+            ".filter(e => e.getClientRects().length).map(e => e.id)"
+        )
+        assert ids[-1] == "pv-sheet-open", ids
+        expect(sheet).to_be_visible()
+
+
+def test_audit_toolbar_tab_order_real_keyboard_at_390(app):
+    page = app
+    preview(page, [lib_item(1)])
+    vp(page, 390, 900)
+    expect(page.locator(".pdf-page")).to_have_count(3)
+    page.locator("#pv-back").focus()
+    seen = []
+    for _ in range(12):
+        seen.append(page.evaluate("document.activeElement.id"))
+        page.keyboard.press("Tab")
+    assert seen.index("pv-sheet-open") > seen.index("pv-hl-color") > seen.index("pv-find-btn")
+    assert seen.index("pv-export") < seen.index("pv-prev")
+
+
+@pytest.mark.parametrize("status", ["failed", "pending"])
+def test_audit_sheet_button_stays_available_when_controls_are_hidden(app, status):
+    page = app
+    pdf = {"status": status, "error": "Not a PDF." if status == "failed" else None, "pages": None}
+    preview(page, [lib_item(1, pdf=pdf)])
+    vp(page, 390, 900)
+    expect(page.locator("#pv-controls")).to_be_hidden()
+    btn = page.locator("#pv-sheet-open")
+    expect(btn).to_be_visible()
+    page.locator("#pv-back").focus()
+    reached = []
+    for _ in range(6):
+        page.keyboard.press("Tab")
+        reached.append(page.evaluate("document.activeElement.id"))
+    assert "pv-sheet-open" in reached, reached
+    btn.click()
+    expect(page.locator("#pv-sheet")).to_be_visible()
+    expect(page.locator("#pv-hl-msg")).to_have_text(
+        "Highlights are available once the PDF is ready."
+    )
