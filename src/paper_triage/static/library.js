@@ -19,6 +19,7 @@
     content: $("lib-content"),
     filter: $("lib-filter"),
     clear: $("lib-clear"),
+    filters: document.querySelector(".lib-filters"),
     tagbar: $("lib-tagbar"),
     tags: $("lib-tags"),
     tagsMore: $("lib-tags-more"),
@@ -179,6 +180,8 @@
     renderCount(m);
     els.content.hidden = false;
     if (els.filter.value !== m.p.q) els.filter.value = m.p.q;
+    // An empty directory has nothing to filter: only the empty-directory message shows.
+    els.filters.hidden = !m.scoped.length;
     els.clear.hidden = !filterActive(m.p);
     renderTags(m);
     renderList(m);
@@ -230,7 +233,8 @@
     var counts = countTags(m.scoped);
     var names = sortedTags(counts, m.p);
     var none = !Object.keys(counts).length && !m.p.tags.length;
-    els.tagsNone.hidden = !none;
+    var libraryHasTags = lib().papers.some(function (it) { return (it.tags || []).length; });
+    els.tagsNone.hidden = !(none && !libraryHasTags);
     els.tags.hidden = none;
     els.tagsMore.hidden = true;
     clear(els.tags);

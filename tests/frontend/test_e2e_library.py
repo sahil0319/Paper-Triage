@@ -2269,3 +2269,92 @@ def test_real_paper_chat_refuses_outside_the_paper(app, real_library):
     expect(chat_turns(page).first.locator(".turn__a--refused")).to_be_visible(timeout=20_000)
     expect(chat_turns(page).first.locator("button.cite")).to_have_count(0)
     expect(chat_turns(page).first.locator(".turn__refused-title")).to_have_text("Not in this paper")
+
+
+# ---- v3 audit fixes: Library ----
+
+
+def test_audit_rail_items_stay_inside_the_rail(app):
+    page = app
+    stub = lib_page(page, [lib_item(1, directory_id=1)])
+    stub.directories = [
+        {"id": 1, "name": "final year thesis with a really very long name indeed", "count": 1}
+    ]
+    page.reload()
+    expect(rows(page)).to_have_count(1)
+    rail = page.locator("#dir-rail").bounding_box()
+    right = rail["x"] + rail["width"]
+    for item in page.locator("#dir-list button.rail__item").all():
+        b = item.bounding_box()
+        assert b["x"] + b["width"] <= right + 0.5, (item.inner_text(), b, right)
+    long = page.locator("#dir-list button.rail__item").nth(2)
+    expect(long).to_have_attribute("title", "final year thesis with a really very long name indeed")
+    assert long.locator(".rail__name").evaluate("e => e.scrollWidth > e.clientWidth")
+
+
+def test_audit_new_directory_form_in_rail_keeps_a_wide_input(app):
+    page = app
+    lib_page(page, [lib_item(1)])
+    page.click("#dir-new")
+    box = page.locator("#dir-new-slot input").bounding_box()
+    assert box["width"] > 180, box
+    for b in page.locator("#dir-new-slot button").all():
+        assert b.bounding_box()["y"] > box["y"]
+
+
+def test_audit_rank_caption_is_one_line_under_authors_at_every_width(app):
+    page = app
+    lib_page(page, [lib_item(1, topic="diffusion models video")])
+    li = rows(page).first
+    expect(li.locator(".rank__for")).to_be_hidden()
+    expect(li.locator(".lib-for")).to_have_text('Ranked for "diffusion models video"')
+    expect(li.locator(".lib-for")).to_be_visible()
+
+
+def test_audit_no_horizontal_overflow_with_long_directory_on_mobile(app):
+    page = app
+    stub = LibraryStub(page, [lib_item(1, directory_id=1)])
+    stub.directories = [
+        {"id": 1, "name": "final year thesis with a really very long name indeed", "count": 1}
+    ]
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto("/#/library")
+    expect(rows(page)).to_have_count(1)
+    assert page.evaluate("document.documentElement.scrollWidth") <= 390
+
+
+def test_audit_mobile_title_gets_the_full_row(app):
+    page = app
+    lib_page(
+        page,
+        [
+            lib_item(
+                1, title="A fairly long saved paper title that needs room to breathe on a phone"
+            )
+        ],
+    )
+    page.set_viewport_size({"width": 390, "height": 844})
+    title = rows(page).first.locator(".paper__title").bounding_box()
+    btn = rows(page).first.locator("button.open-preview").bounding_box()
+    assert btn["y"] > title["y"] + title["height"] - 1
+    assert title["width"] > 250
+
+
+def test_audit_empty_directory_hides_filters_and_tag_note(app):
+    page = app
+    stub = lib_page(page, [lib_item(1, tags=["diffusion"])], hash_="#/library?dir=network")
+    stub.directories = [{"id": 1, "name": "network", "count": 0}]
+    page.reload()
+    expect(page.locator("#library-empty .empty__title")).to_have_text("No papers in network.")
+    expect(page.locator(".lib-filters")).to_be_hidden()
+    expect(page.locator("#lib-tags-none")).to_be_hidden()
+
+
+def test_audit_tag_note_only_when_library_has_no_tags(app):
+    page = app
+    stub = lib_page(page, [tagged(1, ["a1"], directory_id=None), tagged(2, [], directory_id=1)])
+    stub.directories = [{"id": 1, "name": "network", "count": 1}]
+    page.goto("/#/library?dir=network")
+    page.reload()
+    expect(rows(page)).to_have_count(1)
+    expect(page.locator("#lib-tags-none")).to_be_hidden()
