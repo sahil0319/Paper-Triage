@@ -100,6 +100,18 @@ def test_unrelated_question_refused(client):
     r = ask(client, "What is the capital of France?").json()
     assert r["refused"] is True and r["pages"] == [] and r["answer"]
     assert SENTINEL not in r["answer"]
+    assert r["answer"] == "This paper does not cover that."
+
+
+@pytest.mark.parametrize(
+    "question",
+    ["What is the main claim?", "What baselines are compared?", "What are the stated limitations?"],
+)
+def test_ui_starter_questions_get_grounded_mock_answers(client, question):
+    save(client)
+    r = ask(client, question).json()
+    assert r["refused"] is False and len(r["pages"]) == 1 and r["dropped_pages"] == []
+    assert f"[p.{r['pages'][0]}]" in r["answer"]
 
 
 def test_dropped_page_when_model_cites_outside_range(client):

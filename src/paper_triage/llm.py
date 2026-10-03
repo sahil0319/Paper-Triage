@@ -19,6 +19,13 @@ MAX_TOKENS = 16000
 _PAPER_TAG = re.compile(r'<paper id="([^"]*)"(?:[^>]*?basis="(fulltext|abstract)")?')
 _CHAT_PAPER = re.compile(r'<paper id="([^"]*)"(?: title="([^"]*)")?[^>]*>(.*?)</paper>', re.DOTALL)
 _PAGE = re.compile(r'<page n="(\d+)">(.*?)</page>', re.DOTALL)
+# UI starter questions for paper chat: (question pattern, word the cited page must contain; None =
+# the first page with text). Keeps mock answers grounded for the starters on any sample paper.
+_PAGE_STARTERS = (
+    (re.compile(r"\bmain (?:claim|contribution|idea|result)s?\b"), None),
+    (re.compile(r"\bbaselines?\b"), "baseline"),
+    (re.compile(r"\blimitations?\b"), "limitation"),
+)
 _QUESTION = re.compile(r"<question>(.*?)</question>", re.DOTALL)
 _WORD = re.compile(r"[a-z]{4,}")
 _STOP_TEXT = (
@@ -76,7 +83,7 @@ class MockClient:
         refusal = f"{SENTINEL} The stored papers do not cover this."
         q = _QUESTION.search(user)
         if '<page n="' in user:
-            return self._page_answer(user, q, refusal)
+            return self._page_answer(user, q, f"{SENTINEL} This paper does not cover that.")
         papers = _CHAT_PAPER.findall(user[: q.start()] if q else user)
         if q is None or not papers:
             return refusal
@@ -100,8 +107,15 @@ class MockClient:
         word with the question, else refuse."""
         if q is None:
             return refusal
-        words = set(_WORD.findall(q.group(1).lower())) - _MOCK_STOP_WORDS
-        for n, text in _PAGE.findall(user[: q.start()]):
+        pages = _PAGE.findall(user[: q.start()])
+        question = q.group(1).lower()
+        for pattern, key in _PAGE_STARTERS:
+            if pattern.search(question):
+                hit = next((n for n, t in pages if t.strip() and (key is None or key in t.lower())), None)
+                if hit:
+                    return f"Mock answer from this paper [p.{hit}]."
+        words = set(_WORD.findall(question)) - _MOCK_STOP_WORDS
+        for n, text in pages:
             if words & set(_WORD.findall(text.lower())):
                 return f"Mock answer from this paper [p.{n}]."
         return refusal

@@ -382,3 +382,28 @@ def test_llm_mock_page_mode_no_question_refuses():
 def test_llm_mock_results_chat_unchanged_by_page_mode():
     out = MockClient().text("sys", _chat_prompt("Tell me about cobalt?"))
     assert out.endswith("[2401.00002].")
+
+
+def test_llm_mock_page_mode_answers_ui_starters_with_page_cites():
+    assert MockClient().text("sys", _page_prompt("What is the main claim?")).endswith("[p.1].")
+
+
+def test_llm_mock_page_mode_starters_cite_page_with_matching_word():
+    prompt = (
+        '<page n="1">Intro text.</page>\n<page n="2">We compare against two baseline models.'
+        '</page>\n<page n="3">Known limitations remain.</page>\n'
+        "<question>\n{}\n</question>"
+    )
+    m = MockClient()
+    assert m.text("s", prompt.format("What is the main claim?")).endswith("[p.1].")
+    assert m.text("s", prompt.format("What baselines are compared?")).endswith("[p.2].")
+    assert m.text("s", prompt.format("What are the stated limitations?")).endswith("[p.3].")
+    # a starter with no matching page falls back to the plain refusal
+    assert m.text("s", '<page n="1">x</page>\n<question>\nWhat baselines are compared?\n'
+                  "</question>").startswith(SENTINEL)
+
+
+def test_llm_mock_page_mode_refusal_is_paper_specific():
+    out = MockClient().text("sys", _page_prompt("What is the capital of France?"))
+    assert out == f"{SENTINEL} This paper does not cover that."
+    assert "stored papers" not in out
