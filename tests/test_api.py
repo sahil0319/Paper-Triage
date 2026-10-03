@@ -1,4 +1,5 @@
 import json
+import re
 
 import pytest
 from fastapi.testclient import TestClient
@@ -92,7 +93,32 @@ def test_index_has_page_landmarks(client):
 def test_static_css_served(client):
     r = client.get("/app.css")
     assert r.status_code == 200 and "text/css" in r.headers["content-type"]
-    assert "http://" not in r.text and "https://" not in r.text  # no CDN, no external fonts
+    assert _external_css_refs(r.text) == []  # no CDN, no external fonts
+
+
+_DATA_URL = re.compile(r"""url\(\s*(?:(['"])data:.*?\1|data:[^)]*)\s*\)""", re.DOTALL | re.IGNORECASE)
+_FETCHABLE = re.compile(r"""url\(\s*['"]?\s*(?:https?:)?//|@import|https?://""", re.IGNORECASE)
+
+
+def _external_css_refs(css: str) -> list[str]:
+    """Fetchable external references. A data: URI is inline (its SVG xmlns is a namespace
+    name the browser never fetches), so it is removed before the check."""
+    return _FETCHABLE.findall(_DATA_URL.sub("url()", css))
+
+
+def test_css_guard_flags_external_loads_but_allows_data_uri_xmlns():
+    chevron = (
+        "a{background:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E"
+        "%3C/svg%3E\") no-repeat}"
+    )
+    assert _external_css_refs(chevron) == []
+    assert _external_css_refs("a{background:url(data:image/svg+xml,<svg xmlns='http://x'/>)}") == []
+    assert _external_css_refs("a{background:url(https://x/y.png)}")
+    assert _external_css_refs("a{background:url('//x/y.png')}")
+    assert _external_css_refs("@import 'local.css';")
+    assert _external_css_refs("@font-face{src:url( http://x/f.woff2 )}")
+    # an external load next to a data URI is still caught
+    assert _external_css_refs(chevron + "b{background:url(https://x/y.png)}")
 
 
 # --- T019: POST /api/chat ---
