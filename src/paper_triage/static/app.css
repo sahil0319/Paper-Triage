@@ -798,10 +798,10 @@ a.btn--secondary { color: var(--color-ink); }
 .pv-panel[hidden] { display: none; }
 .pv-panel__body { padding: var(--space-md) var(--space-lg) var(--space-xl); }
 .pv-tabbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); border-bottom: 1px solid var(--color-border-subtle); }
-.pv-tabs { display: flex; gap: var(--space-lg); }
+.pv-tabs { display: flex; gap: var(--space-md); }
 .pv-sheet-close { display: none; }
 .pv-sheet .pv-sheet-close { display: inline-flex; }
-.pv-tab { background: none; border: 0; padding: var(--space-xs) 0; margin-bottom: -1px; min-height: 44px; cursor: pointer;
+.pv-tab { background: none; border: 0; padding: var(--space-xs) 0; margin-bottom: -1px; min-height: var(--control-md); cursor: pointer;
   font: var(--type-body-compact); color: var(--color-ink-muted); border-bottom: 2px solid transparent; }
 .pv-tab[aria-selected="true"] { color: var(--color-ink); font-weight: 600; border-bottom-color: var(--color-primary); }
 .pv-tab__count { font: var(--type-label); letter-spacing: var(--tracking-label); font-variant-numeric: tabular-nums; margin-left: var(--space-xxs); }
@@ -834,8 +834,9 @@ a.btn--secondary { color: var(--color-ink); }
 .note-editor { margin-top: var(--space-xs); }
 .note-editor__label { display: block; font: var(--type-label); letter-spacing: var(--tracking-label); color: var(--color-ink-muted); }
 .note-editor textarea { width: 100%; margin-top: var(--space-xxs); font: var(--type-body);
-  color: var(--color-ink); background: var(--color-canvas); border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-none); padding: var(--space-xs) var(--space-sm); resize: vertical; }
+  color: var(--color-ink); background: var(--color-canvas); border: 0; border-bottom: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-none); padding: var(--space-sm) var(--space-md); resize: vertical; }
+.pv-sheet .note-editor textarea { background: var(--color-surface-1); }
 .note-editor__row { display: flex; align-items: center; gap: var(--space-sm); margin-top: var(--space-xs); }
 .note-counter { margin-left: auto; font: var(--type-label); letter-spacing: var(--tracking-label); color: var(--color-ink-muted); font-variant-numeric: tabular-nums; }
 .note-counter.is-max { color: var(--color-error); }
@@ -858,7 +859,7 @@ a.btn--secondary { color: var(--color-ink); }
 .pdf-page__notext { position: absolute; left: 50%; bottom: var(--space-md); transform: translateX(-50%); z-index: 3;
   max-width: calc(100% - 2 * var(--space-md)); padding: var(--space-xs) var(--space-sm); text-align: center;
   font: var(--type-label); letter-spacing: var(--tracking-label); color: var(--color-ink);
-  background: var(--color-info-surface); border-radius: var(--radius-none); }
+  background: var(--color-info-surface); border-left: 3px solid var(--color-info); border-radius: var(--radius-none); }
 
 @media (min-width: 1024px) {
   .pv-layout.has-panel { grid-template-columns: minmax(0, 1fr) var(--panel-w); }

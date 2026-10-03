@@ -687,7 +687,7 @@ runs use `E2E_PORT=8765`.
   popover border-radius `0px` and non-empty box-shadow; swatches border-radius `50%`; the
   highlight list prints the colour name (SC-019). Files `pt/static/app.css`,
   `tests/frontend/test_e2e_design.py`.
-- [ ] T073 [FE] [US8] [US9] Preview side panel, notes, Ask this paper and bottom sheet (FR-030a-c,
+- [x] T073 [FE] [US8] [US9] Preview side panel, notes, Ask this paper and bottom sheet (FR-030a-c,
   FR-030f; brief items 28-31; D8.6, D8.8). Keep F-019: `Ask this paper` is the selected tab on
   every preview open (panel and sheet) and no paper-chat request happens before the first
   question. `app.css`: `.pv-panel` `surface-1` with a 1px `border-page` left edge; `.pv-tab`

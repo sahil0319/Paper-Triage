@@ -406,3 +406,96 @@ def test_find_field_is_carbon_and_hover_fill_is_surface_hover(pv):
     assert abs(field.bounding_box()["height"] - 40) < 1
     assert field.evaluate("e => getComputedStyle(e).borderTopWidth") == "0px"
     assert field.evaluate("e => getComputedStyle(e).backgroundColor") == "rgb(244, 244, 244)"
+
+
+# ---- T073: Preview side panel, notes, Ask this paper and the bottom sheet ----
+
+
+def _open_preview(page, width, height=900, wait_pages=True, **item_kw):
+    from ptstubs import lib_item
+    from test_e2e_library import preview
+
+    chat_calls = []
+    page.on(
+        "request",
+        lambda r: chat_calls.append(r.url) if r.url.endswith("/api/paper-chat") else None,
+    )
+    preview(page, [lib_item(item_kw.pop("n", 1), **item_kw)])
+    page.set_viewport_size({"width": width, "height": height})
+    if wait_pages:
+        expect(page.locator(".pdf-page")).to_have_count(3)
+    else:
+        expect(page.locator("#pv-panel")).to_be_visible()
+    return chat_calls
+
+
+def test_selected_tab_is_ask_this_paper_with_primary_rule_and_no_chat_request(
+    offline_page, live_server
+):
+    live_server.set_triage_delay(0)
+    page = offline_page
+    calls = _open_preview(page, 1440)
+    tab = page.locator('#pv-panel [role="tab"][aria-selected="true"]')
+    expect(tab).to_have_text("Ask this paper")
+    assert tab.evaluate("e => getComputedStyle(e).fontWeight") == "600"
+    assert tab.evaluate("e => getComputedStyle(e).borderBottomWidth") == "2px"
+    assert tab.evaluate("e => getComputedStyle(e).borderBottomColor") == PRIMARY
+    assert abs(tab.bounding_box()["height"] - 40) < 1.5
+    panel = page.locator("#pv-panel")
+    assert panel.evaluate("e => getComputedStyle(e).backgroundColor") == "rgb(244, 244, 244)"
+    assert panel.evaluate("e => getComputedStyle(e).borderLeftColor") == "rgb(198, 198, 198)"
+    page.wait_for_timeout(300)
+    assert calls == []
+
+
+def test_notes_field_is_canvas_on_the_panel(offline_page, live_server):
+    from test_e2e_library import hl_tab
+
+    live_server.set_triage_delay(0)
+    page = offline_page
+    _open_preview(page, 1440)
+    hl_tab(page)
+    page.click("#pv-note-add")
+    area = page.locator(".note-editor textarea").first
+    expect(area).to_be_visible()
+    assert area.evaluate("e => getComputedStyle(e).backgroundColor") == "rgb(255, 255, 255)"
+    assert area.evaluate("e => getComputedStyle(e).borderTopLeftRadius") == "0px"
+    assert area.evaluate("e => getComputedStyle(e).borderTopWidth") == "0px"
+    assert area.evaluate("e => getComputedStyle(e).borderBottomColor") == BORDER_STRONG
+
+
+def test_sheet_is_square_overlay_opening_on_ask_this_paper(offline_page, live_server):
+    live_server.set_triage_delay(0)
+    page = offline_page
+    calls = _open_preview(page, 390, 844)
+    page.click("#pv-sheet-open")
+    sheet = page.locator("#pv-sheet")
+    expect(sheet).to_be_visible()
+    expect(sheet.locator('[role="tab"][aria-selected="true"]')).to_have_text("Ask this paper")
+    assert sheet.evaluate("e => getComputedStyle(e).borderTopLeftRadius") == "0px"
+    assert sheet.evaluate("e => getComputedStyle(e).boxShadow") != "none"
+    assert sheet.evaluate("e => getComputedStyle(e, '::backdrop').backgroundColor") == (
+        "rgba(22, 22, 22, 0.5)"
+    )
+    assert sheet.evaluate("e => getComputedStyle(e).animationTimingFunction") == (
+        "cubic-bezier(0, 0, 0.38, 0.9)"
+    )
+    assert calls == []
+
+
+def test_no_pdf_note_is_an_info_notification(offline_page, live_server):
+    live_server.set_triage_delay(0)
+    page = offline_page
+    _open_preview(
+        page,
+        1440,
+        wait_pages=False,
+        n=5,
+        pdf={"status": "failed", "error": "Not a PDF.", "pages": None},
+    )
+    note = page.locator("#pv-chat-nopdf")
+    expect(note).to_be_visible()
+    assert note.evaluate("e => getComputedStyle(e).backgroundColor") == "rgb(237, 245, 255)"
+    assert note.evaluate("e => getComputedStyle(e).borderLeftWidth") == "3px"
+    assert note.evaluate("e => getComputedStyle(e).borderLeftColor") == PRIMARY
+    assert note.evaluate("e => getComputedStyle(e).borderTopLeftRadius") == "0px"
