@@ -10,7 +10,7 @@ notes, tags, directories and a per-paper chat. It runs locally for one user: no 
 SQLite storage. It works with Anthropic or OpenAI models, and `MOCK_LLM=1` runs the whole thing
 offline with canned output.
 
-![Ranked triage results: each paper with a 0-10 score, a one-line reason, a Save button and the grounded chat beside the list](docs/screenshots/03-ranked-results.png)
+![Ranked triage results: each paper with a 0-10 score, a short reason, a Save button and the grounded chat beside the list](docs/screenshots/03-ranked-results.png)
 
 ## Contents
 
@@ -36,7 +36,7 @@ activity and elapsed time, never a progress percentage.
 Each result shows its rank and reason at a glance. The critique is one click away: a card expands to
 the summary, the contributions and the critique.
 
-![A result card expanded to its summary, contributions and critique](docs/screenshots/03b-critique-expanded.png)
+![A result card expanded to show its summary and contributions](docs/screenshots/03b-critique-expanded.png)
 
 ### Grounded chat
 
