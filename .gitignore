@@ -11,3 +11,4 @@ __pycache__/
 .claude/settings.local.json.bak
 node_modules/
 paper_triage_data/
+.DS_Store
