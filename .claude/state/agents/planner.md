@@ -35,3 +35,22 @@ BLOCKED: analysis.md write denied by harness
 - tasks T043-T065: BE 13, FE 10. Waves F (BE T043-T051 || FE T052-T056), G (BE T057-T059 || FE T060-T063), H (FE T064 || BE T065).
 - analyze: 0 CRITICAL; 3 HIGH + 4 MEDIUM fixed; open: S1 (T060/T062 size), LOW T1, T2, E1. analysis.md Write denied by harness again; report in handoff.
 - next: router spawns Wave F.
+
+## 2026-10-03 v4 amendment (Carbon visual redesign)
+- goal: specify -> plan delta -> tasks T066+ -> analyze for DESIGN.md v2.0 (0da87be) redesign.
+- status: done via Skill speckit-specify/plan/tasks/analyze + .specify helpers (setup-plan, setup-tasks, check-prerequisites). No commit: Bash limited to .specify scripts; orchestrator commits specs/ only.
+- files: spec.md (v4 input, Clarifications v4, 4 edge cases, FR-012 pointer, FR-030 a-f, SC-017..SC-022, assumptions), checklists/requirements.md, plan.md (v4 Amendment), research.md (R19-R21), quickstart.md (steps 20-23), tasks.md (Phase 9, v4 waves, deps, strategy). Constitution unchanged (2.0.0 covers v4).
+- decisions: one FR only (cap 32 reached: 31+FR-030); 8 font files per DESIGN.md (brief "7" miscount); README note = BE task (README owner) not FE; screenshots to $V4_SHOTS_DIR, no pixel diff; FE gate = F-016/F-017/F-019 commits landed.
+- tasks: BE T066 (woff2 MIME), T075 (README/SETUP_LOG). FE T067 fonts, T068 tokens+global, T069 shell/nav/query, T070 results+chat, T071 library, T072 preview toolbar/well/highlights, T073 panel/paper chat/sheet, T074 states/motion/forced colours, T076 design e2e + screenshots.
+- waves: R1 BE T066 || FE T067->T068; R2 BE T075 || FE T069->T074; R3 FE T076; then tester (brief 33), designer re-audit (brief 34), fixes T077+.
+- analyze: 0 CRITICAL, 0 HIGH. Fixed: MEDIUM I4 (F-016/F-017/F-019 browser checks fallback in T076), LOW I2 (plan test file), I3 (Mono loaded check), T1 (font-weight normal). Open: MEDIUM S1 (T068 size: token swap + remap + focus/hover/motion; kept together per R21, tests guard); LOW I1 (brief 7 vs 8 files, recorded), U2 (T066 MIME test may pass pre-fix on macOS), A1 (SC-022 "blocking" is designer judgment), L1 (md table/list lint). Coverage: FR-030 a-f and SC-017..SC-022 all mapped (SC-022 audit step in Lanes). analysis.md not written (harness blocks).
+- next: router commits specs/, then waits for F-016/F-017/F-019 commits, then spawns Wave R1.
+DONE
+
+## 2026-10-04 copy decision: not-saved Preview h1 (v4 audit item 6)
+- goal: confirm or correct designer's h1 `Not in your Library` for not-saved Preview.
+- sources: v3 brief L21 + copy table `pv.notsaved` = `This paper is not in your Library.` / `Go to Library`; L16 h1 = paper title; no h1 key for not-saved. DESIGN.md 8.8 / 3.3: centred column, heading-sm card title, no string. PRODUCT.md: none. redesign-brief: no copy change. v3 audit NTH5 proposed h1 = full sentence + drop card title.
+- decision: confirmed. h1 + its title attribute = `Not in your Library` (no full stop). `.empty__title` stays `This paper is not in your Library.` + `Go to Library` (unchanged). Strings differ on purpose: h1 short state label (refusal-title pattern), card full sentence + action. `.empty__title` is a `<p>`, so only one heading. Rejected v3 NTH5 (markup change, conflicts DESIGN.md 3.3). Unchanged: tab title `Preview · Paper Triage`, library-load-error h1 `Preview`.
+- recorded: spec.md Clarifications Session 2026-10-03 (v4) new Q/A; FR-030 (f) exception clause.
+- no new task (FE fix under audit item 6); analyze not re-run (no task change). FE: check e2e asserting h1 `Preview` in not-saved state.
+DONE

@@ -253,3 +253,8 @@ Frontend-builder continues at T068. Loop until T074, then T076 design e2e, then 
 ### Next
 None. Await user decision on open items. If user approves page-transitions feature, spawn designer for DESIGN.md §6 row update.
 
+
+## README screenshots checkpoint (2026-10-15, commit d355dd9)
+- Recorded 071d354 restructure, c28dbd5 caption fix, 17 live PNGs in docs/screenshots/ (openai gpt-5-mini, isolated DB .local/screens/, user db untouched).
+- Tester GREEN: 646 pytest, ruff clean, 17/17 images. Report docs/qa/readme-screenshots.md (uncommitted).
+- Open items 1-7 kept. DONE true, context_pct preserved. Next: None; await user.

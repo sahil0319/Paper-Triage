@@ -52,3 +52,65 @@ Goal: verify T060-T063 + fixes. Status: PASS. Full pytest 470/471 (F-012 flaky t
 ## v3 final pass (paused by user)
 Done: pytest run1 497 pass, run2 497 pass (87s each); ruff clean; e2e run1 132 pass (runs 2-3 not confirmed, command exited 144 on pause/timeout); tasks.md T001-T065 all ticked + matching commits; .gitignore covers paper_triage_data/, *.db, .env; no db/data tracked (only .env.example); pdfjs LICENSE tracked; impeccable detect 4 findings (layout-transition app.css:661, 2 cramped-padding, flat-type-hierarchy) - not yet compared against baseline.
 Remaining: e2e x2 more, static guard + F-012 solo rerun, README spot-check, real-API smoke on 8766, load-more chat reset, F-012/F-013/F-014 closure in failures.md, v3 section in final.md. No files edited. Gate skipped (no bare repo).
+
+## v3 final pass COMPLETE (HEAD 42fbfc3)
+pytest x2 503 pass; ruff clean; e2e 138 pass x14/15 (1 unnamed flake -> F-015 accepted); static guard 16; F-012 solo 3/3; impeccable 4 hits (all known/accepted); smoke + 390px tab order + F-006..F-008 ok; README ok; hygiene ok. Gate skipped (deferred). final.md v3 section + failures.md updated. Servers killed.
+
+## v4 fixes F-016..F-019 + T066 (2026-10-03, HEAD 6a1912c)
+- Goal: verify 7b43af1..6a1912c. Status: green. pytest 532 x2, ruff check clean, e2e solo x3 for F-016/F-017/F-019 all pass, live 8766 smoke ok (fonts font/woff2), servers killed.
+- F-018 build_query manual repro ok. Report docs/qa/v4-fixes.md. All four marked RESOLVED in failures.md.
+- Detector: 8 design-system advisories vs new DESIGN.md, expected until T068+.
+- Next: tester re-run after T067..T076 land.
+
+## v4 T068 verify (2026-10-04, HEAD 94ed09e, worktree)
+- Goal: verify token layer commit. Status: one [FE] flake. pytest 544 pass (E2E_PORT=8766), ruff clean, test_design_tokens solo x3 12 pass, assets served 200, detect 7+2 (all accepted).
+- F-020 [FE] medium: sheet-up slowed 200->240ms, test_audit_sheet_header_is_one_row_on_canvas fails ~1/3 (parent 12/12). Wait for animation end in test.
+- Deviations (notifications, working card surface-1, tag pressed inverse, rail bar, ink-disabled rgb(140,140,140)) all match DESIGN.md.
+- Report docs/qa/v4-T068.md. Servers killed. Next: frontend-builder fixes F-020 test, then T069.
+
+## v4 T069 + T070 + F-020 verify (2026-10-04, snapshot c41d740)
+- Status: PASS. pytest 559, ruff clean, test_e2e_design x3 15 pass, F-020 test solo 12/12 (tolerance unchanged, getAnimations wait added; reflow hunks format-only), detect identical to T068 baseline (7 + 2 advisories).
+- F-020 RESOLVED in failures.md. Report docs/qa/v4-T069-T070.md. No servers left. No commit (main tree).
+- Next: T071 verify when FE reports.
+
+## v4 T071 + T072 verify (2026-10-04, snapshots 3f6cc23 and d08cf70)
+- Status: UI PASS, suite RED on F-021. d08cf70: pytest 571 pass + 1 fail, ruff clean, test_e2e_design x3 28 pass, test_e2e_library x3 129 pass, F-016/tab-order/mobile-toolbar subset x3 12 pass, detect +1 spec-mandated side-tab (hl-item__quote).
+- F-021 [BE] medium: tests/test_api.py::test_static_css_served greps `http://`; T071 SVG data-URI xmlns trips it. Fix the guard to fetchable URLs (url(http..), @import).
+- F-022 [FE] low: #pv-export 34px and #pv-external 28px vs "every control 40px"; test covers only #pv-controls.
+- Mobile toolbar 243px (<=260), spacing uses --space-xxs/xs tokens, #pv-controls all 40px. Collapse reaches 0px; reduced-motion path unchanged.
+- Reports docs/qa/v4-T071.md. No servers. No commit.
+- Next: backend-builder (F-021), frontend-builder (F-022); then T073 verify.
+
+## v4 T073 + F-021 re-verify (2026-10-04, snapshots 59debeb, 8d1fe79)
+- T073 PASS: pytest 575 pass + known F-021, ruff clean, test_e2e_design 25/26 runs green, F-020 test 5/5, F-019 subset 7 pass. Selected Ask tab, no paper-chat request, sheet opens on Ask, backdrop = overlay token, notext/nopdf info rules, tab 40px verified.
+- F-021 RESOLVED: test_api 37 pass; adversarial probe caught every external ref, data: xmlns allowed.
+- F-023 [FE] low (new): mint highlight design test flaked 1/26 (detached .hl after optimistic swap, F-012 family).
+- Port 8766 was held by BE pytest; tester used E2E_PORT=8786. Report docs/qa/v4-T073.md. No commit.
+- Next: T074 verify when FE reports.
+
+## v4 T074 + F-022 verify (2026-10-04, snapshot ae286b8)
+- PASS. pytest 595 pass (fully green, F-021 gone), ruff clean, design e2e + tokens x3 62 pass, toolbar/F-016 subset x3 14 pass.
+- F-022 RESOLVED: export/external 40px at 1440/820/390, mobile toolbar 249px, tab order same. Forced-colors probe: hl outline 2px, layer forced-color-adjust none. Reduced-motion covers every keyframe.
+- detect: +1 spec-mandated forced-colors rail bar. F-023 still open (FE, after T076).
+- Report docs/qa/v4-T074.md. Port 8766 free; no servers. No commit.
+- Next: wait for T076 + F-023, then final full pass.
+
+## v4 final pass (2026-10-04, HEAD 14af76e)
+- PASS. pytest 638 x2, ruff clean, e2e 231 x3, design e2e + V4_SHOTS_DIR 85 pass (9 PNGs viewed ok), static/font/token 41 pass, F-023 solo 12/12 -> RESOLVED, smoke 12/12 (triage, save, pdf, paper-chat, results chat, woff2), tasks 76/76 ticked with commits, README/SETUP_LOG match, no tracked db/env/tarball.
+- detect: 10 + 1 advisory, all known/spec-mandated. Gate skipped (no bare repo).
+- New low F-024: stray `$S/` dir in repo root (untracked, 164 KB, t72.png). Delete before commit.
+- final.md v4 section written. No commit. Ports free.
+
+## v4 audit fixes re-verify (2026-10-04, HEAD 04b299b)
+- PASS. pytest 646 x2, ruff clean, e2e 239 x2, design e2e 93, detect = final baseline, mobile toolbar 249px, focus order unchanged.
+- Items 1-6 all fixed by probe: rail count 5.92/6.38:1; forced-colors underline only on current nav/tab; back ghost; primary Create/Save note; 12px confirm + save gaps; not-saved h1/title `Not in your Library` centred 640px, load-error h1 `Preview`.
+- No new failures. Cosmetic note only: load-error branch does not reset the h1 title attribute. F-024 (`$S/` dir) still open.
+- Appended to final.md and failures.md. No commit. Ports free.
+
+## README screenshots (live, one-off)
+- Goal: capture feature screenshots, live mode (openai/gpt-5-mini per /api/status), port 8766, isolated DB .local/screens/.
+- Status: 17 PNGs in docs/screenshots/ (01..13a), all read back OK. Queries: "retrieval augmented generation evaluation" (main), "dense passage retrieval benchmark" (2nd tag set, mobile shot). 6 papers saved, PDFs ready. Server killed, port free. No commit.
+- Skipped: PDF pending/failed state (live downloads all succeeded), unsave confirm, zoom variants.
+
+## README screenshots verify (071d354)
+- 17/17 images referenced and present; captions match except 2 cosmetic [BE] nits (README.md:13 "one-line reason", README.md:39 critique not visible in 03b). Quick start matches config/status; no facts dropped. ruff clean; 646 passed. Details: docs/qa/readme-screenshots.md. No commit.

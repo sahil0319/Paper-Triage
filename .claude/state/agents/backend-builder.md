@@ -63,3 +63,24 @@ F-002 6cd65e0: db.touch_results refreshes created_at of reused results in pipeli
 - T059: harness LiveServer now mkdtemp's PAPER_TRIAGE_DATA_DIR in start() (attr server.data_dir) and rmtree's it in stop(). v3 offline smoke in tests/test_e2e_mock.py. Real server: PDF download runs AFTER the save response (race); poll GET /api/library until pdf.status != pending. Wave G BE done: T057 c678faf, T058 b86b1fd, T059 below. pytest (excl. tests/frontend) 344 pass.
 - T065: README.md + SETUP_LOG.md v3 written (Library, viewer, paper chat, data dir, vendored pdf.js, mock ids, personal-use note). UI described per spec/brief.
 - F-014 fix: MockClient page mode answers the 3 UI starters (main claim -> first text page, baselines/limitations -> first page containing the word; sample.pdf: p.1, p.1, p.3) and refuses off-paper with 'This paper does not cover that.' (paper_chat strips sentinel, so API answer = that sentence). Contract wording unchanged.
+
+## F-018 + T066
+- F-018 d323ef9: fetcher.build_query sanitizes terms, OR-joins >4 terms (arXiv ANDs all terms).
+- T066: mimetypes.add_type font/woff2 in app.py; GET /vendor/fonts/plex-sans-latin-400.woff2 test skips until T067 vendors it.
+- T075 needs T067 (fonts absent in static/vendor/fonts): not started. Next: T075 after T067 lands.
+
+## T075
+- README: new "Design and fonts" section (Carbon, light only, 8 woff2, packages/versions, no runtime network, font/woff2 MIME); Test section adds design e2e cmd with V4_SHOTS_DIR (T076 not built yet; matches task text). SETUP_LOG v4 line. Layout line mentions static/vendor/fonts.
+- Docs only; no tests run. next: tester / FE T068+.
+
+## T075
+- README: new "Design and fonts" section (Carbon, light only, 8 woff2, packages/versions, no runtime network, font/woff2 MIME); Test section adds design e2e cmd with V4_SHOTS_DIR (T076 not built yet; matches task text). SETUP_LOG v4 line. Layout line mentions static/vendor/fonts.
+- Docs only; no tests run. next: tester / FE T068+.
+
+## F-021
+- tests/test_api.py: _external_css_refs strips data: URIs then flags url(http/https/ //), @import, leftover http(s)://. Negative test added. pytest (excl. frontend) 367 pass, ruff clean. app.css untouched. next: tester re-verify.
+
+## README restructure (user-requested, no task id)
+- Goal: GitHub-style README + screenshots. Status: done.
+- Outline: title/pitch, hero 03, Contents, Features (Triage, Grounded chat, Library, PDF viewer, Paper chat, Mobile, details block 07b/13a), Quick start (Setup, Run), Usage (Search and results, Library/viewer/paper chat), Reference (Storage, Design and fonts, pdf.js, Library API, Mock mode), Test, Notes, Layout.
+- Checks: 17/17 PNGs referenced, all paths exist; ruff clean; tests/frontend/test_static_assets.py 21 passed (only README test reads fonts README, not root).
