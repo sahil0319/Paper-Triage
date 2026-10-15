@@ -24,8 +24,15 @@
 
 ### Git Verification
 - Since checkpoint 319bcc7: T074 f3a2946, fix(F-021) 8d1fe79, fix(F-022) ae286b8, T076 651ea2f, fix(F-023) 14af76e, v4-audit fixes fa4c533 7d6885f 3f21547 bf43594 c32275c 04b299b
-- Latest: 04b299b (v4-audit alignment)
+- Latest: c28dbd5 (README caption fix); 071d354 (README restructure); prior 04b299b (v4-audit alignment)
 - All T001-T076 have matching commits; no task/commit mismatches
+
+## README screenshots (user-requested docs task, no task id)
+- Phase stays done (v4). DONE stays true. Open items 1-7 unchanged.
+- README restructured: overview + screenshots / quick start / usage / reference. Commit 071d354.
+- Caption fix: c28dbd5.
+- 17 live screenshots in docs/screenshots/. Taken with openai gpt-5-mini. Isolated DB under .local/screens/. User's ./paper_triage.db untouched.
+- Tester verify GREEN: pytest 646, ruff clean, 17/17 images referenced and present. Report docs/qa/readme-screenshots.md (uncommitted, like other docs/qa files).
 
 ## Open Items for User
 
@@ -50,10 +57,13 @@
 - `README.md`, `SETUP_LOG.md` (T075: v4 design note)
 - `docs/design/v4-audit.md` (designer audit, 17/20 items)
 - `docs/qa/final.md` (tester v4 sections)
+- `README.md` (README restructure 071d354, caption fix c28dbd5)
+- `docs/screenshots/` (17 PNGs, live screenshots, uncommitted per tester output)
+- `docs/qa/readme-screenshots.md` (tester verify report, uncommitted)
 
 ## Exact Next Command
 
-None. All phases complete. Await user decision on open items (1-7 above). If user approves page-transitions feature, route to designer.
+None; await user. All phases complete. Await user decision on open items (1-7 above). If user approves page-transitions feature, route to designer.
 
 ---
 
