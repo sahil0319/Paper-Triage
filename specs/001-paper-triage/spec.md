@@ -180,6 +180,17 @@ Non-interactive; the user delegated design decisions. Planner defaults:
   opacity). F-018 is backend-only and already landed (d323ef9).
 - Q: Does the redesign change class names or markup? → A: No. Existing selectors are restyled.
   The only markup addition is the link to the vendored font stylesheet.
+- Q: What does the Preview toolbar heading (`h1`) say when the paper is not saved or the id is
+  unknown (v4 audit item 6, v3 audit nice-to-have 5)? → A: `Not in your Library` (no full stop),
+  also used as the heading's `title` attribute. It replaces the placeholder `Preview`, which
+  never had a copy entry. The card title below keeps the v3 copy `This paper is not in your
+  Library.` and the `Go to Library` action, unchanged in text and markup. The two strings differ
+  on purpose: the `h1` is the focus target on entry and names the state in the short form used by
+  the refusal titles (`Not in this paper`); the card sentence explains it and carries the action.
+  Making the `h1` the full sentence and dropping the card title (v3 suggestion) is rejected:
+  that changes markup and DESIGN.md 3.3 keeps a not-saved card title. The tab title
+  (`Preview · Paper Triage`) and the `h1` of the library-load-error state (`Preview`) do not
+  change. This is the only copy change in v4 (FR-030 (f) exception).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -573,7 +584,8 @@ ask an in-paper question (answer cites valid page numbers) and an outside questi
   and each motion has a static equivalent with the same meaning; in forced-colours mode,
   controls, panels and highlights keep visible borders or outlines;
   (f) copy, DOM order, element ids, ARIA, hash routes, keyboard paths, API calls and stored data
-  are unchanged, including the fixes F-016 (highlight selection), F-017 (previous results stay
+  are unchanged (one exception: the not-saved Preview `h1` reads `Not in your Library`, see
+  Clarifications, Session 2026-10-03 (v4)), including the fixes F-016 (highlight selection), F-017 (previous results stay
   at full opacity and interactive during a new search), F-018 (long multi-keyword topic
   searches succeed) and F-019 (every preview opens on the "Ask this paper" tab; the paper chat
   still loads nothing before the first question).
