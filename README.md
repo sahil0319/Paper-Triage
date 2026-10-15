@@ -1,17 +1,159 @@
 # Paper Triage Assistant
 
-Give it a topic or arXiv IDs / PDF URLs. It fetches papers, summarizes each, critiques it, and
-ranks it 0-10 with a reason. Then ask questions in a chat grounded only in the current search
-results: it cites paper ids and refuses anything outside them. Single user, no auth, SQLite
-storage.
+Cut a pile of new papers down to the few worth opening, with an honest critique of each.
 
-Pipeline: Fetcher -> Summarizer -> Critic -> Ranker -> grounded Chat.
+Give it a topic, or arXiv IDs and PDF URLs. It fetches the papers, summarizes each one, critiques it
+and ranks it 0-10 with a reason (Fetcher -> Summarizer -> Critic -> Ranker). You can then ask
+questions in a chat that answers only from those papers, cites their ids and refuses anything
+outside them. Papers worth keeping go into a local library with an in-page PDF viewer, highlights,
+notes, tags, directories and a per-paper chat. It runs locally for one user: no auth, no accounts,
+SQLite storage. It works with Anthropic or OpenAI models, and `MOCK_LLM=1` runs the whole thing
+offline with canned output.
 
-You can also save papers to a local Library: each saved paper keeps its summary, critique and
-score, gets its PDF stored on disk, and can be read in the page, highlighted, annotated, tagged,
-filed into directories and questioned in a chat that answers from that paper alone.
+![Ranked triage results: each paper with a 0-10 score, a one-line reason, a Save button and the grounded chat beside the list](docs/screenshots/03-ranked-results.png)
 
-## Using the page
+## Contents
+
+- [Features](#features)
+- [Quick start](#quick-start)
+- [Usage](#usage)
+- [Reference](#reference)
+- [Test](#test)
+- [Notes](#notes)
+- [Layout](#layout)
+
+## Features
+
+### Triage a topic
+
+Enter keywords, arXiv IDs or PDF URLs. While the pipeline runs, the page shows a working card with
+activity and elapsed time, never a progress percentage.
+
+![Home page with a search box and example queries](docs/screenshots/01-home-empty-search.png)
+
+![Working card showing activity and elapsed time while a triage runs](docs/screenshots/02-triage-in-progress.png)
+
+Each result shows its rank and reason at a glance. The critique is one click away: a card expands to
+the summary, the contributions and the critique.
+
+![A result card expanded to its summary, contributions and critique](docs/screenshots/03b-critique-expanded.png)
+
+### Grounded chat
+
+The chat answers only from the papers in the current results and shows the cited paper ids with
+every answer.
+
+![Chat answer citing a paper id, with the list of cited papers](docs/screenshots/04-chat-grounded-answer.png)
+
+A question the results do not cover is refused, and the refusal is marked as intentional.
+
+![An out-of-scope question refused with "Not in these papers"](docs/screenshots/05-chat-refusal.png)
+
+### Library
+
+Save any completed result. The card is frozen as shown, with its score, reason and critique, and the
+PDF is downloaded in the background. Cards of saved papers switch to Saved in every later search.
+
+![Result cards switched to the Saved state](docs/screenshots/06-saved-state.png)
+
+The Library lists saved papers with a directory rail and tag pills with paper counts. Tags come from
+the search keywords that surfaced a paper.
+
+![Library with a directory rail and tag pills with counts](docs/screenshots/07-library-tags-directories.png)
+
+Select several tags to filter: a paper must carry all of them.
+
+![Library filtered by two tags](docs/screenshots/08-library-filtered-by-tags.png)
+
+### PDF viewer, highlights and notes
+
+Open a saved PDF in the page with page navigation, zoom, find and "Ask this paper".
+
+![In-page PDF viewer with page navigation, zoom, find, highlight and Ask this paper](docs/screenshots/09-pdf-viewer.png)
+
+Highlight text in one of three colors and attach short notes. An annotation list shows them by page.
+
+![Three highlight colors and a note, with the annotation list](docs/screenshots/10-highlights-and-notes.png)
+
+### Paper chat with page citations
+
+A chat beside the viewer answers from that paper's own text and cites pages as `[p.N]`. Picking a
+citation jumps the viewer to that page.
+
+![Per-paper chat with page citation chips](docs/screenshots/11-paper-chat-page-citations.png)
+
+### Mobile
+
+The same page works at 390 px: results, library and viewer.
+
+<p>
+  <img src="docs/screenshots/12a-mobile-results.png" width="240" alt="Mobile view of ranked results at 390 px wide">
+  <img src="docs/screenshots/12b-mobile-library.png" width="240" alt="Mobile view of the Library at 390 px wide">
+  <img src="docs/screenshots/12c-mobile-viewer.png" width="240" alt="Mobile view of the PDF viewer at 390 px wide">
+</p>
+
+<details>
+<summary>More screenshots</summary>
+
+![A directory view in the Library with rename and delete actions](docs/screenshots/07b-library-directory-rag-eval.png)
+
+![Results page with a "Load 5 more papers" button below the first page](docs/screenshots/13a-load-more.png)
+
+</details>
+
+## Quick start
+
+### Setup
+
+Needs Python 3.11+ and [uv](https://docs.astral.sh/uv/).
+
+```sh
+uv sync
+cp .env.example .env      # live mode only; .env is git-ignored
+```
+
+The app does not load `.env` itself. Export it into your shell before a live run:
+`set -a; source .env; set +a`.
+
+### Run
+
+Mock (offline, canned LLM output and bundled arXiv fixtures, no key needed):
+
+```sh
+MOCK_LLM=1 uv run uvicorn paper_triage.app:app
+```
+
+Live (real arXiv and Claude):
+
+```sh
+export ANTHROPIC_API_KEY=...        # your key
+export ANTHROPIC_MODEL=...          # model id to use
+uv run uvicorn paper_triage.app:app
+```
+
+Live with OpenAI instead of Claude (`LLM_PROVIDER` is `anthropic` by default; `MOCK_LLM=1` wins over both):
+
+```sh
+# in .env (blank values in .env.example): LLM_PROVIDER=openai, OPENAI_API_KEY=..., OPENAI_MODEL=...
+set -a; source .env; set +a
+uv run uvicorn paper_triage.app:app
+```
+
+`OPENAI_MODEL` defaults to `gpt-5-mini`; confirm that id is available to your key, or set your own.
+Startup fails with a clear error if `LLM_PROVIDER=openai` and `OPENAI_API_KEY` is unset.
+
+`TRIAGE_CONCURRENCY` (default 4, min 1) sets how many papers are summarized/critiqued/ranked in
+parallel (summarizer and critic also overlap within a paper). `1` = fully sequential. Fetching and
+arXiv throttling stay sequential; lower it if your key hits rate limits.
+
+Open http://127.0.0.1:8000. Optional: `PAPER_TRIAGE_DB` sets the SQLite path
+(default `./paper_triage.db`); `PAPER_TRIAGE_DATA_DIR` sets where saved PDFs go (default
+`./paper_triage_data`). `GET /api/status` reports mock mode, provider, model and stored
+paper count.
+
+## Usage
+
+### Search and results
 
 - **Search.** Enter a topic (keywords) or arXiv IDs / PDF URLs, or a mix. Results are listed by
   rank (0-10) with the reason, summary and critique.
@@ -31,7 +173,7 @@ filed into directories and questioned in a chat that answers from that paper alo
   answer is a refusal and nothing outside the set is cited. An empty result set is refused without
   a model call.
 
-## Library, PDF viewer and paper chat
+### Library, PDF viewer and paper chat
 
 Everything below is local. There is no account and nothing is shared.
 
@@ -76,6 +218,8 @@ Everything below is local. There is no account and nothing is shared.
   resets on reload or when the preview closes.
 
 The page follows `DESIGN.md`, `PRODUCT.md` and the v3 brief `docs/design/v3-library-brief.md`.
+
+## Reference
 
 ### Storage
 
@@ -144,54 +288,6 @@ try things out. Saving serves `src/paper_triage/fixtures/sample.pdf`, a 3-page P
 - Paper chat in mock mode answers only when your question shares a content word (4 or more
   letters) with a page, and cites the first such page: ask about "Quartzite" for page 2 or
   "Obsidian" for page 3; "What is the capital of France?" is refused.
-
-## Setup
-
-Needs Python 3.11+ and [uv](https://docs.astral.sh/uv/).
-
-```sh
-uv sync
-cp .env.example .env      # live mode only; .env is git-ignored
-```
-
-The app does not load `.env` itself. Export it into your shell before a live run:
-`set -a; source .env; set +a`.
-
-## Run
-
-Mock (offline, canned LLM output and bundled arXiv fixtures, no key needed):
-
-```sh
-MOCK_LLM=1 uv run uvicorn paper_triage.app:app
-```
-
-Live (real arXiv and Claude):
-
-```sh
-export ANTHROPIC_API_KEY=...        # your key
-export ANTHROPIC_MODEL=...          # model id to use
-uv run uvicorn paper_triage.app:app
-```
-
-Live with OpenAI instead of Claude (`LLM_PROVIDER` is `anthropic` by default; `MOCK_LLM=1` wins over both):
-
-```sh
-# in .env (blank values in .env.example): LLM_PROVIDER=openai, OPENAI_API_KEY=..., OPENAI_MODEL=...
-set -a; source .env; set +a
-uv run uvicorn paper_triage.app:app
-```
-
-`OPENAI_MODEL` defaults to `gpt-5-mini`; confirm that id is available to your key, or set your own.
-Startup fails with a clear error if `LLM_PROVIDER=openai` and `OPENAI_API_KEY` is unset.
-
-`TRIAGE_CONCURRENCY` (default 4, min 1) sets how many papers are summarized/critiqued/ranked in
-parallel (summarizer and critic also overlap within a paper). `1` = fully sequential. Fetching and
-arXiv throttling stay sequential; lower it if your key hits rate limits.
-
-Open http://127.0.0.1:8000. Optional: `PAPER_TRIAGE_DB` sets the SQLite path
-(default `./paper_triage.db`); `PAPER_TRIAGE_DATA_DIR` sets where saved PDFs go (default
-`./paper_triage_data`). `GET /api/status` reports mock mode, provider, model and stored
-paper count.
 
 ## Test
 
