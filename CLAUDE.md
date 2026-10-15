@@ -11,17 +11,19 @@ Scope: one page of spec. No auth, no multi-user, no deployment.
 ## Defaults (decided; do not re-ask)
 Python 3.11+, FastAPI, SQLite, Anthropic SDK (model via `ANTHROPIC_MODEL` env, key via `ANTHROPIC_API_KEY`), single-page web UI (vanilla HTML/JS, no framework), pytest + ruff, uv for env.
 `MOCK_LLM=1` -> canned responses; all tests must run offline. Product code in `src/`, tests in `tests/`, one module + prompt file per runtime agent.
-Design: DESIGN.md (user-supplied Apple style; real spec in place since 2026-10-01) + PRODUCT.md. Re-read both before UI work.
+Design: DESIGN.md (user-supplied; the active design spec) + PRODUCT.md. Re-read both before UI work.
 
 ## DEV vs RUNTIME (do not confuse)
 - RUNTIME agents = the product's code: fetcher, summarizer, critic, ranker, chat. Live in `src/`.
-- DEV agents = build crew in `.claude/agents/`: researcher, planner, backend-builder, frontend-builder, tester, sentinel. (impeccable-* agents are tool-provided; ignore unless doing UI polish.)
+- DEV agents = build crew in `.claude/agents/`: router (main session, `claude --agent router`), researcher, planner, designer, backend-builder, frontend-builder, tester, sentinel. (impeccable-* agents are tool-provided; ignore unless doing UI polish.)
 
 ## Roster
 | agent | model | writes | owns |
 |---|---|---|---|
 | researcher | sonnet | docs/research/ | research notes |
-| planner | opus | specs/, .specify/ | speckit-constitution/specify/clarify/plan/tasks/analyze |
+| router | opus | nothing (delegates) | routing, handoffs, parallel waves |
+| planner | opus | specs/, .specify/ | speckit-constitution/specify/clarify/plan/tasks/analyze (+converge on request) |
+| designer | opus | docs/design/ | UI briefs + critique via impeccable/frontend-design; FE implements |
 | backend-builder [BE] | sonnet | src/paper_triage/** except static/, tests/ except tests/frontend/, pyproject, README | speckit-implement (BE tasks) |
 | frontend-builder [FE] | sonnet | src/paper_triage/static/**, tests/frontend/** | speckit-implement (FE tasks); re-reads DESIGN.md + PRODUCT.md every task |
 | tester | sonnet | docs/qa/ | speckit-checklist, pytest, ruff, e2e, no-mistakes gate |

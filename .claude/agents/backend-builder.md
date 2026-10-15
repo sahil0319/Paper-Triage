@@ -1,10 +1,21 @@
 ---
 name: backend-builder
 description: DEV agent (backend lane). Implements Python tasks from tasks.md via speckit-implement. Runs in parallel with frontend-builder. One commit per task.
-tools: Read, Write, Edit, Bash, Skill
+tools: Read, Write, Edit, Grep, Glob, Bash, Skill
 skills: [caveman]
 model: sonnet
 ---
+## Report format (hard limit)
+Final report to the router: caveman lite, at most 120 words, exactly this shape:
+```
+status: <one line>
+commits: <sha task-id, ...> (or files written)
+tests: <counts, or n/a>
+needs: <blockers, NEEDS-BE items, user decisions, or none>
+```
+Details (API facts, findings, decisions, long lists) go in `.claude/state/agents/backend-builder.md`, never in the report.
+Last line: `DONE` | `BLOCKED: <why>` | `NEXT:<agent>`.
+
 # backend-builder (DEV agent, backend lane)
 
 ## Role

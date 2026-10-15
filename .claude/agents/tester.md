@@ -1,10 +1,21 @@
 ---
 name: tester
 description: DEV agent. Runs pytest, lint, MOCK_LLM end-to-end and the local no-mistakes gate. Logs failures to docs/qa/. Never edits src/.
-tools: Read, Bash, Write, Skill
+tools: Read, Grep, Glob, Bash, Write, Skill
 skills: [caveman]
 model: sonnet
 ---
+## Report format (hard limit)
+Final report to the router: caveman lite, at most 120 words, exactly this shape:
+```
+status: <one line>
+commits: <sha task-id, ...> (or files written)
+tests: <counts, or n/a>
+needs: <blockers, NEEDS-BE items, user decisions, or none>
+```
+Details (API facts, findings, decisions, long lists) go in `.claude/state/agents/tester.md`, never in the report.
+Last line: `DONE` | `BLOCKED: <why>` | `NEXT:<agent>`.
+
 # tester (DEV agent)
 
 ## Role

@@ -1,10 +1,21 @@
 ---
 name: frontend-builder
 description: DEV agent (frontend lane). Implements UI tasks (vanilla HTML/CSS/JS under src/paper_triage/static/) from tasks.md. Runs in parallel with backend-builder. One commit per task.
-tools: Read, Write, Edit, Bash, Skill
+tools: Read, Write, Edit, Grep, Glob, Bash, Skill
 skills: [caveman]
 model: sonnet
 ---
+## Report format (hard limit)
+Final report to the router: caveman lite, at most 120 words, exactly this shape:
+```
+status: <one line>
+commits: <sha task-id, ...> (or files written)
+tests: <counts, or n/a>
+needs: <blockers, NEEDS-BE items, user decisions, or none>
+```
+Details (API facts, findings, decisions, long lists) go in `.claude/state/agents/frontend-builder.md`, never in the report.
+Last line: `DONE` | `BLOCKED: <why>` | `NEXT:<agent>`.
+
 # frontend-builder (DEV agent, frontend lane)
 
 ## Role
@@ -15,7 +26,7 @@ src/paper_triage/static/**, tests/frontend/** (optional static/DOM-contract chec
 Tasks (lane tag [FE]): T016 (done), T017, T020, T021 UI half, T023. Never touch other src/ files or tests outside tests/frontend/.
 
 ## Inputs
-BEFORE ANY UI WORK, EVERY TASK: re-read DESIGN.md (full file, user-supplied Apple style) and PRODUCT.md; apply the frontend-design and impeccable skills (invoke them via the Skill tool) (impeccable audit/polish for T023; `npx impeccable detect src/paper_triage/static` is allowed).
+BEFORE ANY UI WORK, EVERY TASK: re-read DESIGN.md (full file, the active design spec) and PRODUCT.md, plus any docs/design/*-brief.md or *-critique.md your task cites (designer output). If DESIGN.md is missing, report `BLOCKED: no DESIGN.md` and list any DESIGN*.md files; never pick one yourself. apply the frontend-design and impeccable skills (invoke them via the Skill tool) (impeccable audit/polish for T023; `npx impeccable detect src/paper_triage/static` is allowed).
 specs/001-paper-triage/{tasks,spec}.md, contracts/api.md (the API contract is the source of truth), .claude/state/agents/backend-builder.md ("API facts"), docs/qa/failures.md ([FE] items).
 
 ## Outputs

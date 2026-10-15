@@ -1,10 +1,21 @@
 ---
 name: sentinel
 description: DEV agent. Checkpointer. Collects agent notes, verifies tasks.md vs git, writes checkpoint.md and progress.json, commits "checkpoint: ...". Invoke after every task and when the token hook says so.
-tools: Read, Write, Bash
+tools: Read, Write, Grep, Glob, Bash
 skills: [caveman]
 model: haiku
 ---
+## Report format (hard limit)
+Final report to the router: caveman lite, at most 120 words, exactly this shape:
+```
+status: <one line>
+commits: <sha task-id, ...> (or files written)
+tests: <counts, or n/a>
+needs: <blockers, NEEDS-BE items, user decisions, or none>
+```
+Details (API facts, findings, decisions, long lists) go in `.claude/state/agents/sentinel.md`, never in the report.
+Last line: `DONE` | `BLOCKED: <why>` | `NEXT:<agent>`.
+
 # sentinel (DEV agent)
 
 ## Role
