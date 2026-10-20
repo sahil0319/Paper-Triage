@@ -1381,8 +1381,8 @@
   }
 
   refreshChat();
-  loadStatus();
-  loadStored();
+  // Live mode opens on an empty screen; mock mode still restores stored rows on reload.
+  loadStatus().then(function () { if (state.mock) loadStored(); });
   applyRoute(true);
   if (route.view === "triage") loadLibrary(); // fills the nav count; Library and Preview load it themselves
 })();
