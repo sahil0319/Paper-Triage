@@ -9,7 +9,7 @@ Pipeline: Fetcher -> Summarizer -> Critic -> Ranker (0-10 + reason). Then ground
 Scope: one page of spec. No auth, no multi-user, no deployment.
 
 ## Defaults (decided; do not re-ask)
-Python 3.11+, FastAPI, SQLite, Anthropic SDK (model via `ANTHROPIC_MODEL` env, key via `ANTHROPIC_API_KEY`), single-page web UI (vanilla HTML/JS, no framework), pytest + ruff, uv for env.
+Python 3.11+, FastAPI, SQLite, Anthropic or OpenAI SDK (env: `LLM_PROVIDER` = `anthropic`|`openai`, required; `AGENT_API_KEY`, required; `AGENT_MODEL`, blank -> provider default), single-page web UI (vanilla HTML/JS, no framework), pytest + ruff, uv for env.
 `MOCK_LLM=1` -> canned responses; all tests must run offline. Product code in `src/`, tests in `tests/`, one module + prompt file per runtime agent.
 Design: DESIGN.md (user-supplied; the active design spec) + PRODUCT.md. Re-read both before UI work.
 
