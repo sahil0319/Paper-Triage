@@ -84,3 +84,10 @@ F-002 6cd65e0: db.touch_results refreshes created_at of reused results in pipeli
 - Goal: GitHub-style README + screenshots. Status: done.
 - Outline: title/pitch, hero 03, Contents, Features (Triage, Grounded chat, Library, PDF viewer, Paper chat, Mobile, details block 07b/13a), Quick start (Setup, Run), Usage (Search and results, Library/viewer/paper chat), Reference (Storage, Design and fonts, pdf.js, Library API, Mock mode), Test, Notes, Layout.
 - Checks: 17/17 PNGs referenced, all paths exist; ruff clean; tests/frontend/test_static_assets.py 21 passed (only README test reads fonts README, not root).
+
+## T077 (LLM env: LLM_PROVIDER / AGENT_API_KEY / AGENT_MODEL)
+- goal: replace ANTHROPIC_*/OPENAI_* with 3 vars; errors at first LLM call.
+- status: code, tests, README done. 659 pass, ruff clean. .env.example NOT updated: Read/Write/Bash on it denied by permission rules. Orchestrator/user must apply (remove 4 old names; add LLM_PROVIDER= "required: anthropic or openai", AGENT_API_KEY= "required: key for the chosen provider", AGENT_MODEL= "optional; blank = claude-opus-5-5 (anthropic) or gpt-5-mini (openai)"; keep MOCK_LLM, PAPER_TRIAGE_DB, PAPER_TRIAGE_DATA_DIR).
+- findings: app.py lifespan called get_client() at startup -> would fail with unset vars. Added llm.LazyClient (resolves on first parse/text/ensure, not cached on error); app.py uses it; post_triage calls ensure() -> 502 "model call failed: ..." naming the var. Outside task list: src/paper_triage/app.py, tests/test_api.py (test_status_mock asserted old default provider).
+- API facts: /api/status returns provider "" / model "" when unset (200). POST /api/triage now 502 on LLM config error (new error path, same shape as /api/chat 502). Settings.api_key new; Settings.provider default "".
+- next: tester run; apply .env.example.

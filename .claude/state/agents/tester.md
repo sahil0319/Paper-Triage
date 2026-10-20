@@ -114,3 +114,9 @@ pytest x2 503 pass; ruff clean; e2e 138 pass x14/15 (1 unnamed flake -> F-015 ac
 
 ## README screenshots verify (071d354)
 - 17/17 images referenced and present; captions match except 2 cosmetic [BE] nits (README.md:13 "one-line reason", README.md:39 critique not visible in 03b). Quick start matches config/status; no facts dropped. ruff clean; 646 passed. Details: docs/qa/readme-screenshots.md. No commit.
+
+## T077 verify (2c0ec7a)
+- PASS. pytest 659 x2, ruff clean, e2e (8766) 67 passed.
+- Live mode, vars unset: app starts, /api/status 200, POST /api/triage 502 naming LLM_PROVIDER / AGENT_API_KEY / unknown provider. Old names ignored.
+- Grep: no leftover old names in src; remaining hits are removal notes/tests. 
+- Nit [BE]: tasks.md says app.py unchanged but commit edits it. Details: docs/qa/T077.md. No commit.

@@ -54,3 +54,13 @@ DONE
 - recorded: spec.md Clarifications Session 2026-10-03 (v4) new Q/A; FR-030 (f) exception clause.
 - no new task (FE fix under audit item 6); analyze not re-run (no task change). FE: check e2e asserting h1 `Preview` in not-saved state.
 DONE
+
+## 2026-10-20 LLM config amendment (T077)
+- goal: switch LLM env to LLM_PROVIDER (required, anthropic|openai), AGENT_API_KEY (required, explicit api_key=), AGENT_MODEL (blank -> claude-opus-5-5 / gpt-5-mini). Old 4 names removed, no fallback. LLMError at first LLM call, not import. MOCK_LLM=1 needs none.
+- status: done via Skill speckit-constitution/clarify/plan/tasks/analyze + .specify helpers (resolve-template, check-prerequisites, setup-plan, setup-tasks). Uncommitted.
+- files: .specify/memory/constitution.md (2.0.0 -> 2.1.0 MINOR: openai allowed dep; II + Technical Constraints), specs/001-paper-triage/{spec.md (Session 2026-10-20 (LLM config), FR-011, v1 Q, assumption, status), plan.md (Technical Context, tree, LLM config Amendment + Constitution Check 2.1.0 + T077 touch map), research.md (R4 line, R22), quickstart.md (live mode, steps 24-25), checklists/requirements.md, contracts/api.md (/api/status T077 note: provider/model may be "", never fails), tasks.md (Phase 10 T077, Wave L1, deps, strategy, T002/T025 superseded notes, designer fixes now T078+)}.
+- decisions: get_settings never raises (provider "" when unset); validation in get_client after mock check; exact LLMError strings in T077; app.py unchanged; other tests relying on old names -> builder reports blocker.
+- analyze: 0 CRITICAL, 0 HIGH. Fixed pre-report: constitution "default documented only in config" vs README naming defaults; /api/status contract typed provider anthropic|openai only; plan dep count; T002 superseded note. Open: MEDIUM I1 CLAUDE.md Defaults still names ANTHROPIC_MODEL/ANTHROPIC_API_KEY (orchestrator); MEDIUM S1 T077 6 files (user-specified, keep); LOW U1 quickstart step 25 error surface; U2 other tests may assume old default provider; I2 T001/T002/T025 history; L1 md lint MD060/MD029. data-model.md not checked. Coverage FR-011 + SC-004 -> T077.
+- analysis.md Write denied by harness ("subagents return findings as text"); summary above for orchestrator to persist.
+- next: backend-builder T077 (Wave L1, BE only), then tester.
+NEXT:backend-builder
