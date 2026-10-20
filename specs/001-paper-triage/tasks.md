@@ -28,7 +28,8 @@ Package = `src/paper_triage/` (abbrev `pt/` below means `src/paper_triage/`).
 - [x] T002 Test first `tests/test_config_llm.py::test_config_*`, then `pt/config.py`: `Settings`
   read from env at call time: `model` (env `ANTHROPIC_MODEL`, default `"claude-opus-5-5"` – the
   only model id in code), `mock` (`MOCK_LLM=="1"`), `db_path` (default `./paper_triage.db`),
-  `max_papers=20`, `default_papers=10`, `text_cap=40000`, `chat_top_k=20`.
+  `max_papers=20`, `default_papers=10`, `text_cap=40000`, `chat_top_k=20`. (Env naming of T001
+  and T002 superseded by T077.)
 
 ## Phase 2: Foundational (blocks all stories)
 
@@ -148,6 +149,7 @@ scope -> `refused: true`; empty store -> refused, LLM not called.
 - [x] T025 [BE] OpenAI provider for LLM wrapper: `LLM_PROVIDER=anthropic|openai` (default anthropic,
   MOCK_LLM=1 wins), `OpenAIClient` (`OPENAI_API_KEY`, `OPENAI_MODEL`), `/api/status.provider`,
   `.env.example` + README, fake-SDK tests. Files `llm.py`, `config.py`, `app.py`, tests, docs.
+  (Env naming and default provider superseded by T077.)
 - [x] T026 [BE] Live-run fixes: concurrent per-paper LLM work in `pipeline.triage()` (`TRIAGE_CONCURRENCY`,
   default 4, 1 = sequential; DB stays on calling thread; summarizer || critic) + `ranker.md` score
   calibration (5-8 typical, 9-10 rare). Tests, README, `.env.example`.
@@ -758,6 +760,61 @@ runs use `E2E_PORT=8765`.
   popover stay until a swatch is chosen and the new `.hl` covers the selected words; F-017 = as
   in T074; F-019 = as in T073. Needs T066, T068-T074. Files `tests/frontend/test_e2e_design.py`.
 
+## Phase 10: LLM config amendment (three provider-neutral variables)
+
+**Sources**: spec.md FR-011 and Clarifications "Session 2026-10-20 (LLM config)"; plan.md "LLM
+config Amendment" (variable table, Constitution Check 2.1.0, T077 touch map); research R22;
+constitution 2.1.0 Technical Constraints; contracts/api.md `GET /api/status` (T077 note).
+User-approved. Backend only: no API shape, data model, UI or copy change. Supersedes the env naming of T001, T002 and T025 (those stay ticked as
+history). Ends with `MOCK_LLM=1 uv run pytest -q` and `uv run ruff check .` green, offline; one
+commit with only its own paths plus `tasks.md`.
+
+### Wave L1 — BE lane
+
+- [x] T077 [BE] Three LLM env variables (FR-011, R22). Test first `tests/test_config_llm.py`
+  (monkeypatch env; clear all seven names first; fake SDK constructors, no network, no real key):
+  (a) `get_settings()` with `LLM_PROVIDER` unset or blank -> `provider == ""`, no exception;
+  `" OpenAI "` -> `"openai"`; (b) `AGENT_MODEL` blank -> `"claude-opus-5-5"` for `anthropic` and
+  `"gpt-5-mini"` for `openai`; `AGENT_MODEL=x` -> `"x"` for both; (c) with `MOCK_LLM` unset,
+  `get_client()` raises `LLMError` whose message contains `LLM_PROVIDER` when the provider is
+  unset, blank or `"gemini"` (message also names `anthropic` and `openai`); (d) provider set and
+  `AGENT_API_KEY` unset or blank -> `LLMError` whose message contains `AGENT_API_KEY`, for both
+  providers; (e) old names ignored: `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` set without
+  `AGENT_API_KEY` -> still the `AGENT_API_KEY` error; `ANTHROPIC_MODEL`/`OPENAI_MODEL` set with
+  `AGENT_MODEL` blank -> model is still the provider default; (f) key passed explicitly: with a
+  monkeypatched `anthropic.Anthropic` / `openai.OpenAI` that records its kwargs, the first
+  `parse`/`text` call constructs it with `api_key=<AGENT_API_KEY>`; (g) `MOCK_LLM=1` with all
+  three unset -> `MockClient`, no error; (h) importing `paper_triage.app` and `create_app()` with
+  all unset and `MOCK_LLM` unset raise nothing (errors only at the first LLM call); replace the
+  existing default-provider and `OPENAI_API_KEY` tests. `tests/test_e2e_mock.py`: delete
+  `LLM_PROVIDER`, `AGENT_API_KEY`, `AGENT_MODEL` and the four old names from the env at the start
+  of the mock flow and keep every existing assertion green (mock needs none of them); replace any
+  old-name setup or assertion. Then `src/paper_triage/config.py` `get_settings()` (current lines
+  35-48): `provider = (os.environ.get("LLM_PROVIDER") or "").strip().lower()`; new
+  `Settings.api_key: str = ""` from `AGENT_API_KEY` (stripped); `model = (AGENT_MODEL or
+  "").strip() or` the default for a known provider (`DEFAULT_MODEL` for `anthropic`,
+  `DEFAULT_OPENAI_MODEL` for `openai`, else `""`); `Settings.provider` default becomes `""`;
+  `get_settings()` never raises; the old names are not read anywhere. `src/paper_triage/llm.py`:
+  `AnthropicClient` and `OpenAIClient` take `api_key` and build `anthropic.Anthropic(api_key=...)`
+  / `openai.OpenAI(api_key=...)` lazily (replace the line-192 `openai.OpenAI()  # reads
+  OPENAI_API_KEY`); `get_client()` (current lines 241-247): mock first; then `""` ->
+  `LLMError("LLM_PROVIDER is not set (use 'anthropic' or 'openai')")`; unknown ->
+  `LLMError("unknown LLM_PROVIDER '<value>' (use 'anthropic' or 'openai')")`; missing key ->
+  `LLMError("AGENT_API_KEY is not set (required for LLM_PROVIDER=<provider>)")`; pass
+  `api_key=s.api_key` and `model=s.model`. `pt/app.py` is unchanged: `GET /api/status` keeps
+  returning 200 when the variables are unset (provider and model may be empty strings, per the
+  T077 note in contracts/api.md `GET /api/status`; assert this in `tests/test_config_llm.py`).
+  `.env.example`: remove `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_MODEL` and
+  `OPENAI_MODEL`; add `LLM_PROVIDER=` with a comment "required: anthropic or openai",
+  `AGENT_API_KEY=` "required: key for the chosen provider", `AGENT_MODEL=` "optional; blank =
+  claude-opus-5-5 (anthropic) or gpt-5-mini (openai)"; keep `MOCK_LLM` and the other entries.
+  `README.md`: configuration table and live-mode steps use the three variables (both marked
+  required), the two model defaults, and one line that the old names are no longer read. Never
+  read or print `.env`. Files `src/paper_triage/config.py`, `src/paper_triage/llm.py`,
+  `tests/test_config_llm.py`, `tests/test_e2e_mock.py`, `.env.example`, `README.md`. If another
+  test outside this list sets or asserts an old name or the old default provider, report it as
+  a blocker instead of editing it.
+
 ## Lanes (parallel build)
 [BE] = backend-builder; [FE] = frontend-builder. Disjoint files: FE owns `src/paper_triage/static/**` + `tests/frontend/**`; BE owns the rest. T021 is split: BE commits the API test half first as "T021 (api): ...", FE then does the UI half and ticks the box as "T021 (ui): ...".
 Waves: A (parallel) BE T018 -> T019 -> T021(api) -> T022 || FE T017 -> T021(ui). B: FE T020 (needs T019 landed) -> T023. C: BE T024 (README) last. Tester runs after each wave on both lanes.
@@ -805,10 +862,18 @@ back tagged):
   check of DESIGN.md section 2 pairs, F-017/F-019 = B-b/B-a still hold) with
   `V4_SHOTS_DIR=docs/qa/screenshots/v4`; then the designer re-audit (brief item 34) on those
   screenshots, one ordered fix list, at most one confirm pass. Fix items become new tasks
-  (T077+) re-checked with speckit-analyze.
+  (T078+; T077 is the LLM config task) re-checked with speckit-analyze.
 - Shared files: none across lanes. BE never edits `pt/static/**` or `tests/frontend/**`; FE
   never edits `pt/app.py`, `README.md` or `SETUP_LOG.md`. The README design note is BE (README
   owner) although its content comes from FE's T067.
+
+LLM config wave (user-approved 2026-10-20; BE only):
+
+| Wave | BE lane | FE lane | Cross-lane needs |
+|---|---|---|---|
+| L1 | T077 | none | none: no API, UI or static change. Spawn backend-builder alone, then the tester (full offline `MOCK_LLM=1 uv run pytest -q` + `uv run ruff check .`). |
+
+- Shared files: none. T077 touches no `pt/static/**`, `tests/frontend/**` or `pt/app.py`.
 
 ## Dependencies
 
@@ -829,6 +894,7 @@ for real API); T064 needs T059-T063.
 v4 (FE lane gated on the F-016, F-017, F-019 fix commits): BE T066 independent; T075 needs
 T067. FE T067 -> T068 -> T069 -> T070 -> T071 -> T072 -> T073 -> T074 -> T076; T076 also needs
 T066.
+LLM config: T077 needs T025 (OpenAI client) and T026 (both landed); independent of every FE task.
 
 ## Parallel Examples
 
@@ -856,3 +922,6 @@ T069 (shell/nav/query), T070 (results + chat), T071 (Library), T072 (Preview too
 highlights), T073 (panel, paper chat, sheet), T074 (states, motion, forced colours), proof
 T076, docs T075. Stop-and-validate point: after T068 every view uses the new tokens and fonts
 with behaviour unchanged.
+LLM config (1 task, T077; BE 1, FE 0; no new story, FR-011 reworded): one commit switches config,
+client wrapper, tests, `.env.example` and README together, so no commit leaves a half-renamed
+config. Validate with quickstart steps 24-25 and the offline suite.

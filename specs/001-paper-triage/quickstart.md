@@ -80,7 +80,18 @@ v4 Carbon redesign (mock mode, offline; visual reference: DESIGN.md):
 MOCK_LLM=1 V4_SHOTS_DIR=docs/qa/screenshots/v4 uv run pytest -q -m e2e tests/frontend/test_e2e_design.py
 ```
 
-Live mode: copy `.env.example` to `.env`, set `ANTHROPIC_API_KEY` (optional
-`ANTHROPIC_MODEL`), run without `MOCK_LLM`. Expect ~3 s per arXiv request (rate limit).
+Live mode: copy `.env.example` to `.env`, set `LLM_PROVIDER` (`anthropic` or `openai`,
+required) and `AGENT_API_KEY` (required), optionally `AGENT_MODEL` (blank: `claude-opus-5-5`
+for anthropic, `gpt-5-mini` for openai), run without `MOCK_LLM`. Expect ~3 s per arXiv request
+(rate limit). The old names `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_MODEL` and
+`OPENAI_MODEL` are not read.
+
+LLM config checks (T077):
+
+24. With `MOCK_LLM=1` and `LLM_PROVIDER`, `AGENT_API_KEY`, `AGENT_MODEL` all unset, the app
+    starts and the mock flow (steps 1-6) works.
+25. Without `MOCK_LLM` and with `LLM_PROVIDER` unset, the app still starts; the first search
+    fails with an error that names `LLM_PROVIDER`. Set `LLM_PROVIDER=anthropic` but leave
+    `AGENT_API_KEY` unset: the first search fails with an error that names `AGENT_API_KEY`.
 
 Details: [contracts/api.md](contracts/api.md), [data-model.md](data-model.md).

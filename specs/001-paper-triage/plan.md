@@ -18,7 +18,8 @@ wrapper with a mock twin; `MOCK_LLM=1` also swaps HTTP to fixtures. See [researc
 
 **Language/Version**: Python 3.11+ (uv-managed)
 
-**Primary Dependencies**: fastapi, uvicorn, httpx, pydantic v2, anthropic, pypdf. Dev: pytest,
+**Primary Dependencies**: fastapi, uvicorn, httpx, pydantic v2, anthropic, openai (T025; allowed
+by constitution 2.1.0), pypdf. Dev: pytest,
 ruff; v2: pytest-playwright + Playwright chromium (browser e2e only; constitution 1.1.0 I,
 justified in research R12). No others.
 
@@ -34,8 +35,10 @@ real-browser e2e (pytest-playwright, marker `e2e`, local server on `E2E_PORT`, d
 **Performance Goals**: mock 5-paper triage < 5 s (SC-001); live bound by arXiv 3 s/request
 
 **Constraints**: offline tests; arXiv 1 req/3 s; <=20 papers/run; 40k chars text per LLM call;
-model from `ANTHROPIC_MODEL` (default `claude-opus-5-5` in `config.py` only);
-T025: `LLM_PROVIDER=openai` swaps in `OpenAIClient` (`OPENAI_API_KEY`, `OPENAI_MODEL`), same wrapper
+LLM config is exactly `LLM_PROVIDER` (`anthropic` | `openai`, required, no default),
+`AGENT_API_KEY` (required, passed explicitly to the SDK client) and `AGENT_MODEL` (blank means
+the provider default in `config.py` only: `claude-opus-5-5` / `gpt-5-mini`); both providers sit
+behind the same wrapper (see "LLM config Amendment")
 
 **Scale/Scope**: 1 user, tens to low hundreds of stored papers
 
@@ -46,7 +49,7 @@ Re-checked for v3 against constitution 2.0.0: PASS (see "v3 Constitution Check" 
 
 | Principle | Check | Status |
 |---|---|---|
-| I Small | 6 runtime deps, one module per agent, prompts for 4 LLM agents, fetcher LLM-free; v2 adds only dev dep pytest-playwright (allowed in 1.1.0), no new runtime dep or module | PASS |
+| I Small | 6 runtime deps (7 with `openai` since T025, allowed by 2.1.0), one module per agent, prompts for 4 LLM agents, fetcher LLM-free; v2 adds only dev dep pytest-playwright (allowed in 1.1.0), no new runtime dep or module | PASS |
 | II Offline | `llm.get_client()` mock twin; `httpx.MockTransport` fixtures; tests need no key/net; v2 browser e2e on 127.0.0.1, no external assets, harness aborts non-local requests | PASS |
 | III Grounded | `[id]` regex validation vs the current result set (`paper_ids`), `NOT_IN_STORED_PAPERS`, empty-set short-circuit; MockClient refuses without overlap | PASS |
 | IV One page | one `index.html`, no auth/deploy/queue; sync triage request; paging via request `offset`, no session; FRs = 15 (cap) | PASS |
@@ -67,13 +70,13 @@ specs/001-paper-triage/
 
 ```text
 pyproject.toml            # uv project, deps, ruff + pytest config
-.env.example              # ANTHROPIC_API_KEY=, ANTHROPIC_MODEL=, MOCK_LLM=, PAPER_TRIAGE_DB=
+.env.example              # LLM_PROVIDER= (required), AGENT_API_KEY= (required), AGENT_MODEL=, MOCK_LLM=, PAPER_TRIAGE_DB=
 src/paper_triage/
 ├── __init__.py
 ├── config.py             # env settings (model default, mock flag, db path, caps)
 ├── models.py             # Pydantic: Summary, Critique, Rank, ChatAnswer, PaperOut
 ├── db.py                 # schema + CRUD (papers, arxiv_cache, results, chat_turns)
-├── llm.py                # LLMClient protocol, AnthropicClient, MockClient, get_client()
+├── llm.py                # LLMClient protocol, AnthropicClient, OpenAIClient, MockClient, get_client()
 ├── extract.py            # extract_text(pdf_bytes) -> str (pypdf; swap point)
 ├── net.py                # make_http(): real httpx + 3 s Throttle, or MockTransport + 0 s
 ├── input_parse.py        # query -> (topic, items)
@@ -337,7 +340,66 @@ Unchanged from v2/v3. New assertions use existing selectors only (`.paper`, `.ra
 `.rank__meter`, `.btn--primary`, `.cite`, `.turn__a--refused`, `.alert`, `.working`,
 `.is-stale`, `.rail__item`, `.tag`, `.hl`, `.pv-tab`, `.pv-sheet`, `.global-nav`).
 
+## LLM config Amendment (2026-10-20)
+
+Sources: spec.md FR-011 and Clarifications "Session 2026-10-20 (LLM config)"; research R22;
+constitution 2.1.0 Technical Constraints. User-approved. Backend only: no API shape, data
+model, UI or copy change; data-model.md is unchanged; contracts/api.md `GET /api/status` gains
+one note (same fields; `provider`/`model` may be `""` when the LLM config is unset, and the
+endpoint never fails on LLM config).
+
+**Technical context deltas**: no new dependency (`openai` was added by T025 and is now listed
+in constitution I). LLM env is exactly three variables:
+
+| Variable | Required | Meaning |
+|---|---|---|
+| `LLM_PROVIDER` | yes (live mode) | `anthropic` or `openai`; trimmed, case-insensitive; no default |
+| `AGENT_API_KEY` | yes (live mode) | key for the chosen provider; passed as `api_key=` to the SDK client |
+| `AGENT_MODEL` | no | model id; blank -> `claude-opus-5-5` (anthropic) or `gpt-5-mini` (openai) |
+
+`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_MODEL` and `OPENAI_MODEL` are removed: the
+code never reads them and there is no fallback. With `MOCK_LLM=1` none of the three is needed.
+
+### LLM config Constitution Check (2.1.0)
+
+| Principle | Check | Status |
+|---|---|---|
+| I Small | No new dependency; `anthropic` and `openai` both allowed core deps; still one wrapper module (`llm.py`) and one settings module (`config.py`) | PASS |
+| II Offline | `MOCK_LLM=1` short-circuits in `get_client()` before any provider or key check; tests set or clear env with `monkeypatch` and use fake SDK clients, no network and no real key | PASS |
+| III Grounded | No chat or citation change | PASS |
+| IV Scope | No new story or FR (FR-011 reworded); 9 stories / 32 FRs | PASS |
+| V Honest critique | No change | PASS |
+
+### Files (T077 touch map, [BE] only)
+
+- `src/paper_triage/config.py`: `get_settings()` reads `LLM_PROVIDER` (strip + lower, no
+  default; empty string when unset), `AGENT_API_KEY` (strip; new `Settings.api_key` field) and
+  `AGENT_MODEL`. The model default is chosen only for a known provider (`DEFAULT_MODEL` /
+  `DEFAULT_OPENAI_MODEL`); unknown or empty provider leaves the model blank. `get_settings()`
+  itself never raises, so import and app startup (and mock mode) stay error-free.
+- `src/paper_triage/llm.py`: `get_client()` returns `MockClient` first when mock; else raises
+  `LLMError` when the provider is missing/blank (`LLM_PROVIDER is not set (use 'anthropic' or
+  'openai')`) or unknown (`unknown LLM_PROVIDER '<value>' (use 'anthropic' or 'openai')`), then
+  when the key is missing/blank (`AGENT_API_KEY is not set (required for LLM_PROVIDER=<p>)`).
+  `AnthropicClient` and `OpenAIClient` take `api_key` and build `anthropic.Anthropic(api_key=...)`
+  / `openai.OpenAI(api_key=...)` lazily (the "reads OPENAI_API_KEY" path goes away). Errors
+  surface at the first LLM call, because pipelines call `get_client()` per request, never at
+  import.
+- `tests/test_config_llm.py`: provider required (unset, blank, unknown -> `LLMError` naming
+  `LLM_PROVIDER`); key required for both providers (-> `LLMError` naming `AGENT_API_KEY`);
+  `AGENT_MODEL` blank -> provider default, set -> used; old names are ignored (set
+  `ANTHROPIC_API_KEY`/`OPENAI_API_KEY`/`ANTHROPIC_MODEL`/`OPENAI_MODEL` alone -> still the missing
+  variable error, model still the default); key passed explicitly (monkeypatched SDK constructor
+  records `api_key`); mock mode with all three unset -> `MockClient`; importing `paper_triage.app`
+  with all unset raises nothing.
+- `tests/test_e2e_mock.py`: replace any old-variable setup or assertion with the three new names;
+  the mock flow still runs with all three unset.
+- `.env.example`: lists `LLM_PROVIDER=` and `AGENT_API_KEY=` marked required, `AGENT_MODEL=`
+  marked optional with both defaults; the old names are removed.
+- `README.md`: configuration section and live-mode steps use the three variables; note that the
+  old names are no longer read.
+
 ## Complexity Tracking
 
 None. No constitution violations (v3 scope covered by constitution 2.0.0; v4 adds one FR to
-reach the 32-FR cap and no story).
+reach the 32-FR cap and no story; the LLM config amendment adds no FR, constitution 2.1.0).

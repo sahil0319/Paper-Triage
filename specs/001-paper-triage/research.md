@@ -40,7 +40,8 @@ Source notes: docs/research/paper-triage.md (arXiv, PDF, prompts, chat) + claude
   instances of the requested schema keyed by sha256 of the `<paper id=..>` in the prompt; chat
   mock cites the first stored id in context, or returns the refusal sentinel if the question
   contains "out of scope" or no ids are in context. `get_client()` picks mock when `MOCK_LLM=1`.
-- **Model**: `ANTHROPIC_MODEL` env, documented default `claude-opus-5-5` in `config.py` only.
+- **Model**: `AGENT_MODEL` env, documented default per provider in `config.py` only
+  (superseded env naming: see R22).
 - **Rationale**: one wrapper = one mock point (constitution II); SDK helper validates schema.
 - **Alternatives**: one combined call per paper (cheaper, but product requires separate
   Summarizer/Critic/Ranker modules + prompt files); server-side refusal `fallbacks` beta
@@ -252,3 +253,24 @@ differ (user decisions relayed 2026-10-03).
   undefined variables.
 - **Alternatives**: alias old tokens to new values during the migration (leaves dead names,
   which D9 forbids); one big restyle commit (violates one-small-commit rule).
+
+## R22 LLM config (2026-10-20): three provider-neutral variables
+
+- **Decision**: live mode reads exactly `LLM_PROVIDER` (`anthropic` | `openai`, required, no
+  default), `AGENT_API_KEY` (required for both providers) and `AGENT_MODEL` (optional; blank ->
+  `claude-opus-5-5` for anthropic, `gpt-5-mini` for openai). The key is passed explicitly:
+  `anthropic.Anthropic(api_key=...)`, `openai.OpenAI(api_key=...)`; SDK environment
+  auto-detection is not relied on. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_MODEL` and
+  `OPENAI_MODEL` are removed with no fallback. Validation happens in `llm.get_client()` (called
+  per LLM-using request), so a missing/unknown provider or missing key raises a clear `LLMError`
+  naming the variable at the first LLM call, never at import or startup. `MOCK_LLM=1` returns
+  `MockClient` before any check.
+- **Rationale**: one key and one model variable regardless of provider keeps `.env` and the
+  README simple (user-approved). Without a default provider, `AGENT_MODEL` defaults are
+  unambiguous. Passing the key explicitly means a stray `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`
+  in the shell cannot silently select credentials, and the error message can name the one
+  variable the user must set.
+- **Alternatives**: keep provider-specific names (two keys, two models; confusing with one
+  active provider); fall back to the old names (user rejected: hides misconfiguration);
+  validate at import (breaks mock mode and app startup without env); default provider
+  `anthropic` (user rejected: `AGENT_MODEL` default would depend on a hidden choice).

@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-01
 
-**Status**: Draft (v4 amendment 2026-10-03; v3 amendment 2026-10-03; v2 amendment 2026-10-01)
+**Status**: Draft (LLM config amendment 2026-10-20; v4 amendment 2026-10-03; v3 amendment 2026-10-03; v2 amendment 2026-10-01)
 
 **Input**: User description: "Paper Triage Assistant. Input topic/keywords or arXiv IDs / PDF URLs.
 Fetcher -> Summarizer -> Critic -> Ranker (0-10 + reason), then grounded chat over stored papers
@@ -41,9 +41,10 @@ Answered by planner with defaults (no user round-trip, per orchestrator).
   the abstract, with basis flagged "abstract" in data and UI.
 - Q: May full extracted text be stored locally? → A: Yes, in the local store only; never served
   to anyone but the local UI/chat; PDFs themselves are not kept.
-- Q: Which model is used, and is there a per-run cap? → A: Model from `ANTHROPIC_MODEL` env with
-  one documented default; per run max 20 papers (default 10). (T025: optional `LLM_PROVIDER=openai`
-  uses `OPENAI_API_KEY`/`OPENAI_MODEL` instead; Anthropic stays the default.)
+- Q: Which model is used, and is there a per-run cap? → A: Model from the `AGENT_MODEL` env with
+  one documented default per provider; per run max 20 papers (default 10). (T025 added OpenAI as
+  a second provider. Superseded by Session 2026-10-20 (LLM config): `LLM_PROVIDER` is required,
+  there is no default provider, and the old provider-specific variable names are gone.)
 - Q: Are non-arXiv PDF URLs supported in v1? → A: Yes, as direct URLs only; id is
   `pdf:` + first 12 hex chars of SHA-256 of the URL; title from PDF metadata else URL.
 - Q: How does chat find relevant papers when many are stored? → A: Put all stored papers'
@@ -191,6 +192,30 @@ Non-interactive; the user delegated design decisions. Planner defaults:
   that changes markup and DESIGN.md 3.3 keeps a not-saved card title. The tab title
   (`Preview · Paper Triage`) and the `h1` of the library-load-error state (`Preview`) do not
   change. This is the only copy change in v4 (FR-030 (f) exception).
+
+### Session 2026-10-20 (LLM config)
+
+Non-interactive; user-approved change relayed by the orchestrator (task T077).
+
+- Q: Which environment variables configure the model provider? → A: Exactly three:
+  `LLM_PROVIDER` (`anthropic` or `openai`, case-insensitive after trimming), `AGENT_API_KEY` and
+  `AGENT_MODEL`. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_MODEL` and `OPENAI_MODEL` are
+  removed completely and are never read, with no fallback to the old names.
+- Q: Is there a default provider? → A: No. `LLM_PROVIDER` is required. When it is missing,
+  blank or not one of the two values, the first LLM call (not app import or startup) raises a
+  clear `LLMError` that names `LLM_PROVIDER` and the allowed values.
+- Q: Is the key required for both providers, and how does it reach the SDK? → A: Yes.
+  `AGENT_API_KEY` is required for `anthropic` and `openai`; when it is missing or blank the first
+  LLM call raises a clear `LLMError` that names `AGENT_API_KEY`. The key is passed explicitly to
+  the SDK client (`anthropic.Anthropic(api_key=...)`, `openai.OpenAI(api_key=...)`), so SDK
+  environment auto-detection is not used.
+- Q: What happens when `AGENT_MODEL` is blank? → A: The provider's documented default is used:
+  `anthropic` -> `claude-opus-5-5`, `openai` -> `gpt-5-mini`. This is why the provider must be
+  set explicitly.
+- Q: What does `.env.example` show? → A: All three variables, with `LLM_PROVIDER` and
+  `AGENT_API_KEY` marked required and `AGENT_MODEL` marked optional with the two defaults.
+- Q: Does mock mode need any of them? → A: No. With `MOCK_LLM=1` all three may be unset, no
+  error is raised, and every test stays offline.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -485,7 +510,12 @@ ask an in-paper question (answer cites valid page numbers) and an outside questi
   live and mock mode alike (mock answers only when the question shares a content word with a
   paper in the set), and MUST refuse without a model call when the set is empty or none of its
   papers is stored.
-- **FR-011**: A mock mode MUST run the full flow with no network and no model key.
+- **FR-011**: A mock mode MUST run the full flow with no network and no model key. Live mode
+  MUST be configured by exactly `LLM_PROVIDER` (`anthropic` | `openai`, required),
+  `AGENT_API_KEY` (required, passed explicitly to the SDK client) and `AGENT_MODEL` (optional,
+  blank means the provider default); a missing or unknown provider or a missing key MUST raise a
+  clear error naming the variable at the first LLM call, and the old provider-specific variable
+  names MUST NOT be read (Session 2026-10-20 (LLM config)).
 - **FR-012** (v2; visual source updated in v4, see FR-030): The UI MUST follow DESIGN.md and
   PRODUCT.md, show rank and reason at a glance,
   critique one click away, citations as links to the cited paper, a visible mock-mode label,
@@ -672,7 +702,8 @@ ask an in-paper question (answer cites valid page numbers) and an outside questi
 - Single local user; no auth, multi-user, or deployment (constitution IV).
 - arXiv is the only search source; other hosts are supported only as direct PDF URLs.
 - Two-column PDF text may be out of order; acceptable for triage.
-- Model chosen by env setting with a documented default; no model id hard-coded elsewhere.
+- Model chosen by the `AGENT_MODEL` env setting with one documented default per provider (in
+  config only); no model id hard-coded elsewhere. The provider (`LLM_PROVIDER`) has no default.
 - Text extraction uses a permissive-license library behind one swap point (AGPL alternative not
   bundled).
 - Visual style follows DESIGN.md and PRODUCT.md. (v2 used an Airtable-style DESIGN.md with a

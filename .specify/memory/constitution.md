@@ -1,16 +1,18 @@
 <!--
 Sync Impact Report
-- Version: 1.1.0 -> 2.0.0 (MAJOR: principle III scope redefined with a second chat scope;
-  principle IV scope cap redefined)
-- Modified principles: I. Small (vendored same-origin static JS libraries allowed, no
-  framework, no build step); II. Offline-Testable (PDF downloads injectable, fixture PDF in mock
-  mode); III. Grounded Answers (adds per-paper chat scope with page citations); IV. One-Page
-  Scope (cap 9 user stories / 32 FRs; views via hash routes on one page; in-process background
-  download allowed; locally stored PDFs for saved papers)
+- Version: 2.0.0 -> 2.1.0 (MINOR: LLM configuration contract materially changed; openai added
+  to allowed core deps; no principle removed or redefined)
+- Modified principles: I. Small (allowed core deps add openai, the second LLM provider SDK);
+  II. Offline-Testable (tests MUST NOT require AGENT_API_KEY / LLM_PROVIDER / AGENT_MODEL;
+  MOCK_LLM=1 needs none of them)
+- Modified sections: Technical Constraints (LLM env = exactly LLM_PROVIDER, AGENT_API_KEY,
+  AGENT_MODEL; ANTHROPIC_API_KEY, OPENAI_API_KEY, ANTHROPIC_MODEL, OPENAI_MODEL removed with no
+  fallback; key passed explicitly to the SDK client; config errors raised at first LLM call)
 - Added sections: none
 - Removed sections: none
 - Templates: plan/spec/tasks templates read this file at runtime; no edits needed
-- Deferred TODOs: PRODUCT.md Library section (designer drafting; orchestrator owns)
+- Deferred TODOs: CLAUDE.md "Defaults" still names ANTHROPIC_MODEL / ANTHROPIC_API_KEY
+  (orchestrator owns CLAUDE.md)
 -->
 # Paper Triage Assistant Constitution
 
@@ -22,7 +24,7 @@ Sync Impact Report
   `src/`. Each LLM-using agent (summarizer, critic, ranker, chat, paper chat) has exactly one
   prompt file; the fetcher makes no LLM calls. No agent framework, no orchestration library.
 - New dependencies MUST be justified in plan.md; prefer stdlib. Allowed core deps: fastapi,
-  uvicorn, httpx, pydantic, anthropic, pypdf. Dev: pytest, ruff, pytest-playwright (plus the
+  uvicorn, httpx, pydantic, anthropic, openai, pypdf. Dev: pytest, ruff, pytest-playwright (plus the
   Playwright chromium browser, installed once with `uv run playwright install chromium` and
   recorded in SETUP_LOG.md) for real-browser e2e tests only.
 - Front end: vanilla HTML/JS/CSS, no framework, no bundler, no build step. Third-party browser
@@ -38,7 +40,8 @@ Rationale: a single user tool; size is the main source of bugs and cost.
   `MOCK_LLM=1` returns deterministic canned outputs valid against the same Pydantic schemas.
 - All network (arXiv API, PDF download for triage and for saved papers) goes through injectable
   fetch functions; tests use fixtures (mock mode serves a fixture PDF) and MUST NOT touch the
-  network or require `ANTHROPIC_API_KEY`.
+  network or require any LLM setting: with `MOCK_LLM=1`, `LLM_PROVIDER`, `AGENT_API_KEY` and
+  `AGENT_MODEL` may all be unset.
 - Browser e2e tests run against a local server on 127.0.0.1 with `MOCK_LLM=1`; the page
   MUST load no external assets (fonts, scripts, CDNs), so the browser needs no network.
 - `pytest` and `ruff check` MUST pass offline before any task is marked done.
@@ -84,9 +87,15 @@ Rationale: skeptical triage is the purpose.
 
 ## Technical Constraints
 
-Python 3.11+, uv, FastAPI, SQLite (stdlib `sqlite3`), Anthropic SDK. Model from
-`ANTHROPIC_MODEL` env (documented default only in config), key from `ANTHROPIC_API_KEY`.
-arXiv API and arXiv PDF downloads: max 1 request per 3 s, results cached in SQLite. Saved PDFs
+Python 3.11+, uv, FastAPI, SQLite (stdlib `sqlite3`), Anthropic SDK and OpenAI SDK (one
+selected per run). LLM configuration is exactly three env variables: `LLM_PROVIDER`
+(`anthropic` | `openai`, required, no default), `AGENT_API_KEY` (required for both providers,
+passed explicitly to the SDK client; SDK env auto-detection is not used) and `AGENT_MODEL`
+(optional; blank means the provider default; in code the default model ids live only in
+`config.py`, while README and `.env.example` may name them). The old names
+`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_MODEL` and `OPENAI_MODEL` are not read, with
+no fallback. A missing or invalid setting raises a clear `LLMError` naming the variable at the
+first LLM call, never at import. arXiv API and arXiv PDF downloads: max 1 request per 3 s, results cached in SQLite. Saved PDFs
 live as files in a git-ignored local data directory, capped at 50 MB each. Secrets only in
 `.env` (git-ignored). UI work MUST re-read DESIGN.md and PRODUCT.md first.
 
@@ -103,4 +112,4 @@ version (MAJOR: principle removed/redefined; MINOR: principle/section added; PAT
 record a Sync Impact Report. plan.md MUST include a Constitution Check; analyze treats
 principle violations as CRITICAL. Runtime guidance lives in CLAUDE.md.
 
-**Version**: 2.0.0 | **Ratified**: 2026-10-01 | **Last Amended**: 2026-10-03
+**Version**: 2.1.0 | **Ratified**: 2026-10-01 | **Last Amended**: 2026-10-20

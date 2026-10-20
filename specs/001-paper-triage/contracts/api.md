@@ -9,7 +9,12 @@ Single-page UI (`static/index.html`).
 ## GET /api/status
 
 `200 {"mock": bool, "model": str, "provider": "anthropic"|"openai", "paper_count": int}`
-(`provider` additive, T025; `model` is the active provider's model.)
+(`provider` additive, T025; `model` is the active provider's model.) T077 (LLM config,
+2026-10-20): `provider` is the trimmed, lowercased `LLM_PROVIDER` value and `model` is
+`AGENT_MODEL` or the provider default. The endpoint never fails on LLM config: when
+`LLM_PROVIDER` is unset or unknown, `provider` is that value (`""` when unset) and `model` is
+`AGENT_MODEL` or `""`; the configuration error surfaces only on the first LLM call. Shape and
+field names unchanged.
 
 ## POST /api/triage
 

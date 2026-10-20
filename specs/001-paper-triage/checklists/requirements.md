@@ -31,8 +31,9 @@
 
 ## Notes
 
-- Env var names (`ANTHROPIC_MODEL`) and id format in Clarifications are recorded decisions from
-  CLAUDE.md defaults, kept deliberately; not treated as leakage.
+- Env var names (`LLM_PROVIDER`, `AGENT_API_KEY`, `AGENT_MODEL`) and id format in
+  Clarifications and FR-011 are recorded, user-approved decisions, kept deliberately; not treated
+  as leakage.
 - v2 re-validation (2026-10-01): all items still pass. FR count is 15 (FR-001..FR-014 incl.
   FR-001a), at the constitution IV cap; stories stay at 3 (load-more and links fold into US1,
   chat scope into US2). arXiv URL patterns in FR-014 are the user-visible link targets, kept
@@ -53,3 +54,10 @@
   of pixel diff, behaviour-unchanged rule). Scope 9 stories / 32 FRs = constitution 2.0.0 cap.
   Font family names, WCAG levels and the 250 KB cap are user-visible or compliance limits, kept
   deliberately. Zero [NEEDS CLARIFICATION] markers.
+- LLM config re-validation (2026-10-20): all items pass (16/16 before and after; no state
+  change). The user-approved switch to exactly three LLM variables (`LLM_PROVIDER` required with
+  no default, `AGENT_API_KEY` required for both providers, `AGENT_MODEL` optional with a
+  provider default) is recorded under Clarifications "Session 2026-10-20 (LLM config)" and folded
+  into FR-011 and the assumptions. The old names `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
+  `ANTHROPIC_MODEL` and `OPENAI_MODEL` are removed with no fallback. No new FR or story; scope
+  stays 9 stories / 32 FRs. Zero [NEEDS CLARIFICATION] markers.
