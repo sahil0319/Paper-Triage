@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from . import db, paper_chat, pdfstore
 from .chat import answer as chat_answer
 from .config import get_settings
-from .llm import LLMError, get_client
+from .llm import LazyClient, LLMError
 from .models import LibraryItem
 from .net import make_http
 from .pipeline import (
@@ -173,7 +173,7 @@ def create_app() -> FastAPI:
         db.init_schema(conn)
         app.state.conn = conn
         app.state.http = make_http(s.mock)
-        app.state.llm = get_client()
+        app.state.llm = LazyClient()  # LLM config errors surface at the first call, not startup
         app.state.lock = threading.Lock()  # one sqlite connection, one user
         Path(s.data_dir).mkdir(parents=True, exist_ok=True)
         pdfstore.sweep_pending(conn)
@@ -205,6 +205,11 @@ def create_app() -> FastAPI:
         if not 1 <= body.max_results <= get_settings().max_papers:
             raise HTTPException(422, f"max_results must be 1..{get_settings().max_papers}")
         st = request.app.state
+        if isinstance(st.llm, LazyClient):
+            try:
+                st.llm.ensure()
+            except LLMError as e:
+                raise HTTPException(502, f"model call failed: {e}") from e
         with st.lock:
             try:
                 return triage(

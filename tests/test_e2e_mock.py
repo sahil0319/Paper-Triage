@@ -13,7 +13,16 @@ from paper_triage.app import create_app
 def client(tmp_db, tmp_path, monkeypatch):
     monkeypatch.setenv("MOCK_LLM", "1")
     monkeypatch.setenv("PAPER_TRIAGE_DATA_DIR", str(tmp_path / "data"))
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    for k in (
+        "LLM_PROVIDER",
+        "AGENT_API_KEY",
+        "AGENT_MODEL",
+        "ANTHROPIC_API_KEY",
+        "OPENAI_API_KEY",
+        "ANTHROPIC_MODEL",
+        "OPENAI_MODEL",
+    ):
+        monkeypatch.delenv(k, raising=False)
     monkeypatch.setenv("PAPER_TRIAGE_DB", tmp_db)
 
     def no_connect(self, *a, **k):

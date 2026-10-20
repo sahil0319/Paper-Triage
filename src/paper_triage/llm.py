@@ -1,9 +1,9 @@
 """Single LLM wrapper. Every model call goes through an LLMClient; MOCK_LLM=1 swaps in MockClient.
 
-LLM_PROVIDER picks anthropic (default) or openai; MOCK_LLM=1 wins over both."""
+LLM_PROVIDER (anthropic or openai, required) picks the client, AGENT_API_KEY is its key and
+AGENT_MODEL its model; MOCK_LLM=1 needs none of them."""
 
 import hashlib
-import os
 import re
 from typing import Protocol, TypeVar
 
@@ -124,8 +124,9 @@ class MockClient:
 class AnthropicClient:
     """Real client. SDK imported and constructed lazily so no key/network is needed to build it."""
 
-    def __init__(self, model: str, client=None):
+    def __init__(self, model: str, api_key: str = "", client=None):
         self.model = model
+        self._api_key = api_key
         self._client = client
 
     @property
@@ -133,7 +134,7 @@ class AnthropicClient:
         if self._client is None:
             import anthropic
 
-            self._client = anthropic.Anthropic()
+            self._client = anthropic.Anthropic(api_key=self._api_key)
         return self._client
 
     def _call(self, fn, **kwargs):
@@ -180,8 +181,9 @@ class AnthropicClient:
 class OpenAIClient:
     """OpenAI chat-completions client. SDK imported and constructed lazily (key checked in get_client)."""
 
-    def __init__(self, model: str, client=None):
+    def __init__(self, model: str, api_key: str = "", client=None):
         self.model = model
+        self._api_key = api_key
         self._client = client
 
     @property
@@ -189,7 +191,7 @@ class OpenAIClient:
         if self._client is None:
             import openai
 
-            self._client = openai.OpenAI()  # reads OPENAI_API_KEY
+            self._client = openai.OpenAI(api_key=self._api_key)
         return self._client
 
     def _call(self, fn, **kwargs):
@@ -238,10 +240,32 @@ def get_client() -> LLMClient:
     s = get_settings()
     if s.mock:
         return MockClient()
-    if s.provider == "anthropic":
-        return AnthropicClient(model=s.model)
+    if not s.provider:
+        raise LLMError("LLM_PROVIDER is not set (use 'anthropic' or 'openai')")
+    if s.provider not in ("anthropic", "openai"):
+        raise LLMError(f"unknown LLM_PROVIDER {s.provider!r} (use 'anthropic' or 'openai')")
+    if not s.api_key:
+        raise LLMError(f"AGENT_API_KEY is not set (required for LLM_PROVIDER={s.provider})")
     if s.provider == "openai":
-        if not os.environ.get("OPENAI_API_KEY"):
-            raise LLMError("LLM_PROVIDER=openai but OPENAI_API_KEY is not set")
-        return OpenAIClient(model=s.model)
-    raise LLMError(f"unknown LLM_PROVIDER {s.provider!r} (use 'anthropic' or 'openai')")
+        return OpenAIClient(model=s.model, api_key=s.api_key)
+    return AnthropicClient(model=s.model, api_key=s.api_key)
+
+
+class LazyClient:
+    """Defers get_client() to the first call, so app startup never fails on LLM config.
+
+    A config error (LLMError) is raised at the first parse/text/ensure call and is not cached."""
+
+    def __init__(self):
+        self._client: LLMClient | None = None
+
+    def ensure(self) -> LLMClient:
+        if self._client is None:
+            self._client = get_client()
+        return self._client
+
+    def parse(self, system: str, user: str, schema: type[T]) -> T:
+        return self.ensure().parse(system, user, schema)
+
+    def text(self, system: str, user: str) -> str:
+        return self.ensure().text(system, user)

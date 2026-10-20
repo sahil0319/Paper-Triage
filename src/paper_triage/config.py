@@ -12,7 +12,8 @@ class Settings:
     model: str
     mock: bool
     db_path: str
-    provider: str = "anthropic"
+    provider: str = ""  # LLM_PROVIDER, no default; validated at the first LLM call
+    api_key: str = ""  # AGENT_API_KEY
     max_papers: int = 20
     default_papers: int = 10
     text_cap: int = 40000
@@ -33,14 +34,14 @@ def _concurrency() -> int:
 
 
 def get_settings() -> Settings:
-    provider = (os.environ.get("LLM_PROVIDER") or "anthropic").strip().lower()
-    if provider == "openai":
-        model = os.environ.get("OPENAI_MODEL") or DEFAULT_OPENAI_MODEL
-    else:
-        model = os.environ.get("ANTHROPIC_MODEL") or DEFAULT_MODEL
+    """Read env at call time. Never raises: LLM config errors surface in llm.get_client()."""
+    provider = (os.environ.get("LLM_PROVIDER") or "").strip().lower()
+    default_model = {"anthropic": DEFAULT_MODEL, "openai": DEFAULT_OPENAI_MODEL}.get(provider, "")
+    model = (os.environ.get("AGENT_MODEL") or "").strip() or default_model
     return Settings(
         model=model,
         provider=provider,
+        api_key=(os.environ.get("AGENT_API_KEY") or "").strip(),
         mock=os.environ.get("MOCK_LLM") == "1",
         db_path=os.environ.get("PAPER_TRIAGE_DB") or "./paper_triage.db",
         concurrency=_concurrency(),

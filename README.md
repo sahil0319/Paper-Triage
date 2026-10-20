@@ -125,24 +125,25 @@ Mock (offline, canned LLM output and bundled arXiv fixtures, no key needed):
 MOCK_LLM=1 uv run uvicorn paper_triage.app:app
 ```
 
-Live (real arXiv and Claude):
+Live (real arXiv and a real model). Three variables configure the model:
+
+| Variable | Required | Meaning |
+|---|---|---|
+| `LLM_PROVIDER` | yes | `anthropic` or `openai` (trimmed, case-insensitive; no default) |
+| `AGENT_API_KEY` | yes | API key for the chosen provider |
+| `AGENT_MODEL` | no | model id; blank means `claude-opus-5-5` (anthropic) or `gpt-5-mini` (openai) |
 
 ```sh
-export ANTHROPIC_API_KEY=...        # your key
-export ANTHROPIC_MODEL=...          # model id to use
-uv run uvicorn paper_triage.app:app
-```
-
-Live with OpenAI instead of Claude (`LLM_PROVIDER` is `anthropic` by default; `MOCK_LLM=1` wins over both):
-
-```sh
-# in .env (blank values in .env.example): LLM_PROVIDER=openai, OPENAI_API_KEY=..., OPENAI_MODEL=...
+# in .env (copy .env.example): LLM_PROVIDER=anthropic, AGENT_API_KEY=..., AGENT_MODEL=
 set -a; source .env; set +a
 uv run uvicorn paper_triage.app:app
 ```
 
-`OPENAI_MODEL` defaults to `gpt-5-mini`; confirm that id is available to your key, or set your own.
-Startup fails with a clear error if `LLM_PROVIDER=openai` and `OPENAI_API_KEY` is unset.
+The app starts without these variables. A missing or invalid `LLM_PROVIDER`, or a missing
+`AGENT_API_KEY`, raises a clear error at the first model call (for example the first search).
+`MOCK_LLM=1` needs none of the three. The old names `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
+`ANTHROPIC_MODEL` and `OPENAI_MODEL` are no longer read. Confirm that the default `gpt-5-mini`
+id is available to your key, or set `AGENT_MODEL`.
 
 `TRIAGE_CONCURRENCY` (default 4, min 1) sets how many papers are summarized/critiqued/ranked in
 parallel (summarizer and critic also overlap within a paper). `1` = fully sequential. Fetching and

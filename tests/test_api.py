@@ -14,11 +14,13 @@ def client(tmp_db, monkeypatch):
         yield c
 
 
-def test_status_mock(client):
+def test_status_mock(client, monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "anthropic")
+    monkeypatch.delenv("AGENT_MODEL", raising=False)
     r = client.get("/api/status")
     assert r.status_code == 200
     body = r.json()
-    assert body["mock"] is True and body["model"] and body["paper_count"] == 0
+    assert body["mock"] is True and body["model"] == "claude-opus-5-5" and body["paper_count"] == 0
     assert body["provider"] == "anthropic"
 
 
