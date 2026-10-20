@@ -155,6 +155,16 @@ def _item(conn, saved: dict) -> dict:
     return LibraryItem(**library_item(conn, saved)).model_dump()
 
 
+
+class _RevalidatedStatic(StaticFiles):
+    """Static files the browser must revalidate on every load, so UI updates show up without a hard refresh."""
+
+    def file_response(self, *args, **kwargs):
+        resp = super().file_response(*args, **kwargs)
+        resp.headers.setdefault("Cache-Control", "no-cache")
+        return resp
+
+
 def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -400,7 +410,7 @@ def create_app() -> FastAPI:
                 raise HTTPException(404, "unknown annotation")
         return Response(status_code=204)
 
-    app.mount("/", StaticFiles(directory=STATIC, html=True), name="static")
+    app.mount("/", _RevalidatedStatic(directory=STATIC, html=True), name="static")
     return app
 
 
