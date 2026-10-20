@@ -1,5 +1,7 @@
 # Paper Triage Assistant
 
+**Repository:** [github.com/sahil0319/Paper-Triage](https://github.com/sahil0319/Paper-Triage)
+
 Cut a pile of new papers down to the few worth opening, with an honest critique of each.
 
 Give it a topic, or arXiv IDs and PDF URLs. It fetches the papers, summarizes each one, critiques it
